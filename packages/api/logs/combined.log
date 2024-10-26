@@ -1257,3 +1257,9 @@ PostGIS Version:
 [2024-10-25 21:42:48] info: WebSocket server started on port 3004
 [2024-10-25 21:42:48] info: 🚀 HTTP Server running on port 3001
 [2024-10-25 21:42:48] info: Database connection verified:
+[2024-10-25 21:43:28] info: POST /api/accounts
+[2024-10-25 21:43:28] info: POST /api/accounts
+[2024-10-25 21:43:29] info: POST /api/accounts 201 941ms
+[2024-10-25 21:43:36] info: GET /api/accounts/39f407d5-f392-48c3-ab68-a90b85a44bf6
+[2024-10-25 21:43:36] info: GET /api/accounts/39f407d5-f392-48c3-ab68-a90b85a44bf6
+[2024-10-25 21:43:37] info: GET /api/accounts/39f407d5-f392-48c3-ab68-a90b85a44bf6 200 95ms
