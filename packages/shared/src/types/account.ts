@@ -1,8 +1,9 @@
 export interface BillingAddress {
-    street: string;
+    address1: string;
+    address2?: string;
     city: string;
-    state: string;
-    zipCode: string;
+    province: string;
+    postalCode: string;
     country: string;
 }
 
@@ -11,6 +12,7 @@ export type AccountStatus = 'active' | 'inactive' | 'suspended';
 export interface Account {
     id: string;
     name: string;
+    is_company: boolean;
     billingAddress?: BillingAddress;
     status: AccountStatus;
     createdAt: string;
@@ -19,12 +21,14 @@ export interface Account {
 
 export interface CreateAccountDto {
     name: string;
+    is_company: boolean;
     billingAddress?: BillingAddress;
     status?: AccountStatus;
 }
 
 export interface UpdateAccountDto {
     name?: string;
+    is_company?: boolean;
     billingAddress?: BillingAddress;
     status?: AccountStatus;
 }
@@ -32,6 +36,7 @@ export interface UpdateAccountDto {
 export interface AccountResponse {
     id: string;
     name: string;
+    is_company: boolean;
     billingAddress?: BillingAddress;
     status: AccountStatus;
     createdAt: string;

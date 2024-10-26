@@ -1,10 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Chip } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { mockAccounts, Account } from '../../services/mockData';
-import { dataGridStyles } from '../../styles/dataGrid';
+import { dataGridStyles } from '@/styles/dataGrid';
+import { getAccounts } from '@/services/api';
+import { Account } from '@fieldhive/shared';
+
+interface AccountsTableProps {
+    refreshTrigger: number;
+}
 
 const getStatusColor = (status: string) => {
     switch (status) {
@@ -33,7 +38,7 @@ const columns: GridColDef[] = [
         minWidth: 200,
         valueGetter: (params) => {
             const address = params.value;
-            return `${address.city}, ${address.state}`;
+            return address ? `${address.city}, ${address.province}` : '';
         }
     },
     {
@@ -63,22 +68,45 @@ const columns: GridColDef[] = [
     }
 ];
 
-export default function AccountsTable() {
-    const [paginationModel, setPaginationModel] = useState({
-        pageSize: 5,
-        page: 0
-    });
-    const [accounts] = useState<Account[]>(mockAccounts);
+export default function AccountsTable({ refreshTrigger }: AccountsTableProps) {
+    const [page, setPage] = useState(0);
+    const [pageSize, setPageSize] = useState(5);
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [totalRows, setTotalRows] = useState(0);
+
+    useEffect(() => {
+        const fetchAccounts = async () => {
+            try {
+                setLoading(true);
+                const response = await getAccounts(page + 1, pageSize);
+                setAccounts(response.accounts);
+                setTotalRows(response.total);
+            } catch (error) {
+                console.error('Failed to fetch accounts:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAccounts();
+    }, [page, pageSize, refreshTrigger]);
 
     return (
         <Box sx={{ height: 400, width: '100%' }}>
             <DataGrid
                 rows={accounts}
                 columns={columns}
-                paginationModel={paginationModel}
-                onPaginationModelChange={setPaginationModel}
-                pageSizeOptions={[5, 10, 20]}
-                disableRowSelectionOnClick
+                getRowId={(row) => row.id}
+                rowCount={totalRows}
+                loading={loading}
+                paginationMode="server"
+                page={page}
+                pageSize={pageSize}
+                onPageChange={(newPage) => setPage(newPage)}
+                onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
+                rowsPerPageOptions={[5, 10, 20]}
+                disableSelectionOnClick
                 sx={dataGridStyles}
             />
         </Box>

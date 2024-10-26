@@ -1,15 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Box, Typography, Button, TextField, InputAdornment } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
+import { Box, Typography, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import AddAccountDialog from './AddAccountDialog';
-import { Account } from '../../services/mockData';
 
-export default function AccountsHeader() {
+interface AccountsHeaderProps {
+    onAccountCreated: () => void;
+}
+
+export default function AccountsHeader({ onAccountCreated }: AccountsHeaderProps) {
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
 
     const handleOpenAddDialog = () => {
         setIsAddDialogOpen(true);
@@ -19,9 +20,8 @@ export default function AccountsHeader() {
         setIsAddDialogOpen(false);
     };
 
-    const handleAddAccount = (account: Account) => {
-        // TODO: Implement account creation logic
-        console.log('New account:', account);
+    const handleSuccess = () => {
+        onAccountCreated();
     };
 
     return (
@@ -44,47 +44,10 @@ export default function AccountsHeader() {
                 </Button>
             </Box>
 
-            <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                <TextField
-                    fullWidth
-                    variant="outlined"
-                    placeholder="Search accounts..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <SearchIcon sx={{ color: 'text.secondary' }} />
-                            </InputAdornment>
-                        ),
-                        sx: {
-                            backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                            '&:hover': {
-                                backgroundColor: 'rgba(15, 23, 42, 0.8)'
-                            }
-                        }
-                    }}
-                    sx={{
-                        maxWidth: 400,
-                        '& .MuiOutlinedInput-root': {
-                            '& fieldset': {
-                                borderColor: 'rgba(148, 163, 184, 0.2)'
-                            },
-                            '&:hover fieldset': {
-                                borderColor: 'rgba(148, 163, 184, 0.3)'
-                            },
-                            '&.Mui-focused fieldset': {
-                                borderColor: 'primary.main'
-                            }
-                        }
-                    }}
-                />
-            </Box>
-
-            <AddAccountDialog 
-                open={isAddDialogOpen} 
-                onClose={handleCloseAddDialog} 
-                onSubmit={handleAddAccount}
+            <AddAccountDialog
+                open={isAddDialogOpen}
+                onClose={handleCloseAddDialog}
+                onSuccess={handleSuccess}
             />
         </Box>
     );
