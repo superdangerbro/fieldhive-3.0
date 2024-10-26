@@ -1,0 +1,47 @@
+{
+  "name": "@fieldhive/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint \"src/**/*.ts\"",
+    "clean": "rm -rf .turbo && rm -rf node_modules && rm -rf dist",
+    "check-db": "ts-node src/scripts/check-db.ts",
+    "typeorm": "typeorm-ts-node-commonjs",
+    "migration:generate": "ts-node src/scripts/generate-migration.ts",
+    "migration:create": "typeorm migration:create",
+    "migration:run": "ts-node src/scripts/run-migrations.ts",
+    "migration:revert": "ts-node src/scripts/revert-migration.ts"
+  },
+  "dependencies": {
+    "@fieldhive/shared": "workspace:*",
+    "@types/cors": "^2.8.14",
+    "@types/express": "^4.17.18",
+    "@types/geojson": "^7946.0.14",
+    "@types/node": "^20.8.0",
+    "@types/pg": "^8.10.3",
+    "@types/winston": "^2.4.4",
+    "@types/ws": "^8.5.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "express-async-handler": "^1.2.0",
+    "geojson": "^0.5.0",
+    "helmet": "^7.0.0",
+    "pg": "^8.11.3",
+    "reflect-metadata": "^0.1.13",
+    "typeorm": "^0.3.17",
+    "winston": "^3.15.0",
+    "ws": "^8.14.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/reflect-metadata": "^0.1.0",
+    "eslint": "^8.50.0",
+    "ts-node": "^10.9.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.2.2"
+  }
+}

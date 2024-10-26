@@ -1,0 +1,30 @@
+{
+  "name": "fieldhive",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm run --parallel dev",
+    "build": "pnpm run --parallel build",
+    "lint": "pnpm run --parallel lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "api:dev": "pnpm --filter @fieldhive/api dev",
+    "web:dev": "pnpm --filter @fieldhive/web dev",
+    "shared:build": "pnpm --filter @fieldhive/shared build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.3",
+    "@typescript-eslint/parser": "^6.7.3",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
+    "prettier": "^3.0.3",
+    "typescript": "^5.2.2"
+  },
+  "packageManager": "pnpm@8.8.0",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
