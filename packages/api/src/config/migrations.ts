@@ -2,6 +2,7 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 import { DataSource } from 'typeorm';
 import { logger } from '../utils/logger';
+import { Property } from '../entities/Property';
 
 // Load environment variables
 const envPath = resolve(__dirname, '../../.env');
@@ -9,33 +10,27 @@ config({ path: envPath });
 
 // Log connection details (without sensitive info)
 logger.info('Database connection details:', {
-  host: process.env.POSTGRES_HOST,
-  port: process.env.POSTGRES_PORT,
-  database: process.env.POSTGRES_DB,
-  username: process.env.POSTGRES_USER
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  username: process.env.DB_USER
 });
 
 // This configuration is specifically for running migrations
 export const MigrationDataSource = new DataSource({
   type: 'postgres',
-  host: process.env.POSTGRES_HOST,
-  port: Number(process.env.POSTGRES_PORT),
-  username: process.env.POSTGRES_USER,
-  password: process.env.POSTGRES_PASSWORD,
-  database: process.env.POSTGRES_DB,
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT),
+  username: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
   // Disable synchronization for migrations
   synchronize: false,
   logging: true,
-  entities: ['src/entities/**/*.ts'],
-  migrations: ['src/migrations/**/*.ts'],
-  subscribers: ['src/subscribers/**/*.ts'],
+  entities: [Property],
+  migrations: [resolve(__dirname, '../migrations/*{.ts,.js}')],
   ssl: {
     rejectUnauthorized: false
-  },
-  extra: {
-    ssl: {
-      rejectUnauthorized: false
-    }
   }
 });
 

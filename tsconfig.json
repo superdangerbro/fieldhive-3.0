@@ -10,7 +10,8 @@
   },
   "references": [
     { "path": "./packages/shared" },
-    { "path": "./packages/api" }
+    { "path": "./packages/api" },
+    { "path": "./packages/web" }
   ],
   "files": []
 }

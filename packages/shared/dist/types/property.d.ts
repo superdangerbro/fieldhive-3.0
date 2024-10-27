@@ -1,40 +1,5 @@
 import { Point, Polygon } from 'geojson';
-import { Account } from './account';
-export interface Property {
-    id: string;
-    name: string;
-    address: string;
-    location: Point;
-    boundary?: Polygon;
-    area?: number;
-    accounts: PropertyAccount[];
-    status: PropertyStatus;
-    type: PropertyType;
-    createdAt: string;
-    updatedAt: string;
-}
-export interface PropertyAccount {
-    propertyId: string;
-    accountId: string;
-    account: Account;
-    role: PropertyAccountRole;
-    createdAt: string;
-    updatedAt: string;
-}
-export interface Job {
-    id: string;
-    propertyId: string;
-    property: Property;
-    name: string;
-    description?: string;
-    status: JobStatus;
-    startDate?: string;
-    endDate?: string;
-    type: JobType;
-    priority: JobPriority;
-    createdAt: string;
-    updatedAt: string;
-}
+import { AccountRole } from './account';
 export declare enum PropertyStatus {
     ACTIVE = "active",
     INACTIVE = "inactive",
@@ -47,33 +12,22 @@ export declare enum PropertyType {
     AGRICULTURAL = "agricultural",
     MIXED_USE = "mixed_use"
 }
-export declare enum PropertyAccountRole {
-    OWNER = "owner",
-    MANAGER = "manager",
-    TENANT = "tenant",
-    CONTRACTOR = "contractor"
+export interface PropertyAccount {
+    accountId: string;
+    name: string;
+    role: AccountRole;
 }
-export declare enum JobStatus {
-    DRAFT = "draft",
-    SCHEDULED = "scheduled",
-    IN_PROGRESS = "in_progress",
-    ON_HOLD = "on_hold",
-    COMPLETED = "completed",
-    CANCELLED = "cancelled"
-}
-export declare enum JobType {
-    INSPECTION = "inspection",
-    MAINTENANCE = "maintenance",
-    INSTALLATION = "installation",
-    REPAIR = "repair",
-    SURVEY = "survey",
-    OTHER = "other"
-}
-export declare enum JobPriority {
-    LOW = "low",
-    MEDIUM = "medium",
-    HIGH = "high",
-    URGENT = "urgent"
+export interface Property {
+    id: string;
+    name: string;
+    address: string;
+    location: Point;
+    boundary?: Polygon;
+    type: PropertyType;
+    status: PropertyStatus;
+    accounts: PropertyAccount[];
+    createdAt: string;
+    updatedAt: string;
 }
 export interface CreatePropertyRequest {
     name: string;
@@ -83,7 +37,7 @@ export interface CreatePropertyRequest {
     type: PropertyType;
     accountConnections: {
         accountId: string;
-        role: PropertyAccountRole;
+        role: AccountRole;
     }[];
 }
 export interface UpdatePropertyRequest {
@@ -94,41 +48,13 @@ export interface UpdatePropertyRequest {
     type?: PropertyType;
     status?: PropertyStatus;
 }
-export interface CreateJobRequest {
-    propertyId: string;
-    name: string;
-    description?: string;
-    type: JobType;
-    priority: JobPriority;
-    startDate?: string;
-    endDate?: string;
-}
-export interface UpdateJobRequest {
-    name?: string;
-    description?: string;
-    status?: JobStatus;
-    type?: JobType;
-    priority?: JobPriority;
-    startDate?: string;
-    endDate?: string;
-}
-export interface PropertyResponse {
-    success: boolean;
-    data: Property;
+export interface PropertyResponse extends Property {
 }
 export interface PropertiesResponse {
-    success: boolean;
-    data: Property[];
+    properties: Property[];
     total: number;
-}
-export interface JobResponse {
-    success: boolean;
-    data: Job;
-}
-export interface JobsResponse {
-    success: boolean;
-    data: Job[];
-    total: number;
+    page: number;
+    pageSize: number;
 }
 export interface PropertySearchParams {
     query?: string;
@@ -146,18 +72,4 @@ export interface PropertySearchParams {
     sortBy?: keyof Property;
     sortOrder?: 'asc' | 'desc';
 }
-export interface JobSearchParams {
-    query?: string;
-    propertyId?: string;
-    status?: JobStatus;
-    type?: JobType;
-    priority?: JobPriority;
-    dateRange?: {
-        start: string;
-        end: string;
-    };
-    page?: number;
-    limit?: number;
-    sortBy?: keyof Job;
-    sortOrder?: 'asc' | 'desc';
-}
+//# sourceMappingURL=property.d.ts.map

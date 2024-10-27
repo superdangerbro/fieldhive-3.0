@@ -107,3 +107,4 @@ export interface ChartWidgetProps extends DashboardWidgetProps {
     type: 'line' | 'bar' | 'pie' | 'doughnut';
     height?: number;
 }
+//# sourceMappingURL=dashboard.d.ts.map

@@ -10,3 +10,4 @@ var SensorType;
     SensorType["WATER_LEVEL"] = "water_level";
     SensorType["SOIL_MOISTURE"] = "soil_moisture";
 })(SensorType || (exports.SensorType = SensorType = {}));
+//# sourceMappingURL=sensor.js.map

@@ -16,3 +16,4 @@ var FieldStatus;
     FieldStatus["MAINTENANCE"] = "maintenance";
     FieldStatus["MONITORING"] = "monitoring";
 })(FieldStatus || (exports.FieldStatus = FieldStatus = {}));
+//# sourceMappingURL=field.js.map

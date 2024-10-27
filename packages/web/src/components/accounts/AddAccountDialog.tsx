@@ -16,7 +16,8 @@ import {
     Alert,
     Snackbar
 } from '@mui/material';
-import { createAccount } from '@/services/api';
+import { createAccount } from '../../services/api';
+import type { CreateAccountDto, BillingAddress } from '@fieldhive/shared';
 
 export interface AddAccountDialogProps {
     open: boolean;
@@ -24,26 +25,30 @@ export interface AddAccountDialogProps {
     onSuccess: () => void;
 }
 
-interface AccountFormData {
+type AccountFormData = {
     name: string;
-    is_company: boolean;
-    address1: string;
-    address2: string;
-    city: string;
-    province: string;
-    postalCode: string;
-    country: string;
-}
+    isCompany: boolean;
+    billingAddress: {
+        address1: string;
+        address2?: string;
+        city: string;
+        province: string;
+        postalCode: string;
+        country: string;
+    };
+};
 
 const initialFormData: AccountFormData = {
     name: '',
-    is_company: false,
-    address1: '',
-    address2: '',
-    city: '',
-    province: '',
-    postalCode: '',
-    country: 'Canada'
+    isCompany: false,
+    billingAddress: {
+        address1: '',
+        address2: '',
+        city: '',
+        province: '',
+        postalCode: '',
+        country: 'Canada'
+    }
 };
 
 export default function AddAccountDialog({ open, onClose, onSuccess }: AddAccountDialogProps) {
@@ -53,10 +58,19 @@ export default function AddAccountDialog({ open, onClose, onSuccess }: AddAccoun
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value, type, checked } = e.target;
-        if (name === 'is_company') {
+        if (name === 'isCompany') {
             setFormData((prev) => ({
                 ...prev,
                 [name]: checked
+            }));
+        } else if (name.startsWith('billing.')) {
+            const field = name.replace('billing.', '') as keyof AccountFormData['billingAddress'];
+            setFormData((prev) => ({
+                ...prev,
+                billingAddress: {
+                    ...prev.billingAddress,
+                    [field]: value
+                }
             }));
         } else {
             setFormData((prev) => ({
@@ -72,17 +86,18 @@ export default function AddAccountDialog({ open, onClose, onSuccess }: AddAccoun
         setError(null);
         
         try {
-            const accountData = {
+            const accountData: CreateAccountDto = {
                 name: formData.name,
-                is_company: formData.is_company,
+                isCompany: formData.isCompany,
+                status: 'active',
                 billingAddress: {
-                    street: formData.address1,
-                    state: formData.province,
-                    city: formData.city,
-                    zipCode: formData.postalCode,
-                    country: formData.country
-                },
-                status: 'active' as const
+                    address1: formData.billingAddress.address1,
+                    address2: formData.billingAddress.address2,
+                    city: formData.billingAddress.city,
+                    province: formData.billingAddress.province,
+                    postalCode: formData.billingAddress.postalCode,
+                    country: formData.billingAddress.country
+                }
             };
 
             await createAccount(accountData);
@@ -142,8 +157,8 @@ export default function AddAccountDialog({ open, onClose, onSuccess }: AddAccoun
                                     <FormControlLabel
                                         control={
                                             <Switch
-                                                name="is_company"
-                                                checked={formData.is_company}
+                                                name="isCompany"
+                                                checked={formData.isCompany}
                                                 onChange={handleChange}
                                                 disabled={loading}
                                             />
@@ -153,65 +168,65 @@ export default function AddAccountDialog({ open, onClose, onSuccess }: AddAccoun
                                 </Grid>
                                 <Grid item xs={12}>
                                     <TextField
-                                        name="address1"
+                                        name="billing.address1"
                                         label="Address Line 1"
                                         fullWidth
                                         required
-                                        value={formData.address1}
+                                        value={formData.billingAddress.address1}
                                         onChange={handleChange}
                                         disabled={loading}
                                     />
                                 </Grid>
                                 <Grid item xs={12}>
                                     <TextField
-                                        name="address2"
+                                        name="billing.address2"
                                         label="Address Line 2"
                                         fullWidth
-                                        value={formData.address2}
+                                        value={formData.billingAddress.address2}
                                         onChange={handleChange}
                                         disabled={loading}
                                     />
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
                                     <TextField
-                                        name="city"
+                                        name="billing.city"
                                         label="City"
                                         fullWidth
                                         required
-                                        value={formData.city}
+                                        value={formData.billingAddress.city}
                                         onChange={handleChange}
                                         disabled={loading}
                                     />
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
                                     <TextField
-                                        name="province"
+                                        name="billing.province"
                                         label="Province"
                                         fullWidth
                                         required
-                                        value={formData.province}
+                                        value={formData.billingAddress.province}
                                         onChange={handleChange}
                                         disabled={loading}
                                     />
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
                                     <TextField
-                                        name="postalCode"
+                                        name="billing.postalCode"
                                         label="Postal Code"
                                         fullWidth
                                         required
-                                        value={formData.postalCode}
+                                        value={formData.billingAddress.postalCode}
                                         onChange={handleChange}
                                         disabled={loading}
                                     />
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
                                     <TextField
-                                        name="country"
+                                        name="billing.country"
                                         label="Country"
                                         fullWidth
                                         required
-                                        value={formData.country}
+                                        value={formData.billingAddress.country}
                                         onChange={handleChange}
                                         disabled={true}
                                     />

@@ -15,11 +15,11 @@ if (result.error) {
 
 // Verify environment variables
 const requiredEnvVars = [
-  'POSTGRES_HOST',
-  'POSTGRES_PORT',
-  'POSTGRES_USER',
-  'POSTGRES_PASSWORD',
-  'POSTGRES_DB'
+  'DB_HOST',
+  'DB_PORT',
+  'DB_USER',
+  'DB_PASSWORD',
+  'DB_NAME'
 ];
 
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
@@ -30,10 +30,10 @@ if (missingEnvVars.length > 0) {
 
 // Log connection details (without sensitive info)
 logger.info('Database connection details:', {
-  host: process.env.POSTGRES_HOST,
-  port: process.env.POSTGRES_PORT,
-  database: process.env.POSTGRES_DB,
-  username: process.env.POSTGRES_USER
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  username: process.env.DB_USER
 });
 
 async function main() {

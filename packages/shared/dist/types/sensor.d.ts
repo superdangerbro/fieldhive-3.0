@@ -81,3 +81,4 @@ export interface SensorAlert {
     resolved_at?: Date;
     metadata?: Record<string, any>;
 }
+//# sourceMappingURL=sensor.d.ts.map

@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Box, Chip } from '@mui/material';
+import { Box, Chip, IconButton, Tooltip } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { dataGridStyles } from '@/styles/dataGrid';
-import { getAccounts } from '@/services/api';
+import EditIcon from '@mui/icons-material/Edit';
+import { getAccounts } from '../../services/api';
 import { Account } from '@fieldhive/shared';
+import EditAccountDialog from './EditAccountDialog';
 
 interface AccountsTableProps {
     refreshTrigger: number;
@@ -24,49 +25,14 @@ const getStatusColor = (status: string) => {
     }
 };
 
-const columns: GridColDef[] = [
-    {
-        field: 'name',
-        headerName: 'Account Name',
-        flex: 1,
-        minWidth: 200
-    },
-    {
-        field: 'billingAddress',
-        headerName: 'Location',
-        flex: 1,
-        minWidth: 200,
-        valueGetter: (params) => {
-            const address = params.value;
-            return address ? `${address.city}, ${address.province}` : '';
-        }
-    },
-    {
-        field: 'status',
-        headerName: 'Status',
-        width: 120,
-        renderCell: (params) => (
-            <Chip
-                label={params.value}
-                color={getStatusColor(params.value) as any}
-                size="small"
-                sx={{ textTransform: 'capitalize' }}
-            />
-        )
-    },
-    {
-        field: 'createdAt',
-        headerName: 'Created',
-        width: 180,
-        valueGetter: (params) => new Date(params.value).toLocaleDateString()
-    },
-    {
-        field: 'updatedAt',
-        headerName: 'Last Updated',
-        width: 180,
-        valueGetter: (params) => new Date(params.value).toLocaleDateString()
-    }
-];
+const formatAddress = (address: any) => {
+    if (!address) return 'No address';
+    const parts = [];
+    if (address.address1) parts.push(address.address1);
+    if (address.city) parts.push(address.city);
+    if (address.province) parts.push(address.province);
+    return parts.length > 0 ? parts.join(', ') : 'No address';
+};
 
 export default function AccountsTable({ refreshTrigger }: AccountsTableProps) {
     const [page, setPage] = useState(0);
@@ -74,26 +40,108 @@ export default function AccountsTable({ refreshTrigger }: AccountsTableProps) {
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(true);
     const [totalRows, setTotalRows] = useState(0);
+    const [editAccount, setEditAccount] = useState<Account | null>(null);
+
+    const handleEdit = (account: Account) => {
+        setEditAccount(account);
+    };
+
+    const handleEditSuccess = () => {
+        fetchAccounts();
+    };
+
+    const columns: GridColDef[] = [
+        {
+            field: 'name',
+            headerName: 'Account Name',
+            flex: 1,
+            minWidth: 200
+        },
+        {
+            field: 'billingAddress',
+            headerName: 'Billing Address',
+            flex: 1,
+            minWidth: 200,
+            valueGetter: (params) => formatAddress(params.value)
+        },
+        {
+            field: 'properties',
+            headerName: 'Properties',
+            flex: 1,
+            minWidth: 200,
+            valueGetter: (params) => {
+                const properties = params.value || [];
+                return properties.length ? properties.map((p: any) => p.name).join(', ') : 'No properties';
+            }
+        },
+        {
+            field: 'isCompany',
+            headerName: 'Type',
+            width: 120,
+            valueGetter: (params) => params.value ? 'Company' : 'Individual'
+        },
+        {
+            field: 'status',
+            headerName: 'Status',
+            width: 120,
+            renderCell: (params) => (
+                <Chip
+                    label={params.value || 'Unknown'}
+                    color={getStatusColor(params.value) as any}
+                    size="small"
+                    sx={{ textTransform: 'capitalize' }}
+                />
+            )
+        },
+        {
+            field: 'createdAt',
+            headerName: 'Created',
+            width: 180,
+            valueGetter: (params) => params.value ? new Date(params.value).toLocaleDateString() : 'N/A'
+        },
+        {
+            field: 'updatedAt',
+            headerName: 'Last Updated',
+            width: 180,
+            valueGetter: (params) => params.value ? new Date(params.value).toLocaleDateString() : 'N/A'
+        },
+        {
+            field: 'actions',
+            headerName: 'Actions',
+            width: 100,
+            renderCell: (params) => (
+                <Tooltip title="Edit Account">
+                    <IconButton
+                        onClick={() => handleEdit(params.row)}
+                        size="small"
+                        sx={{ color: 'primary.main' }}
+                    >
+                        <EditIcon />
+                    </IconButton>
+                </Tooltip>
+            )
+        }
+    ];
+
+    const fetchAccounts = async () => {
+        try {
+            setLoading(true);
+            const response = await getAccounts(page + 1, pageSize);
+            setAccounts(response.accounts);
+            setTotalRows(response.total);
+        } catch (error) {
+            console.error('Failed to fetch accounts:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchAccounts = async () => {
-            try {
-                setLoading(true);
-                const response = await getAccounts(page + 1, pageSize);
-                setAccounts(response.accounts);
-                setTotalRows(response.total);
-            } catch (error) {
-                console.error('Failed to fetch accounts:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchAccounts();
     }, [page, pageSize, refreshTrigger]);
 
     return (
-        <Box sx={{ height: 400, width: '100%' }}>
+        <Box sx={{ height: 435, width: '100%' }}>
             <DataGrid
                 rows={accounts}
                 columns={columns}
@@ -107,7 +155,12 @@ export default function AccountsTable({ refreshTrigger }: AccountsTableProps) {
                 onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
                 rowsPerPageOptions={[5, 10, 20]}
                 disableSelectionOnClick
-                sx={dataGridStyles}
+            />
+            <EditAccountDialog
+                open={!!editAccount}
+                account={editAccount}
+                onClose={() => setEditAccount(null)}
+                onSuccess={handleEditSuccess}
             />
         </Box>
     );

@@ -9,6 +9,7 @@
     "lint": "eslint \"src/**/*.ts\"",
     "clean": "rm -rf .turbo && rm -rf node_modules && rm -rf dist",
     "check-db": "ts-node src/scripts/check-db.ts",
+    "check-tables": "ts-node src/scripts/check-tables.ts",
     "typeorm": "typeorm-ts-node-commonjs",
     "migration:generate": "ts-node src/scripts/generate-migration.ts",
     "migration:create": "typeorm migration:create",

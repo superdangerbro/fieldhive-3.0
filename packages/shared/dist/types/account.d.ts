@@ -1,34 +1,52 @@
 export interface BillingAddress {
-    street: string;
+    address1: string;
+    address2?: string;
     city: string;
-    state: string;
-    zipCode: string;
+    province: string;
+    postalCode: string;
     country: string;
 }
 export type AccountStatus = 'active' | 'inactive' | 'suspended';
+export type AccountRole = 'owner' | 'manager' | 'tenant' | 'contractor';
+export interface AccountProperty {
+    propertyId: string;
+    name: string;
+    address: string;
+    role: AccountRole;
+    billingAddress?: {
+        useAccountBilling: boolean;
+        address?: BillingAddress;
+    };
+}
 export interface Account {
     id: string;
     name: string;
-    billingAddress?: BillingAddress;
+    isCompany: boolean;
     status: AccountStatus;
+    billingAddress: BillingAddress;
+    properties: AccountProperty[];
     createdAt: string;
     updatedAt: string;
 }
 export interface CreateAccountDto {
     name: string;
-    billingAddress?: BillingAddress;
+    isCompany?: boolean;
     status?: AccountStatus;
+    billingAddress: BillingAddress;
 }
 export interface UpdateAccountDto {
     name?: string;
-    billingAddress?: BillingAddress;
+    isCompany?: boolean;
     status?: AccountStatus;
+    billingAddress?: BillingAddress;
 }
 export interface AccountResponse {
     id: string;
     name: string;
-    billingAddress?: BillingAddress;
+    isCompany: boolean;
     status: AccountStatus;
+    billingAddress: BillingAddress;
+    properties: AccountProperty[];
     createdAt: string;
     updatedAt: string;
 }
@@ -38,3 +56,26 @@ export interface AccountsResponse {
     page: number;
     pageSize: number;
 }
+export interface AssignPropertyDto {
+    propertyId: string;
+    role: AccountRole;
+    billingAddress?: {
+        useAccountBilling: boolean;
+        address?: BillingAddress;
+    };
+}
+export interface UpdatePropertyAssignmentDto {
+    role?: AccountRole;
+    billingAddress?: {
+        useAccountBilling: boolean;
+        address?: BillingAddress;
+    };
+}
+export interface AssignAccountDto {
+    accountId: string;
+    role: AccountRole;
+}
+export interface UpdateAccountAssignmentDto {
+    role: AccountRole;
+}
+//# sourceMappingURL=account.d.ts.map

@@ -8,3 +8,4 @@ var WebSocketEventType;
     WebSocketEventType["LOCATION_UPDATE"] = "LOCATION_UPDATE";
     WebSocketEventType["ALERT"] = "ALERT";
 })(WebSocketEventType || (exports.WebSocketEventType = WebSocketEventType = {}));
+//# sourceMappingURL=index.js.map

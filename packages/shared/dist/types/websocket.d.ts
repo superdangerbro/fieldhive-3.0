@@ -44,3 +44,4 @@ export interface PongMessage extends WebSocketMessage<{
     type: 'pong';
 }
 export type WebSocketResponse = MetricsUpdateMessage | EquipmentUpdateMessage | SensorUpdateMessage | ErrorMessage | ConnectionMessage | PingMessage | PongMessage;
+//# sourceMappingURL=websocket.d.ts.map

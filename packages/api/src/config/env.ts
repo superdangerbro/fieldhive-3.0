@@ -1,4 +1,14 @@
 import { z } from 'zod';
+import * as dotenv from 'dotenv';
+import { resolve } from 'path';
+
+// Load environment variables from .env file
+const envPath = resolve(process.cwd(), '.env');
+const result = dotenv.config({ path: envPath });
+
+if (result.error) {
+    throw new Error(`Error loading .env file: ${result.error.message}`);
+}
 
 // Schema for environment variables
 const envSchema = z.object({

@@ -1,72 +1,113 @@
-import { CreateAccountDto, AccountResponse, AccountsResponse } from '@fieldhive/shared';
+import { Account, Property, CreateAccountDto } from '@fieldhive/shared';
+import { Contact } from '../components/properties/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-export async function createAccount(data: CreateAccountDto): Promise<AccountResponse> {
-    const response = await fetch(`${API_BASE_URL}/accounts`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create account');
-    }
-
-    return response.json();
+interface AccountsResponse {
+  accounts: Account[];
+  total: number;
 }
 
-export async function getAccounts(page: number = 1, pageSize: number = 10): Promise<AccountsResponse> {
-    const response = await fetch(
-        `${API_BASE_URL}/accounts?page=${page}&pageSize=${pageSize}`
-    );
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to fetch accounts');
-    }
-
-    return response.json();
+interface PropertiesResponse {
+  properties: Property[];
+  total: number;
 }
 
-export async function getAccount(id: string): Promise<AccountResponse> {
-    const response = await fetch(`${API_BASE_URL}/accounts/${id}`);
-
+export async function getAccounts(): Promise<AccountsResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/accounts`);
     if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to fetch account');
+      throw new Error('Failed to fetch accounts');
     }
-
     return response.json();
+  } catch (error) {
+    console.error('Error fetching accounts:', error);
+    return { accounts: [], total: 0 };
+  }
 }
 
-export async function updateAccount(id: string, data: Partial<CreateAccountDto>): Promise<AccountResponse> {
-    const response = await fetch(`${API_BASE_URL}/accounts/${id}`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-    });
-
+export async function getProperties(page: number, pageSize: number): Promise<PropertiesResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/properties?page=${page}&pageSize=${pageSize}`);
     if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update account');
+      throw new Error('Failed to fetch properties');
     }
-
     return response.json();
+  } catch (error) {
+    console.error('Error fetching properties:', error);
+    return { properties: [], total: 0 };
+  }
 }
 
-export async function deleteAccount(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/accounts/${id}`, {
-        method: 'DELETE',
-    });
+export async function createAccount(accountData: CreateAccountDto): Promise<Account> {
+  const response = await fetch(`${API_BASE_URL}/accounts`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(accountData),
+  });
 
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to delete account');
-    }
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to create account: ${error}`);
+  }
+
+  return response.json();
+}
+
+export async function createProperty(data: any, accountId: string): Promise<Property> {
+  const response = await fetch(`${API_BASE_URL}/properties`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      ...data,
+      accountId,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to create property: ${error}`);
+  }
+
+  return response.json();
+}
+
+export async function updateProperty(id: string, data: any): Promise<Property> {
+  const response = await fetch(`${API_BASE_URL}/properties/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to update property: ${error}`);
+  }
+
+  return response.json();
+}
+
+export async function geocodeAddress(address: string) {
+  const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  if (!MAPBOX_TOKEN) {
+    throw new Error('MAPBOX_TOKEN not found');
+  }
+
+  const response = await fetch(
+    `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+      address
+    )}.json?access_token=${MAPBOX_TOKEN}&country=CA`
+  );
+
+  if (!response.ok) {
+    throw new Error('Geocoding failed');
+  }
+
+  return response.json();
 }

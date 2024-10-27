@@ -1,51 +1,61 @@
-# AI Development Logs
+# AI Chat Insights
 
-This directory contains logs of conversations with Cline AI during the development of FieldHive. These logs serve as documentation for:
+## Latest Session (Property Creation Flow)
 
-1. Design decisions and their rationale
-2. Technical solutions to specific challenges
-3. Configuration details and setup procedures
-4. Architecture evolution and improvements
+### Key Achievements
+- Successfully implemented property creation with Mapbox integration
+- Added GeoJSON handling for property boundaries
+- Integrated PostGIS for spatial data storage
+- Created reusable map control hooks
 
-## Structure
+### Technical Insights
+1. Component Organization:
+   - Breaking down complex map functionality into focused hooks improves maintainability
+   - Separating concerns between drawing, events, and data handling makes debugging easier
 
-Each log file follows this format:
-- `initial-setup.md` - Initial project setup and configuration
-- `feature-name.md` - Logs related to specific feature development
-- `refactor-name.md` - Logs of major refactoring sessions
-- `bugfix-name.md` - Logs of significant bug fixes and their solutions
+2. Data Flow:
+   - GeoJSON formatting is critical for PostGIS compatibility
+   - Need careful handling of coordinate transformations
+   - Important to validate spatial data before database operations
 
-## Purpose
+3. State Management:
+   - Map state needs careful coordination between multiple components
+   - Drawing state affects multiple UI elements and behaviors
+   - Need to handle async operations (geocoding, saving) gracefully
 
-These logs help:
-- Track the evolution of the codebase
-- Document complex decisions
-- Provide context for future development
-- Share knowledge about the system's architecture
-- Maintain a history of AI-assisted development
+### Challenges & Solutions
+1. Double-click Handling:
+   - Mapbox's default double-click zoom interferes with polygon completion
+   - Solution: Disable double-click zoom and implement custom handler
 
-## Guidelines for New Logs
+2. GeoJSON Formatting:
+   - PostGIS requires specific GeoJSON structure
+   - Solution: Added utility functions for coordinate formatting
 
-When adding new AI chat logs:
+3. Data Synchronization:
+   - Need to keep map state in sync with form data
+   - Solution: Centralized state management in form hooks
 
-1. Create a new markdown file with a descriptive name
-2. Include the date of the conversation
-3. Structure the content with clear headings
-4. Document key decisions and their rationale
-5. Include relevant code snippets or configurations
-6. Remove any sensitive information
-7. Add a brief summary at the top
+### Next Steps
+1. UI/UX Improvements:
+   - Add loading states for async operations
+   - Improve error messaging
+   - Add property boundary editing
 
-## Using These Logs
+2. Data Validation:
+   - Add GeoJSON schema validation
+   - Validate spatial operations
+   - Add error boundaries for map components
 
-- Reference these logs when working on related features
-- Use them to understand the context of specific implementations
-- Consult them when making architectural decisions
-- Share them with new team members for onboarding
+3. Testing:
+   - Add unit tests for GeoJSON utilities
+   - Test PostGIS operations
+   - Add integration tests for map interactions
 
-## Note on Sensitive Information
-
-- Never commit sensitive credentials or tokens
-- Remove or redact any private information
-- Use placeholder values for sensitive data
-- Document the existence and purpose of redacted information
+## Previous Sessions
+- [Initial Setup](initial-setup.md)
+- [Schema Management](schema-management.md)
+- [Schema Analysis](schema-analysis.md)
+- [Schema Change Example](schema-change-example.md)
+- [Schema Updates](schema-updates.md)
+- [Property Creation Flow](property-creation-flow.md)

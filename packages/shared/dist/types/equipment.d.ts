@@ -83,3 +83,4 @@ export interface EquipmentCluster {
     bounds: SpatialBounds;
     equipment: Equipment[];
 }
+//# sourceMappingURL=equipment.d.ts.map

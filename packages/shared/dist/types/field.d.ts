@@ -103,3 +103,4 @@ export interface FieldCluster {
         west: number;
     };
 }
+//# sourceMappingURL=field.d.ts.map
