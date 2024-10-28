@@ -32,7 +32,8 @@ export const getAccounts = async (req: Request, res: Response) => {
                             json_build_object(
                                 'propertyId', p.property_id,
                                 'name', p.name,
-                                'address', p.address,
+                                'address1', p.address1,  -- Updated to address1
+                                'address2', p.address2,  -- Updated to address2
                                 'role', paj.role,
                                 'billingAddress', CASE
                                     WHEN pba.use_account_billing THEN json_build_object(

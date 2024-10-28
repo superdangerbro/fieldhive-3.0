@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
                     `SELECT 
                         p.property_id as id,
                         p.name,
-                        p.address,
+                        CONCAT_WS(', ', p.address1, p.address2, p.city, p.province, p.postal_code, p.country) as address,
                         p.status,
                         p.type,
                         ST_AsGeoJSON(p.location)::jsonb as location,
@@ -45,7 +45,12 @@ router.get('/', async (req, res) => {
                     GROUP BY 
                         p.property_id,
                         p.name,
-                        p.address,
+                        p.address1,
+                        p.address2,
+                        p.city,
+                        p.province,
+                        p.postal_code,
+                        p.country,
                         p.status,
                         p.type,
                         p.location,

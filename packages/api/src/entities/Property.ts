@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Point, Polygon } from 'geojson';
 import { PropertyType, PropertyStatus } from '@fieldhive/shared';
+import { Address } from './Address';
 
 @Entity('properties')
 export class Property {
@@ -10,8 +11,32 @@ export class Property {
     @Column()
     name: string;
 
+    // Service Address fields (physical location)
     @Column()
-    address: string;
+    address1: string;
+
+    @Column({ nullable: true })
+    address2: string;
+
+    @Column()
+    city: string;
+
+    @Column()
+    province: string;
+
+    @Column()
+    postal_code: string;
+
+    @Column()
+    country: string;
+
+    // Billing Address reference
+    @ManyToOne(() => Address, { nullable: true })
+    @JoinColumn({ name: 'billing_address_id' })
+    billing_address: Address;
+
+    @Column({ nullable: true })
+    billing_address_id: string;
 
     @Column({
         type: 'geometry',

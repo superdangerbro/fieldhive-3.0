@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 
 // Load environment variables from .env file
-const envPath = resolve(process.cwd(), '.env');
+const envPath = resolve(__dirname, '../../.env'); // Adjusted path
 const result = dotenv.config({ path: envPath });
 
 if (result.error) {

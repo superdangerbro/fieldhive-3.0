@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { createAccount, createProperty } from '../../../services/api';
 import { PropertyFormData, Contact } from '../types';
-import { CreateAccountDto, AccountRole } from '@fieldhive/shared';
+import { CreateAccountDto } from '@fieldhive/shared';
 import { Feature, Polygon, FeatureCollection } from 'geojson';
 
 interface UsePropertySubmitProps {
@@ -83,6 +83,8 @@ export const usePropertySubmit = ({
             : propertyData.serviceAddress
         };
 
+        console.log('Account Data:', JSON.stringify(accountData, null, 2)); // Log account data
+
         const account = await createAccount(accountData);
         accountId = account.id;
 
@@ -125,7 +127,7 @@ export const usePropertySubmit = ({
         boundary: boundaryGeoJSON,
         accountConnections: [{
           accountId,
-          role: 'owner' as AccountRole
+          role: 'owner' // Removed type assertion
         }]
       };
 
