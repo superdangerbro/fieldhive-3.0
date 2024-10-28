@@ -7,6 +7,8 @@ import propertyRouter from './properties';
 import sensorRouter from './sensors';
 import jobTypeRouter from './job-types';
 import jobRouter from './jobs';
+import fieldEquipmentRouter from './field-equipment';
+import equipmentTypeRouter from './equipment-types';
 
 const router = Router();
 
@@ -18,5 +20,7 @@ router.use('/properties', propertyRouter);
 router.use('/sensors', sensorRouter);
 router.use('/job-types', jobTypeRouter);
 router.use('/jobs', jobRouter);
+router.use('/field-equipment', fieldEquipmentRouter);
+router.use('/equipment-types', equipmentTypeRouter);
 
 export default router;

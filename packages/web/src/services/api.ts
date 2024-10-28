@@ -13,16 +13,16 @@ interface PropertiesResponse {
   total: number;
 }
 
-interface JobType {
+export interface JobType {
   id: string;
   name: string;
 }
 
-interface JobTypesResponse {
+export interface JobTypesResponse {
   jobTypes: JobType[];
 }
 
-interface Job {
+export interface Job {
   job_id: string;
   job_type: {
     job_type_id: string;
@@ -43,7 +43,7 @@ interface Job {
   updated_at: string;
 }
 
-interface JobsResponse {
+export interface JobsResponse {
   jobs: Job[];
   total: number;
   page: number;

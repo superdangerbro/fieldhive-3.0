@@ -21,16 +21,10 @@ SELECT
         'property_id', p.property_id, 
         'name', p.name, 
         'address', CONCAT_WS(', ', p.address1, p.city, p.province)
-    ) as property,
-    jsonb_build_object(
-        'account_id', a.account_id,
-        'name', a.name
-    ) as account
+    ) as property
 FROM jobs j
 LEFT JOIN job_types jt ON jt.job_type_id = j.job_type_id
-LEFT JOIN properties p ON p.property_id = j.property_id
-LEFT JOIN property_accounts pa ON pa.property_id = p.property_id AND pa.is_primary = true
-LEFT JOIN accounts a ON a.account_id = pa.account_id`;
+LEFT JOIN properties p ON p.property_id = j.property_id`;
 
 // Get all jobs with pagination
 router.get('/', async (req, res) => {

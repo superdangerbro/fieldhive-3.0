@@ -48,7 +48,7 @@ const MAP_STYLES = [
 export const useMapStore = create<MapStore>((set, get) => ({
   viewState: INITIAL_VIEW_STATE,
   mapStyle: MAP_STYLES[0], // Start with night style
-  isTracking: true,
+  isTracking: true, // Start with tracking enabled
   userLocation: null,
   watchId: null,
   mapRef: null,
@@ -67,10 +67,15 @@ export const useMapStore = create<MapStore>((set, get) => ({
   },
 
   toggleTracking: () => {
-    set(state => ({ isTracking: !state.isTracking }));
+    const isTracking = get().isTracking;
+    set({ isTracking: !isTracking });
   },
 
   cleanup: () => {
+    const { watchId } = get();
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+    }
     set({
       watchId: null,
       isTracking: false,

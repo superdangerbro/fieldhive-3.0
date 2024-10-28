@@ -3,10 +3,11 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
 import { Box, CircularProgress } from '@mui/material';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 // Dynamically import the map component to avoid SSR issues
 const TechnicianMap = dynamic(
-  () => import('@/components/technician/TechnicianMap'),
+  () => import('../../components/technician/TechnicianMap'),
   {
     loading: () => (
       <Box
