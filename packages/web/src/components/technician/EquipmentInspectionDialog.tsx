@@ -15,12 +15,14 @@ import {
   Box,
   Typography,
   IconButton,
+  Alert,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { format } from 'date-fns';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface Equipment {
-  id: number;
+  id: string;
   type: string;
   location: [number, number];
   status: string;
@@ -40,18 +42,44 @@ export function EquipmentInspectionDialog({
   onComplete,
 }: EquipmentInspectionDialogProps) {
   const [inspectionData, setInspectionData] = useState({
-    status: 'ok',
+    status: 'active',
     notes: '',
-    actionTaken: 'none',
-    timestamp: format(new Date(), 'yyyy-MM-dd\'T\'HH:mm'),
+    barcode: '',
+    image_url: '',
+    inspected_by: '00000000-0000-0000-0000-000000000000' // Temporary default user ID
   });
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onComplete({
-      equipmentId: equipment.id,
-      ...inspectionData,
-    });
+    setError(null);
+    setSubmitting(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/inspections`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          equipment_id: equipment.id,
+          ...inspectionData
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save inspection');
+      }
+
+      const result = await response.json();
+      onComplete(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save inspection');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -74,6 +102,11 @@ export function EquipmentInspectionDialog({
         </Box>
       </DialogTitle>
       <DialogContent>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
         <Box
           component="form"
           onSubmit={handleSubmit}
@@ -95,25 +128,18 @@ export function EquipmentInspectionDialog({
               label="Status"
               onChange={(e) => setInspectionData({ ...inspectionData, status: e.target.value })}
             >
-              <MenuItem value="ok">OK</MenuItem>
-              <MenuItem value="needs_attention">Needs Attention</MenuItem>
-              <MenuItem value="critical">Critical</MenuItem>
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+              <MenuItem value="maintenance">Maintenance</MenuItem>
             </Select>
           </FormControl>
 
-          <FormControl fullWidth>
-            <InputLabel>Action Taken</InputLabel>
-            <Select
-              value={inspectionData.actionTaken}
-              label="Action Taken"
-              onChange={(e) => setInspectionData({ ...inspectionData, actionTaken: e.target.value })}
-            >
-              <MenuItem value="none">No Action Required</MenuItem>
-              <MenuItem value="cleaned">Cleaned</MenuItem>
-              <MenuItem value="repaired">Repaired</MenuItem>
-              <MenuItem value="replaced">Replaced</MenuItem>
-            </Select>
-          </FormControl>
+          <TextField
+            fullWidth
+            label="Barcode"
+            value={inspectionData.barcode}
+            onChange={(e) => setInspectionData({ ...inspectionData, barcode: e.target.value })}
+          />
 
           <TextField
             fullWidth
@@ -126,13 +152,9 @@ export function EquipmentInspectionDialog({
 
           <TextField
             fullWidth
-            type="datetime-local"
-            label="Timestamp"
-            value={inspectionData.timestamp}
-            onChange={(e) => setInspectionData({ ...inspectionData, timestamp: e.target.value })}
-            InputLabelProps={{
-              shrink: true,
-            }}
+            label="Image URL"
+            value={inspectionData.image_url}
+            onChange={(e) => setInspectionData({ ...inspectionData, image_url: e.target.value })}
           />
         </Box>
       </DialogContent>
@@ -141,6 +163,7 @@ export function EquipmentInspectionDialog({
           onClick={onClose}
           variant="outlined"
           fullWidth
+          disabled={submitting}
         >
           Cancel
         </Button>
@@ -148,8 +171,9 @@ export function EquipmentInspectionDialog({
           onClick={handleSubmit}
           variant="contained"
           fullWidth
+          disabled={submitting}
         >
-          Complete Inspection
+          {submitting ? 'Saving...' : 'Complete Inspection'}
         </Button>
       </DialogActions>
     </Dialog>

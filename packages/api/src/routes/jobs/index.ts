@@ -21,10 +21,16 @@ SELECT
         'property_id', p.property_id, 
         'name', p.name, 
         'address', CONCAT_WS(', ', p.address1, p.city, p.province)
-    ) as property
+    ) as property,
+    jsonb_build_object(
+        'account_id', a.account_id,
+        'name', a.name
+    ) as account
 FROM jobs j
 LEFT JOIN job_types jt ON jt.job_type_id = j.job_type_id
-LEFT JOIN properties p ON p.property_id = j.property_id`;
+LEFT JOIN properties p ON p.property_id = j.property_id
+LEFT JOIN properties_accounts_join pa ON pa.property_id = p.property_id
+LEFT JOIN accounts a ON a.account_id = pa.account_id`;
 
 // Get all jobs with pagination
 router.get('/', async (req, res) => {
@@ -49,13 +55,15 @@ router.get('/', async (req, res) => {
             AppDataSource.query('SELECT COUNT(*) as count FROM jobs j')
         ]);
 
+        // Log each job for debugging
+        jobs.forEach((job: any, index: number) => {
+            logger.info(`Job ${index + 1}:`, JSON.stringify(job, null, 2));
+        });
+
         logger.info('Jobs query result:', {
             jobsCount: jobs.length,
             totalCount: parseInt(total[0].count),
-            firstJob: jobs[0] ? {
-                job_id: jobs[0].job_id,
-                status: jobs[0].status
-            } : null
+            firstJob: jobs[0] ? JSON.stringify(jobs[0], null, 2) : null
         });
 
         // Check if we have any jobs
@@ -70,12 +78,7 @@ router.get('/', async (req, res) => {
             pageSize
         };
 
-        logger.info('Sending response:', {
-            totalJobs: response.jobs.length,
-            totalCount: response.total,
-            page: response.page,
-            pageSize: response.pageSize
-        });
+        logger.info('Sending response:', JSON.stringify(response, null, 2));
 
         res.json(response);
     } catch (error) {

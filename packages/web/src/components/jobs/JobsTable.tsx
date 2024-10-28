@@ -4,21 +4,29 @@ import React, { useState, useEffect } from 'react';
 import {
     Box,
     IconButton,
-    Tooltip,
+    Menu,
+    MenuItem,
     Dialog,
     DialogTitle,
     DialogContent,
     DialogActions,
     Button,
     TextField,
-    MenuItem,
     Snackbar,
     Alert,
-    Typography
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    InputAdornment
 } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import SearchIcon from '@mui/icons-material/Search';
 import { getJobs, updateJob, deleteJob } from '../../services/api';
 
 interface Job {
@@ -105,129 +113,88 @@ const EditDialog: React.FC<EditDialogProps> = ({ open, job, onClose, onSave }) =
 };
 
 export default function JobsTable() {
-    const [page, setPage] = useState(0);
-    const [pageSize, setPageSize] = useState(5);
     const [jobs, setJobs] = useState<Job[]>([]);
-    const [totalRows, setTotalRows] = useState(0);
+    const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [editJob, setEditJob] = useState<Job | null>(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [error, setError] = useState<string | null>(null);
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [headerAnchorEl, setHeaderAnchorEl] = useState<null | HTMLElement>(null);
+    const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
-    const columns: GridColDef[] = [
-        {
-            field: 'job_type',
-            headerName: 'Job Type',
-            flex: 1,
-            minWidth: 150,
-            valueGetter: (params) => params.value.name
-        },
-        {
-            field: 'account',
-            headerName: 'Account',
-            flex: 1,
-            minWidth: 150,
-            renderCell: (params) => {
-                const account = params.value;
-                if (!account) {
-                    return <Typography color="text.secondary">No Account</Typography>;
-                }
-                return account.name;
-            }
-        },
-        {
-            field: 'property',
-            headerName: 'Property',
-            flex: 1,
-            minWidth: 200,
-            valueGetter: (params) => `${params.value.name} (${params.value.address})`
-        },
-        {
-            field: 'status',
-            headerName: 'Status',
-            width: 130,
-            valueFormatter: (params) => 
-                params.value.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
-        },
-        {
-            field: 'created_at',
-            headerName: 'Created',
-            width: 180,
-            valueGetter: (params) => new Date(params.value).toLocaleDateString()
-        },
-        {
-            field: 'updated_at',
-            headerName: 'Last Updated',
-            width: 180,
-            valueGetter: (params) => new Date(params.value).toLocaleDateString()
-        },
-        {
-            field: 'actions',
-            headerName: 'Actions',
-            width: 120,
-            renderCell: (params) => (
-                <Box>
-                    <Tooltip title="Edit Job">
-                        <IconButton
-                            onClick={() => setEditJob(params.row)}
-                            size="small"
-                        >
-                            <EditIcon />
-                        </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete Job">
-                        <IconButton
-                            onClick={() => handleDeleteJob(params.row.job_id)}
-                            size="small"
-                            color="error"
-                        >
-                            <DeleteIcon />
-                        </IconButton>
-                    </Tooltip>
-                </Box>
-            )
+    const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, job: Job) => {
+        event.stopPropagation();
+        setAnchorEl(event.currentTarget);
+        setSelectedJob(job);
+    };
+
+    const handleHeaderMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+        event.stopPropagation();
+        setHeaderAnchorEl(event.currentTarget);
+    };
+
+    const handleMenuClose = () => {
+        setAnchorEl(null);
+        setHeaderAnchorEl(null);
+        setSelectedJob(null);
+    };
+
+    const handleEdit = () => {
+        if (selectedJob) {
+            setEditJob(selectedJob);
         }
-    ];
+        handleMenuClose();
+    };
+
+    const handleDelete = () => {
+        if (selectedJob) {
+            handleDeleteJob(selectedJob.job_id);
+        }
+        handleMenuClose();
+    };
 
     const fetchJobs = async () => {
         try {
-            console.log('Fetching jobs with page:', page + 1, 'pageSize:', pageSize);
             setLoading(true);
-            const response = await getJobs(page + 1, pageSize);
-            console.log('Jobs response:', response);
-            setJobs(response.jobs);
-            setTotalRows(response.total);
+            const response = await getJobs(1, 100); // Simplified pagination for now
+            setJobs(response.jobs || []);
+            setFilteredJobs(response.jobs || []);
         } catch (error) {
             console.error('Failed to fetch jobs:', error);
             setError('Failed to fetch jobs. Please try again later.');
+            setJobs([]);
+            setFilteredJobs([]);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        console.log('JobsTable useEffect triggered');
         fetchJobs();
-    }, [page, pageSize, refreshTrigger]);
+    }, [refreshTrigger]);
 
-    // Listen for jobsUpdated event
     useEffect(() => {
-        const handleJobsUpdated = () => {
-            console.log('Jobs updated event received');
-            setRefreshTrigger(prev => prev + 1);
-        };
-
-        window.addEventListener('jobsUpdated', handleJobsUpdated);
-        return () => {
-            window.removeEventListener('jobsUpdated', handleJobsUpdated);
-        };
-    }, []);
+        const filtered = jobs.filter(job => {
+            const searchLower = searchQuery.toLowerCase();
+            return (
+                job.job_type?.name?.toLowerCase().includes(searchLower) ||
+                job.account?.name?.toLowerCase().includes(searchLower) ||
+                job.property?.name?.toLowerCase().includes(searchLower) ||
+                job.property?.address?.toLowerCase().includes(searchLower) ||
+                job.status?.toLowerCase().includes(searchLower)
+            );
+        });
+        setFilteredJobs(filtered);
+    }, [searchQuery, jobs]);
 
     const handleUpdateJob = async (jobId: string, data: { status: string; notes?: string }) => {
         try {
             await updateJob(jobId, data);
             setEditJob(null);
             setRefreshTrigger(prev => prev + 1);
+            setError(null);
         } catch (error) {
             console.error('Failed to update job:', error);
             setError('Failed to update job. Please try again later.');
@@ -242,36 +209,154 @@ export default function JobsTable() {
         try {
             await deleteJob(jobId);
             setRefreshTrigger(prev => prev + 1);
+            setError(null);
         } catch (error) {
             console.error('Failed to delete job:', error);
             setError('Failed to delete job. Please try again later.');
         }
     };
 
-    if (loading && jobs.length === 0) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 435 }}>
-                <Typography>Loading jobs...</Typography>
-            </Box>
-        );
-    }
+    const handleRefresh = () => {
+        setRefreshTrigger(prev => prev + 1);
+    };
 
     return (
-        <Box sx={{ height: 435, width: '100%' }}>
-            <DataGrid
-                rows={jobs}
-                columns={columns}
-                getRowId={(row) => row.job_id}
-                rowCount={totalRows}
-                loading={loading}
-                paginationMode="server"
-                page={page}
-                pageSize={pageSize}
-                onPageChange={(newPage) => setPage(newPage)}
-                onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
-                rowsPerPageOptions={[5, 10, 20]}
-                disableSelectionOnClick
-            />
+        <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, gap: 2 }}>
+                <TextField
+                    placeholder="Search jobs..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    sx={{ 
+                        flex: 1,
+                        '& .MuiOutlinedInput-root': {
+                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                            '&:hover': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                            },
+                        }
+                    }}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <SearchIcon />
+                            </InputAdornment>
+                        ),
+                    }}
+                />
+                <IconButton onClick={handleRefresh} size="small">
+                    <RefreshIcon />
+                </IconButton>
+            </Box>
+
+            <TableContainer>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell sx={{ minWidth: 150 }}>
+                                Job Type
+                                <IconButton size="small" onClick={handleHeaderMenuOpen} sx={{ ml: 1 }}>
+                                    <MoreVertIcon fontSize="small" />
+                                </IconButton>
+                            </TableCell>
+                            <TableCell sx={{ minWidth: 150 }}>
+                                Account
+                                <IconButton size="small" onClick={handleHeaderMenuOpen} sx={{ ml: 1 }}>
+                                    <MoreVertIcon fontSize="small" />
+                                </IconButton>
+                            </TableCell>
+                            <TableCell sx={{ minWidth: 200 }}>
+                                Property
+                                <IconButton size="small" onClick={handleHeaderMenuOpen} sx={{ ml: 1 }}>
+                                    <MoreVertIcon fontSize="small" />
+                                </IconButton>
+                            </TableCell>
+                            <TableCell sx={{ minWidth: 130 }}>
+                                Status
+                                <IconButton size="small" onClick={handleHeaderMenuOpen} sx={{ ml: 1 }}>
+                                    <MoreVertIcon fontSize="small" />
+                                </IconButton>
+                            </TableCell>
+                            <TableCell sx={{ minWidth: 130 }}>
+                                Created
+                                <IconButton size="small" onClick={handleHeaderMenuOpen} sx={{ ml: 1 }}>
+                                    <MoreVertIcon fontSize="small" />
+                                </IconButton>
+                            </TableCell>
+                            <TableCell width="50px"></TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {filteredJobs.map((job) => (
+                            <TableRow key={job.job_id}>
+                                <TableCell>{job.job_type?.name || 'Unknown'}</TableCell>
+                                <TableCell>{job.account?.name || 'No Account'}</TableCell>
+                                <TableCell>{job.property ? `${job.property.name} (${job.property.address})` : 'Unknown'}</TableCell>
+                                <TableCell>
+                                    {job.status?.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase()) || 'Unknown'}
+                                </TableCell>
+                                <TableCell>{new Date(job.created_at).toLocaleDateString()}</TableCell>
+                                <TableCell>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                        <IconButton
+                                            size="small"
+                                            onClick={(event) => handleMenuOpen(event, job)}
+                                            sx={{ color: 'text.secondary', p: 0 }}
+                                        >
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                                <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: 'text.secondary' }} />
+                                                <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: 'text.secondary' }} />
+                                                <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: 'text.secondary' }} />
+                                            </Box>
+                                        </IconButton>
+                                    </Box>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+
+            <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleMenuClose}
+                anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'right',
+                }}
+                transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'right',
+                }}
+            >
+                <MenuItem onClick={handleEdit}>
+                    <EditIcon sx={{ mr: 1 }} />
+                    Edit
+                </MenuItem>
+                <MenuItem onClick={handleDelete}>
+                    <DeleteIcon sx={{ mr: 1 }} />
+                    Delete
+                </MenuItem>
+            </Menu>
+
+            <Menu
+                anchorEl={headerAnchorEl}
+                open={Boolean(headerAnchorEl)}
+                onClose={handleMenuClose}
+                anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'right',
+                }}
+                transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'right',
+                }}
+            >
+                <MenuItem onClick={handleMenuClose}>Sort Ascending</MenuItem>
+                <MenuItem onClick={handleMenuClose}>Sort Descending</MenuItem>
+                <MenuItem onClick={handleMenuClose}>Hide Column</MenuItem>
+            </Menu>
 
             <EditDialog
                 open={!!editJob}

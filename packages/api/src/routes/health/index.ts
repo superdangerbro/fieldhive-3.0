@@ -4,7 +4,7 @@ import detailedRouter from './detailed';
 
 const router = Router();
 
-router.use(basicRouter);
-router.use(detailedRouter);
+router.use('/basic', basicRouter);
+router.use('/detailed', detailedRouter);
 
 export default router;
