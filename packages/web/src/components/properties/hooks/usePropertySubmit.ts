@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { createAccount, createProperty } from '../../../services/api';
 import { PropertyFormData, Contact } from '../types';
-import { CreateAccountDto } from '@fieldhive/shared';
-import { Feature, Polygon, FeatureCollection } from 'geojson';
+import { CreateAccountDto, CreatePropertyRequest, PropertyType } from '@fieldhive/shared';
+import { Point } from 'geojson';
 
 interface UsePropertySubmitProps {
   propertyData: PropertyFormData;
@@ -30,8 +30,8 @@ export const usePropertySubmit = ({
       return false;
     }
 
-    if (!propertyData.boundary) {
-      setFormErrors({ submit: 'Please draw a property boundary' });
+    if (!propertyData.location) {
+      setFormErrors({ submit: 'Property location is required. Please ensure the address can be geocoded.' });
       return false;
     }
 
@@ -62,12 +62,6 @@ export const usePropertySubmit = ({
       return;
     }
 
-    // This check is redundant with validateSubmission, but helps TypeScript
-    if (!propertyData.boundary) {
-      setFormErrors({ submit: 'Please draw a property boundary' });
-      return;
-    }
-
     try {
       let accountId: string;
 
@@ -83,56 +77,47 @@ export const usePropertySubmit = ({
             : propertyData.serviceAddress
         };
 
-        console.log('Account Data:', JSON.stringify(accountData, null, 2)); // Log account data
-
+        console.log('Creating account with data:', accountData);
         const account = await createAccount(accountData);
         accountId = account.id;
 
         // TODO: Create contacts for the account in a separate API call
-        // This would require adding a new API endpoint for creating contacts
       } else if (selectedAccount) {
         accountId = selectedAccount.id;
       } else {
         throw new Error('No account selected or created');
       }
 
-      // Format location as GeoJSON Point
-      const locationGeoJSON = propertyData.location ? {
+      // Create location point
+      const location: Point = {
         type: 'Point',
         coordinates: [
-          Number(propertyData.location.coordinates[0]),
-          Number(propertyData.location.coordinates[1])
+          Number(propertyData.location!.coordinates[0]),
+          Number(propertyData.location!.coordinates[1])
         ]
-      } : null;
+      };
 
-      // Format boundary as GeoJSON Polygon
-      const boundaryGeoJSON = propertyData.boundary ? {
-        type: 'Polygon',
-        coordinates: [
-          propertyData.boundary.coordinates[0].map(coord => [
-            Number(coord[0]),
-            Number(coord[1])
-          ])
-        ]
-      } : null;
-
-      // Prepare property data
+      // Prepare property data according to CreatePropertyRequest type
       const propertyPayload = {
         name: propertyData.useCustomName 
           ? propertyData.customName 
-          : `${propertyData.serviceAddress.address1}, ${propertyData.serviceAddress.city}`,
+          : propertyData.serviceAddress.address1,
+        address1: propertyData.serviceAddress.address1,
+        address2: propertyData.serviceAddress.address2,
+        city: propertyData.serviceAddress.city,
+        province: propertyData.serviceAddress.province,
+        postal_code: propertyData.serviceAddress.postalCode,
+        country: propertyData.serviceAddress.country,
         type: propertyData.type,
-        address: propertyData.serviceAddress.address1,
-        location: locationGeoJSON,
-        boundary: boundaryGeoJSON,
+        location,
         accountConnections: [{
           accountId,
-          role: 'owner' // Removed type assertion
+          role: 'owner'
         }]
       };
 
-      console.log('Creating property with payload:', JSON.stringify(propertyPayload, null, 2));
-      const result = await createProperty(propertyPayload, accountId);
+      console.log('Creating property with payload:', propertyPayload);
+      const result = await createProperty(propertyPayload);
       console.log('Property created:', result);
 
       onClose();

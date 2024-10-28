@@ -13,19 +13,18 @@ import {
   Alert,
 } from '@mui/material';
 import { AddressFormStep } from './steps/AddressFormStep';
-import { GeofenceStep } from './steps/GeofenceStep';
 import { AccountStep } from './steps/AccountStep';
+import { LocationPickerDialog } from './LocationPickerDialog';
 import { usePropertyForm } from './hooks/usePropertyForm';
 import { usePropertySubmit } from './hooks/usePropertySubmit';
 import { usePropertyGeocoding } from './hooks/usePropertyGeocoding';
 import { getAccounts } from '../../services/api';
 
-const steps = ['Property Details', 'Property Boundary', 'Account'];
+const steps = ['Property Details', 'Account'];
 
 const stepTitles = {
   0: 'Enter Property Details',
-  1: 'Draw Property Boundary',
-  2: 'Select or Create Account',
+  1: 'Select or Create Account',
 };
 
 interface AddPropertyDialogProps {
@@ -35,28 +34,22 @@ interface AddPropertyDialogProps {
 }
 
 const AddPropertyDialog: React.FC<AddPropertyDialogProps> = ({ open, onClose, onSuccess }) => {
+  const [showLocationPicker, setShowLocationPicker] = React.useState(false);
+  const lastLocation = React.useRef<[number, number] | null>(null);
+
   const {
     activeStep,
     setActiveStep,
-    mapLoaded,
-    setMapLoaded,
-    isDrawing,
-    setIsDrawing,
-    showInstructions,
-    setShowInstructions,
     accounts,
     setAccounts,
     selectedAccount,
     setSelectedAccount,
     showAddAccount,
     setShowAddAccount,
-    drawnFeatures,
-    setDrawnFeatures,
     formErrors,
     setFormErrors,
     contacts,
     setContacts,
-    lastLocation,
     propertyData,
     setPropertyData,
     validateAddressForm,
@@ -78,7 +71,6 @@ const AddPropertyDialog: React.FC<AddPropertyDialogProps> = ({ open, onClose, on
     propertyData,
     setPropertyData,
     lastLocation,
-    activeStep,
   });
 
   // Reset form when dialog closes
@@ -89,8 +81,17 @@ const AddPropertyDialog: React.FC<AddPropertyDialogProps> = ({ open, onClose, on
   }, [open, reset]);
 
   const handleNext = async () => {
-    if (activeStep === 0 && !validateAddressForm()) {
-      return;
+    if (activeStep === 0) {
+      if (!validateAddressForm()) {
+        return;
+      }
+
+      // Try to geocode the address
+      const geocoded = await handleGeocodeAddress();
+      if (!geocoded) {
+        setShowLocationPicker(true);
+        return;
+      }
     }
 
     setActiveStep(prev => prev + 1);
@@ -98,6 +99,18 @@ const AddPropertyDialog: React.FC<AddPropertyDialogProps> = ({ open, onClose, on
 
   const handleBack = () => {
     setActiveStep(prev => prev - 1);
+    // Clear any step-specific errors when going back
+    setFormErrors({});
+  };
+
+  const handleLocationSelect = (point: Point) => {
+    setPropertyData({
+      ...propertyData,
+      location: point
+    });
+    lastLocation.current = [point.coordinates[0], point.coordinates[1]];
+    setShowLocationPicker(false);
+    setActiveStep(prev => prev + 1);
   };
 
   const fetchAccounts = React.useCallback(async () => {
@@ -123,22 +136,6 @@ const AddPropertyDialog: React.FC<AddPropertyDialogProps> = ({ open, onClose, on
         );
       case 1:
         return (
-          <GeofenceStep
-            showInstructions={showInstructions}
-            setShowInstructions={setShowInstructions}
-            formErrors={formErrors}
-            mapLoaded={mapLoaded}
-            setMapLoaded={setMapLoaded}
-            isDrawing={isDrawing}
-            setIsDrawing={setIsDrawing}
-            drawnFeatures={drawnFeatures}
-            setDrawnFeatures={setDrawnFeatures}
-            lastLocation={lastLocation}
-            onGeocodeAddress={handleGeocodeAddress}
-          />
-        );
-      case 2:
-        return (
           <AccountStep
             selectedAccount={selectedAccount}
             setSelectedAccount={setSelectedAccount}
@@ -156,45 +153,55 @@ const AddPropertyDialog: React.FC<AddPropertyDialogProps> = ({ open, onClose, on
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose} 
-      maxWidth="md" 
-      fullWidth
-      PaperProps={{
-        sx: {
-          backgroundColor: 'background.paper',
-          backgroundImage: 'none'
-        }
-      }}
-    >
-      <DialogTitle>{stepTitles[activeStep as keyof typeof stepTitles]}</DialogTitle>
-      <DialogContent>
-        <Stepper activeStep={activeStep} sx={{ pt: 3, pb: 5 }}>
-          {steps.map(label => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-        {getStepContent(activeStep)}
-        {formErrors.submit && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {formErrors.submit}
-          </Alert>
-        )}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        {activeStep > 0 && <Button onClick={handleBack}>Back</Button>}
-        <Button 
-          onClick={activeStep === steps.length - 1 ? handleSubmit : handleNext} 
-          variant="contained"
-        >
-          {activeStep === steps.length - 1 ? 'Create Property' : 'Next'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+    <>
+      <Dialog 
+        open={open} 
+        onClose={onClose} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            backgroundColor: 'background.paper',
+            backgroundImage: 'none'
+          }
+        }}
+      >
+        <DialogTitle>{stepTitles[activeStep as keyof typeof stepTitles]}</DialogTitle>
+        <DialogContent>
+          <Stepper activeStep={activeStep} sx={{ pt: 3, pb: 5 }}>
+            {steps.map(label => (
+              <Step key={label}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+          {getStepContent(activeStep)}
+          {formErrors.submit && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {formErrors.submit}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose}>Cancel</Button>
+          {activeStep > 0 && <Button onClick={handleBack}>Back</Button>}
+          <Button 
+            onClick={activeStep === steps.length - 1 ? handleSubmit : handleNext} 
+            variant="contained"
+          >
+            {activeStep === steps.length - 1 ? 'Create Property' : 'Next'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <LocationPickerDialog
+        open={showLocationPicker}
+        onClose={() => setShowLocationPicker(false)}
+        onSelect={handleLocationSelect}
+        initialLocation={lastLocation.current || [-98, 56]}
+        address={`${propertyData.serviceAddress.address1}, ${propertyData.serviceAddress.city}`}
+      />
+    </>
   );
 };
 

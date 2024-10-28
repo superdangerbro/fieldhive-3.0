@@ -1,4 +1,4 @@
-import { Account, Property, CreateAccountDto } from '@fieldhive/shared';
+import { Account, Property, CreateAccountDto, CreatePropertyRequest } from '@fieldhive/shared';
 import { Contact } from '../components/properties/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -56,29 +56,11 @@ export async function createAccount(accountData: CreateAccountDto): Promise<Acco
   return response.json();
 }
 
-export async function createProperty(data: any, accountId: string): Promise<Property> {
+export async function createProperty(data: CreatePropertyRequest): Promise<Property> {
+  console.log('API createProperty payload:', JSON.stringify(data, null, 2));
+  
   const response = await fetch(`${API_BASE_URL}/properties`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      ...data,
-      accountId,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to create property: ${error}`);
-  }
-
-  return response.json();
-}
-
-export async function updateProperty(id: string, data: any): Promise<Property> {
-  const response = await fetch(`${API_BASE_URL}/properties/${id}`, {
-    method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
     },
@@ -86,8 +68,9 @@ export async function updateProperty(id: string, data: any): Promise<Property> {
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to update property: ${error}`);
+    const errorText = await response.text();
+    console.error('Create property error response:', errorText);
+    throw new Error(`Failed to create property: ${errorText}`);
   }
 
   return response.json();

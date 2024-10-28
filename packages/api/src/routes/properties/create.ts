@@ -10,17 +10,22 @@ router.post('/', async (req, res) => {
     try {
         const { 
             name, 
-            address, 
+            address1,
+            address2,
+            city,
+            province,
+            postal_code,
+            country,
             location, 
             boundary,
             type,
             accountConnections 
-        } = req.body as CreatePropertyRequest;
+        } = req.body;
 
-        if (!name || !address || !location || !accountConnections?.length) {
+        if (!name || !address1 || !city || !province || !postal_code || !location || !accountConnections?.length) {
             return res.status(400).json({
                 error: 'Bad request',
-                message: 'Name, address, location, and at least one account connection are required'
+                message: 'Name, address fields (address1, city, province, postal_code), location, and at least one account connection are required'
             });
         }
 
@@ -31,8 +36,13 @@ router.post('/', async (req, res) => {
             // Create property
             const [property] = await AppDataSource.query(
                 `INSERT INTO properties (
-                    name, 
-                    address, 
+                    name,
+                    address1,
+                    address2,
+                    city,
+                    province,
+                    postal_code,
+                    country,
                     location, 
                     boundary,
                     type,
@@ -42,13 +52,18 @@ router.post('/', async (req, res) => {
                 )
                 VALUES (
                     $1, 
-                    $2, 
-                    ST_SetSRID(ST_GeomFromGeoJSON($3), 4326),
-                    CASE WHEN $4::jsonb IS NOT NULL 
-                        THEN ST_SetSRID(ST_GeomFromGeoJSON($4), 4326)
+                    $2,
+                    $3,
+                    $4,
+                    $5,
+                    $6,
+                    $7,
+                    ST_SetSRID(ST_GeomFromGeoJSON($8), 4326),
+                    CASE WHEN $9::jsonb IS NOT NULL 
+                        THEN ST_SetSRID(ST_GeomFromGeoJSON($9), 4326)
                         ELSE NULL
                     END,
-                    $5,
+                    $10,
                     'active',
                     NOW(), 
                     NOW()
@@ -56,7 +71,12 @@ router.post('/', async (req, res) => {
                 RETURNING 
                     property_id as id,
                     name,
-                    address,
+                    address1,
+                    address2,
+                    city,
+                    province,
+                    postal_code as "postalCode",
+                    country,
                     ST_AsGeoJSON(location)::jsonb as location,
                     ST_AsGeoJSON(boundary)::jsonb as boundary,
                     type,
@@ -64,8 +84,13 @@ router.post('/', async (req, res) => {
                     created_at as "createdAt",
                     updated_at as "updatedAt"`,
                 [
-                    name, 
-                    address, 
+                    name,
+                    address1,
+                    address2 || null,
+                    city,
+                    province,
+                    postal_code,
+                    country || 'Canada',
                     JSON.stringify(location),
                     boundary ? JSON.stringify(boundary) : null,
                     type
@@ -99,8 +124,12 @@ router.post('/', async (req, res) => {
 
             await AppDataSource.query('COMMIT');
 
+            // Format the address for the response
+            const formattedAddress = `${property.address1}, ${property.city}, ${property.province} ${property.postalCode}`;
+
             const response: PropertyResponse = {
                 ...property,
+                address: formattedAddress,
                 accounts
             };
 

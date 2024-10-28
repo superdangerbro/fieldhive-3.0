@@ -52,7 +52,7 @@ const AppBar = styled(MuiAppBar, {
   }),
 }));
 
-const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' })(
+const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' })( 
   ({ theme, open }) => ({
     '& .MuiDrawer-paper': {
       position: 'relative',
@@ -88,7 +88,8 @@ const mainListItems = [
   { text: 'Reports', icon: <BarChartIcon />, path: '/reports' },
   { text: 'Equipment', icon: <LayersIcon />, path: '/equipment' },
   { text: 'Technician', icon: <HandymanIcon />, path: '/technician' },
-  { text: 'Settings', icon: <SettingsIcon />, path: '/settings' }
+  { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
+  { text: 'Properties', icon: <LayersIcon />, path: '/properties' } // Added link to Properties page
 ];
 
 export default function DashboardLayout({

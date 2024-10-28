@@ -1,13 +1,18 @@
 import { useCallback } from 'react';
 import { MapRef } from 'react-map-gl';
+import { useMapEvents } from './useMapEvents';
 
 export const useMapControls = (
   mapRef: React.RefObject<MapRef>,
-  drawControlRef: React.RefObject<any>,
+  drawControlRef: React.RefObject<any> | null, // Make this parameter optional
   isDrawing: boolean,
   setIsDrawing: (drawing: boolean) => void,
-  lastLocation: React.RefObject<[number, number] | null>
+  lastLocation: React.RefObject<[number, number] | null>,
+  setDrawnFeatures: (features: any) => void,
+  setPropertyData: (data: any) => void
 ) => {
+  const { setupMapEvents } = useMapEvents(drawControlRef?.current, setDrawnFeatures, setIsDrawing, isDrawing, setPropertyData);
+
   const handleZoomIn = useCallback(() => {
     if (mapRef.current) {
       const map = mapRef.current.getMap();
@@ -23,13 +28,12 @@ export const useMapControls = (
   }, [mapRef]);
 
   const handleDrawToggle = useCallback(() => {
-    if (!drawControlRef.current) return;
+    if (!drawControlRef?.current) return;
 
     try {
       const features = drawControlRef.current.getAll();
       
       if (isDrawing) {
-        // If currently drawing and we have enough points, finish the polygon
         if (features.features.length > 0) {
           const currentFeature = features.features[features.features.length - 1];
           if (currentFeature.geometry.coordinates[0].length >= 3) {
@@ -38,12 +42,10 @@ export const useMapControls = (
           }
         }
       } else {
-        // If not drawing, start a new polygon or edit existing one
         if (features.features.length === 0) {
           drawControlRef.current.changeMode('draw_polygon');
           setIsDrawing(true);
         } else {
-          // Toggle between select and direct_select modes for existing polygon
           const mode = drawControlRef.current.getMode();
           if (mode === 'simple_select') {
             drawControlRef.current.changeMode('direct_select', {
@@ -62,11 +64,10 @@ export const useMapControls = (
   }, [isDrawing, setIsDrawing, drawControlRef]);
 
   const handleClear = useCallback(() => {
-    if (!drawControlRef.current) return;
+    if (!drawControlRef?.current) return;
 
     try {
       drawControlRef.current.deleteAll();
-      // Automatically start drawing mode after clearing
       drawControlRef.current.changeMode('draw_polygon');
       setIsDrawing(true);
     } catch (error) {
@@ -94,5 +95,6 @@ export const useMapControls = (
     handleDrawToggle,
     handleClear,
     handleRecenter,
+    setupMapEvents
   };
 };

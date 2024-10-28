@@ -24,6 +24,7 @@ interface GeofenceStepProps {
   setDrawnFeatures: (features: FeatureCollection) => void;
   lastLocation: React.RefObject<[number, number] | null>;
   onGeocodeAddress: () => Promise<void>;
+  setPropertyData: (data: any) => void; // Add this parameter
 }
 
 export const GeofenceStep: React.FC<GeofenceStepProps> = ({
@@ -38,6 +39,7 @@ export const GeofenceStep: React.FC<GeofenceStepProps> = ({
   setDrawnFeatures,
   lastLocation,
   onGeocodeAddress,
+  setPropertyData, // Destructure the new parameter
 }) => {
   const mapRef = useRef<MapRef>(null);
   const drawControlRef = useRef<any>(null);
@@ -48,7 +50,7 @@ export const GeofenceStep: React.FC<GeofenceStepProps> = ({
     handleDrawToggle,
     handleClear,
     handleRecenter,
-  } = useMapControls(mapRef, drawControlRef, isDrawing, setIsDrawing, lastLocation);
+  } = useMapControls(mapRef, drawControlRef, isDrawing, setIsDrawing, lastLocation, setDrawnFeatures, setPropertyData);
 
   const { initializeDrawControl, cleanupDrawControl } = useDrawControl(
     mapRef,
@@ -56,14 +58,15 @@ export const GeofenceStep: React.FC<GeofenceStepProps> = ({
     drawnFeatures,
     setDrawnFeatures,
     isDrawing,
-    setIsDrawing
+    setIsDrawing,
+    setPropertyData
   );
 
   // Handle map load
   const handleMapLoad = useCallback(() => {
     setMapLoaded(true);
-    // Initialize draw control after map is loaded
-    setTimeout(initializeDrawControl, 100);
+    console.log('Map loaded, initializing draw control...'); // Debug log
+    initializeDrawControl(); // Initialize draw control
   }, [initializeDrawControl, setMapLoaded]);
 
   // Geocode and fly to address when component mounts

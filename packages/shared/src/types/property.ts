@@ -37,7 +37,12 @@ export interface Property {
 // API Request Types
 export interface CreatePropertyRequest {
     name: string;
-    address: string;
+    address1: string;
+    address2?: string;
+    city: string;
+    province: string;
+    postal_code: string;
+    country?: string;
     location: Point;
     boundary?: Polygon;
     type: PropertyType;

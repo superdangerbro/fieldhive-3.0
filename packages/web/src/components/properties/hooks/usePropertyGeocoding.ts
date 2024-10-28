@@ -1,25 +1,23 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { geocodeAddress } from '../utils/api';
 import { PropertyFormData } from '../types';
 import { Point } from 'geojson';
 
 interface UsePropertyGeocodingProps {
   propertyData: PropertyFormData;
-  setPropertyData: (data: PropertyFormData) => void;
+  setPropertyData: (data: PropertyFormData | ((prev: PropertyFormData) => PropertyFormData)) => void;
   lastLocation: React.MutableRefObject<[number, number] | null>;
-  activeStep: number;
 }
 
 export const usePropertyGeocoding = ({
   propertyData,
   setPropertyData,
   lastLocation,
-  activeStep,
 }: UsePropertyGeocodingProps) => {
-  const handleGeocodeAddress = useCallback(async () => {
+  const handleGeocodeAddress = useCallback(async (): Promise<boolean> => {
     const { serviceAddress } = propertyData;
     if (!serviceAddress.address1 || !serviceAddress.city || !serviceAddress.province) {
-      return;
+      return false;
     }
 
     const address = `${serviceAddress.address1}, ${serviceAddress.city}, ${serviceAddress.province}, ${serviceAddress.postalCode}`;
@@ -30,25 +28,29 @@ export const usePropertyGeocoding = ({
         const [lng, lat] = data.features[0].center;
         lastLocation.current = [lng, lat];
         
-        setPropertyData({
-          ...propertyData,
-          location: {
-            type: 'Point',
-            coordinates: [lng, lat],
-          } as Point,
-        });
+        // Ensure coordinates are numbers
+        const point: Point = {
+          type: 'Point',
+          coordinates: [Number(lng), Number(lat)]
+        };
+
+        console.log('Setting location:', point);
+
+        setPropertyData((prev: PropertyFormData) => ({
+          ...prev,
+          location: point
+        }));
+
+        return true;
+      } else {
+        console.warn('No geocoding results found for address:', address);
+        return false;
       }
     } catch (error) {
       console.error('Error geocoding address:', error);
+      return false;
     }
   }, [propertyData, setPropertyData, lastLocation]);
-
-  // Effect to trigger geocoding when entering map step
-  useEffect(() => {
-    if (activeStep === 1) {
-      handleGeocodeAddress();
-    }
-  }, [activeStep, handleGeocodeAddress]);
 
   return {
     handleGeocodeAddress,

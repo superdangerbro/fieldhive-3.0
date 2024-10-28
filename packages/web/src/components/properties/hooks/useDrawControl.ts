@@ -41,16 +41,21 @@ export const useDrawControl = (
   drawnFeatures: FeatureCollection | null,
   setDrawnFeatures: (features: FeatureCollection) => void,
   isDrawing: boolean,
-  setIsDrawing: (drawing: boolean) => void
+  setIsDrawing: (drawing: boolean) => void,
+  setPropertyData: (data: any) => void // Add this parameter
 ) => {
-  const { setupMapEvents } = useMapEvents(drawControlRef.current, setDrawnFeatures, setIsDrawing, isDrawing);
+  const { setupMapEvents } = useMapEvents(drawControlRef.current, setDrawnFeatures, setIsDrawing, isDrawing, setPropertyData); // Pass the new parameter
 
   const initializeDrawControl = useCallback(async () => {
-    if (!mapRef.current || !mapRef.current.getMap()) return;
+    if (!mapRef.current || !mapRef.current.getMap()) {
+      console.error('Map is not initialized.');
+      return;
+    }
 
     try {
       const map = mapRef.current.getMap();
-      
+      console.log('Initializing draw control...'); // Debug log
+
       // Remove existing control if it exists
       if (drawControlRef.current) {
         map.removeControl(drawControlRef.current);
@@ -72,18 +77,22 @@ export const useDrawControl = (
       map.addControl(drawControl);
       drawControlRef.current = drawControl;
 
+      console.log('Draw control initialized:', drawControlRef.current); // Debug log
+
       // Restore drawn features if any
       if (drawnFeatures && drawnFeatures.features && drawnFeatures.features.length > 0) {
         drawControl.set(drawnFeatures);
         drawControl.changeMode('simple_select');
         setIsDrawing(false);
+        console.log('Restored drawn features and changed mode to simple_select.'); // Debug log
       } else {
         // Start drawing mode if no features exist
         drawControl.changeMode('draw_polygon');
         setIsDrawing(true);
+        console.log('No features found, starting draw_polygon mode.'); // Debug log
       }
 
-      setupMapEvents(map);
+      setupMapEvents(map); // Call with the correct parameters
     } catch (error) {
       console.error('Error initializing draw control:', error);
     }
