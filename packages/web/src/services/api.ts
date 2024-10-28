@@ -1,7 +1,7 @@
 import { Account, Property, CreateAccountDto, CreatePropertyRequest } from '@fieldhive/shared';
 import { Contact } from '../components/properties/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface AccountsResponse {
   accounts: Account[];
@@ -32,6 +32,10 @@ interface Job {
     property_id: string;
     name: string;
     address: string;
+  };
+  account: {
+    account_id: string;
+    name: string;
   };
   status: string;
   notes?: string;
@@ -186,19 +190,26 @@ export async function deleteJobType(jobTypeId: string): Promise<void> {
 }
 
 export async function getJobs(page: number, pageSize: number): Promise<JobsResponse> {
+  console.log(`Fetching jobs from ${API_BASE_URL}/jobs?page=${page}&pageSize=${pageSize}`);
   try {
     const response = await fetch(`${API_BASE_URL}/jobs?page=${page}&pageSize=${pageSize}`);
+    console.log('Jobs API response status:', response.status);
     if (!response.ok) {
-      throw new Error('Failed to fetch jobs');
+      const errorText = await response.text();
+      console.error('Error response text:', errorText);
+      throw new Error(`Failed to fetch jobs: ${errorText}`);
     }
-    return response.json();
+    const data = await response.json();
+    console.log('Jobs API response data:', data);
+    return data;
   } catch (error) {
     console.error('Error fetching jobs:', error);
-    return { jobs: [], total: 0, page, pageSize };
+    throw error;
   }
 }
 
 export async function createJob(data: { property_id: string; job_type_id: string; notes?: string }): Promise<Job> {
+  console.log('Creating job with data:', data);
   const response = await fetch(`${API_BASE_URL}/jobs`, {
     method: 'POST',
     headers: {
@@ -209,6 +220,7 @@ export async function createJob(data: { property_id: string; job_type_id: string
 
   if (!response.ok) {
     const error = await response.text();
+    console.error('Create job error response:', error);
     throw new Error(`Failed to create job: ${error}`);
   }
 

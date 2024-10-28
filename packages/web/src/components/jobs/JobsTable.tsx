@@ -11,7 +11,10 @@ import {
     DialogActions,
     Button,
     TextField,
-    MenuItem
+    MenuItem,
+    Snackbar,
+    Alert,
+    Typography
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
@@ -29,6 +32,10 @@ interface Job {
         name: string;
         address: string;
     };
+    account: {
+        account_id: string;
+        name: string;
+    } | null;
     status: string;
     notes?: string;
     created_at: string;
@@ -75,7 +82,7 @@ const EditDialog: React.FC<EditDialogProps> = ({ open, job, onClose, onSave }) =
                     >
                         {jobStatuses.map((s) => (
                             <MenuItem key={s} value={s}>
-                                {s.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                {s.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                             </MenuItem>
                         ))}
                     </TextField>
@@ -105,14 +112,28 @@ export default function JobsTable() {
     const [loading, setLoading] = useState(true);
     const [editJob, setEditJob] = useState<Job | null>(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [error, setError] = useState<string | null>(null);
 
     const columns: GridColDef[] = [
         {
             field: 'job_type',
             headerName: 'Job Type',
             flex: 1,
-            minWidth: 200,
+            minWidth: 150,
             valueGetter: (params) => params.value.name
+        },
+        {
+            field: 'account',
+            headerName: 'Account',
+            flex: 1,
+            minWidth: 150,
+            renderCell: (params) => {
+                const account = params.value;
+                if (!account) {
+                    return <Typography color="text.secondary">No Account</Typography>;
+                }
+                return account.name;
+            }
         },
         {
             field: 'property',
@@ -126,7 +147,7 @@ export default function JobsTable() {
             headerName: 'Status',
             width: 130,
             valueFormatter: (params) => 
-                params.value.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+                params.value.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
         },
         {
             field: 'created_at',
@@ -170,20 +191,37 @@ export default function JobsTable() {
 
     const fetchJobs = async () => {
         try {
+            console.log('Fetching jobs with page:', page + 1, 'pageSize:', pageSize);
             setLoading(true);
             const response = await getJobs(page + 1, pageSize);
+            console.log('Jobs response:', response);
             setJobs(response.jobs);
             setTotalRows(response.total);
         } catch (error) {
             console.error('Failed to fetch jobs:', error);
+            setError('Failed to fetch jobs. Please try again later.');
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
+        console.log('JobsTable useEffect triggered');
         fetchJobs();
     }, [page, pageSize, refreshTrigger]);
+
+    // Listen for jobsUpdated event
+    useEffect(() => {
+        const handleJobsUpdated = () => {
+            console.log('Jobs updated event received');
+            setRefreshTrigger(prev => prev + 1);
+        };
+
+        window.addEventListener('jobsUpdated', handleJobsUpdated);
+        return () => {
+            window.removeEventListener('jobsUpdated', handleJobsUpdated);
+        };
+    }, []);
 
     const handleUpdateJob = async (jobId: string, data: { status: string; notes?: string }) => {
         try {
@@ -192,6 +230,7 @@ export default function JobsTable() {
             setRefreshTrigger(prev => prev + 1);
         } catch (error) {
             console.error('Failed to update job:', error);
+            setError('Failed to update job. Please try again later.');
         }
     };
 
@@ -205,8 +244,17 @@ export default function JobsTable() {
             setRefreshTrigger(prev => prev + 1);
         } catch (error) {
             console.error('Failed to delete job:', error);
+            setError('Failed to delete job. Please try again later.');
         }
     };
+
+    if (loading && jobs.length === 0) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 435 }}>
+                <Typography>Loading jobs...</Typography>
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{ height: 435, width: '100%' }}>
@@ -231,6 +279,16 @@ export default function JobsTable() {
                 onClose={() => setEditJob(null)}
                 onSave={handleUpdateJob}
             />
+
+            <Snackbar
+                open={!!error}
+                autoHideDuration={6000}
+                onClose={() => setError(null)}
+            >
+                <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+                    {error}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }

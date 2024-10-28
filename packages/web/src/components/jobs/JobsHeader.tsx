@@ -5,6 +5,7 @@ import { Box, Typography, Button, TextField, InputAdornment } from '@mui/materia
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import AddJobDialog from './AddJobDialog';
+import { createJob } from '../../services/api';
 
 interface Job {
     job_id: string;
@@ -20,6 +21,7 @@ interface Job {
 export default function JobsHeader() {
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [error, setError] = useState<string | null>(null);
 
     const handleOpenAddDialog = () => {
         setIsAddDialogOpen(true);
@@ -29,10 +31,16 @@ export default function JobsHeader() {
         setIsAddDialogOpen(false);
     };
 
-    const handleAddJob = (data: { property_id: string; job_type_id: string }) => {
-        // TODO: Implement job creation logic
-        console.log('New job:', data);
-        handleCloseAddDialog();
+    const handleAddJob = async (data: { property_id: string; job_type_id: string }) => {
+        try {
+            await createJob(data);
+            handleCloseAddDialog();
+            // Trigger a refresh of the jobs table
+            window.dispatchEvent(new CustomEvent('jobsUpdated'));
+        } catch (error) {
+            console.error('Failed to create job:', error);
+            setError('Failed to create job. Please try again.');
+        }
     };
 
     return (

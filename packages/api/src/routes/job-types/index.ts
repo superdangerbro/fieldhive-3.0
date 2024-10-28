@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AppDataSource } from '../../config/database';
 import { logger } from '../../utils/logger';
+import { sql } from '../../utils/sql';
 
 const router = Router();
 
@@ -8,12 +9,15 @@ const router = Router();
 router.get('/', async (req, res) => {
     try {
         logger.info('Fetching job types...');
+        const selectFields = sql.fields([
+            { name: 'job_type_id', alias: 'id' },
+            { name: 'name' },
+            { name: 'created_at', alias: 'createdAt' },
+            { name: 'updated_at', alias: 'updatedAt' }
+        ]);
+
         const jobTypes = await AppDataSource.query(
-            `SELECT 
-                job_type_id as id,
-                name,
-                created_at as "createdAt",
-                updated_at as "updatedAt"
+            `SELECT ${selectFields}
             FROM job_types
             ORDER BY name ASC`
         );
@@ -55,6 +59,13 @@ router.post('/', async (req, res) => {
         }
 
         // Create new job type
+        const selectFields = sql.fields([
+            { name: 'job_type_id', alias: 'id' },
+            { name: 'name' },
+            { name: 'created_at', alias: 'createdAt' },
+            { name: 'updated_at', alias: 'updatedAt' }
+        ]);
+
         const [jobType] = await AppDataSource.query(
             `INSERT INTO job_types (
                 name,
@@ -62,11 +73,7 @@ router.post('/', async (req, res) => {
                 updated_at
             )
             VALUES ($1, NOW(), NOW())
-            RETURNING 
-                job_type_id as id,
-                name,
-                created_at as "createdAt",
-                updated_at as "updatedAt"`,
+            RETURNING ${selectFields}`,
             [name.trim()]
         );
 
@@ -84,6 +91,19 @@ router.post('/', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
+
+        // Check if job type is in use
+        const jobsUsingType = await AppDataSource.query(
+            'SELECT COUNT(*) as count FROM jobs WHERE job_type_id = $1',
+            [id]
+        );
+
+        if (parseInt(jobsUsingType[0].count) > 0) {
+            return res.status(409).json({
+                error: 'Conflict',
+                message: 'Cannot delete job type that is in use'
+            });
+        }
 
         const result = await AppDataSource.query(
             'DELETE FROM job_types WHERE job_type_id = $1 RETURNING job_type_id',

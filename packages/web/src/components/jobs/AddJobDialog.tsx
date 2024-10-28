@@ -19,34 +19,15 @@ import {
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { getAccounts, getProperties, getJobTypes } from '../../services/api';
-import { Point, Polygon } from 'geojson';
-import { PropertyType, PropertyStatus } from '@fieldhive/shared/src/types/property';
+import { Property, PropertyType, PropertyStatus } from '@fieldhive/shared/src/types/property';
+import { Account } from '@fieldhive/shared/src/types/account';
 
-interface Account {
-    id: string;
+// Match the API's JobType interface with aliased id
+interface ApiJobType {
+    id: string; // This is actually job_type_id aliased as id in the API
     name: string;
-}
-
-interface PropertyAccount {
-    accountId: string;
-    name: string;
-    role: string;
-}
-
-interface Property {
-    id: string;
-    name: string;
-    address: string;
-    location: Point;
-    boundary?: Polygon;
-    type: PropertyType;
-    status: PropertyStatus;
-    accounts: PropertyAccount[];
-}
-
-interface JobType {
-    id: string;
-    name: string;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 interface AddJobDialogProps {
@@ -67,12 +48,18 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
     const [propertySearchQuery, setPropertySearchQuery] = useState('');
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
-    const [jobTypes, setJobTypes] = useState<JobType[]>([]);
+    const [jobTypes, setJobTypes] = useState<ApiJobType[]>([]);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchAccounts = async () => {
-            const response = await getAccounts();
-            setAccounts(response.accounts);
+            try {
+                const response = await getAccounts();
+                setAccounts(response.accounts);
+            } catch (error) {
+                console.error('Error fetching accounts:', error);
+                setError('Failed to fetch accounts');
+            }
         };
 
         const fetchJobTypes = async () => {
@@ -83,6 +70,7 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
                 setJobTypes(response.jobTypes);
             } catch (error) {
                 console.error('Error fetching job types:', error);
+                setError('Failed to fetch job types');
             }
         };
 
@@ -92,13 +80,18 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
 
     useEffect(() => {
         const fetchProperties = async () => {
-            const response = await getProperties(1, 100);
-            if (selectedAccount) {
-                setProperties(response.properties.filter((p: Property) => 
-                    p.accounts.some(account => account.accountId === selectedAccount.id)
-                ));
-            } else {
-                setProperties([]);
+            try {
+                const response = await getProperties(1, 100);
+                if (selectedAccount) {
+                    setProperties(response.properties.filter((p: Property) => 
+                        p.accounts.some(account => account.accountId === selectedAccount.id)
+                    ));
+                } else {
+                    setProperties([]);
+                }
+            } catch (error) {
+                console.error('Error fetching properties:', error);
+                setError('Failed to fetch properties');
             }
         };
 
@@ -126,6 +119,10 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
 
     const handleSubmit = () => {
         if (!selectedProperty) return;
+        console.log('Submitting job with data:', {
+            property_id: selectedProperty.id,
+            job_type_id: selectedJobType
+        });
         onSubmit({
             property_id: selectedProperty.id,
             job_type_id: selectedJobType
@@ -140,6 +137,7 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
         setSelectedJobType('');
         setAccountSearchQuery('');
         setPropertySearchQuery('');
+        setError(null);
         onClose();
     };
 
@@ -246,6 +244,11 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
                     <Box sx={{ mt: 4, mb: 2 }}>
                         {getStepContent(activeStep)}
                     </Box>
+                    {error && (
+                        <Typography color="error" sx={{ mt: 2 }}>
+                            {error}
+                        </Typography>
+                    )}
                 </Box>
             </DialogContent>
             <DialogActions>
