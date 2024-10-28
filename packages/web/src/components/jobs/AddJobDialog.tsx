@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -18,24 +18,35 @@ import {
     Link
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
+import { getAccounts, getProperties, getJobTypes } from '../../services/api';
+import { Point, Polygon } from 'geojson';
+import { PropertyType, PropertyStatus } from '@fieldhive/shared/src/types/property';
 
 interface Account {
     id: string;
     name: string;
 }
 
+interface PropertyAccount {
+    accountId: string;
+    name: string;
+    role: string;
+}
+
 interface Property {
     id: string;
     name: string;
-    account: {
-        id: string;
-        name: string;
-    };
+    address: string;
+    location: Point;
+    boundary?: Polygon;
+    type: PropertyType;
+    status: PropertyStatus;
+    accounts: PropertyAccount[];
 }
 
 interface JobType {
-    job_type_id: string;
-    job_name: string;
+    id: string;
+    name: string;
 }
 
 interface AddJobDialogProps {
@@ -54,11 +65,45 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
     const [selectedJobType, setSelectedJobType] = useState<string>('');
     const [accountSearchQuery, setAccountSearchQuery] = useState('');
     const [propertySearchQuery, setPropertySearchQuery] = useState('');
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [properties, setProperties] = useState<Property[]>([]);
+    const [jobTypes, setJobTypes] = useState<JobType[]>([]);
 
-    // TODO: Replace with actual data fetching
-    const accounts: Account[] = [];
-    const properties: Property[] = [];
-    const jobTypes: JobType[] = [];
+    useEffect(() => {
+        const fetchAccounts = async () => {
+            const response = await getAccounts();
+            setAccounts(response.accounts);
+        };
+
+        const fetchJobTypes = async () => {
+            try {
+                console.log('Fetching job types...');
+                const response = await getJobTypes();
+                console.log('Job types response:', response);
+                setJobTypes(response.jobTypes);
+            } catch (error) {
+                console.error('Error fetching job types:', error);
+            }
+        };
+
+        fetchAccounts();
+        fetchJobTypes();
+    }, []);
+
+    useEffect(() => {
+        const fetchProperties = async () => {
+            const response = await getProperties(1, 100);
+            if (selectedAccount) {
+                setProperties(response.properties.filter((p: Property) => 
+                    p.accounts.some(account => account.accountId === selectedAccount.id)
+                ));
+            } else {
+                setProperties([]);
+            }
+        };
+
+        fetchProperties();
+    }, [selectedAccount]);
 
     const handleCreateNewAccount = () => {
         onClose();
@@ -130,7 +175,7 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
                     <Box>
                         <Autocomplete
                             fullWidth
-                            options={properties.filter(p => p.account.id === selectedAccount?.id)}
+                            options={properties}
                             getOptionLabel={(option) => option.name}
                             value={selectedProperty}
                             onChange={(_, newValue) => setSelectedProperty(newValue)}
@@ -151,6 +196,7 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
                     </Box>
                 );
             case 2:
+                console.log('Available job types:', jobTypes);
                 return (
                     <TextField
                         select
@@ -161,8 +207,8 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
                         sx={{ mt: 2 }}
                     >
                         {jobTypes.map((type) => (
-                            <MenuItem key={type.job_type_id} value={type.job_type_id}>
-                                {type.job_name}
+                            <MenuItem key={type.id} value={type.id}>
+                                {type.name}
                             </MenuItem>
                         ))}
                     </TextField>

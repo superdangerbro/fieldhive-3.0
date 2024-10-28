@@ -6,9 +6,19 @@ export const getAccounts = async (req: Request, res: Response) => {
     try {
         const page = parseInt(req.query.page as string) || 1;
         const pageSize = parseInt(req.query.pageSize as string) || 10;
+        const search = req.query.search as string;
         const offset = (page - 1) * pageSize;
 
-        logger.info(`Fetching accounts with page ${page}, pageSize ${pageSize}, offset ${offset}`);
+        logger.info(`Fetching accounts with page ${page}, pageSize ${pageSize}, offset ${offset}, search ${search}`);
+
+        // Build the WHERE clause for search
+        const whereClause = search 
+            ? `WHERE LOWER(a.name) LIKE LOWER($3)` 
+            : '';
+
+        const params = search 
+            ? [pageSize, offset, `%${search}%`]
+            : [pageSize, offset];
 
         const [accounts, total] = await Promise.all([
             AppDataSource.query(
@@ -32,8 +42,8 @@ export const getAccounts = async (req: Request, res: Response) => {
                             json_build_object(
                                 'propertyId', p.property_id,
                                 'name', p.name,
-                                'address1', p.address1,  -- Updated to address1
-                                'address2', p.address2,  -- Updated to address2
+                                'address1', p.address1,
+                                'address2', p.address2,
                                 'role', paj.role,
                                 'billingAddress', CASE
                                     WHEN pba.use_account_billing THEN json_build_object(
@@ -60,6 +70,7 @@ export const getAccounts = async (req: Request, res: Response) => {
                 LEFT JOIN properties_accounts_join paj ON paj.account_id = a.account_id
                 LEFT JOIN properties p ON p.property_id = paj.property_id
                 LEFT JOIN property_billing_address pba ON pba.property_id = p.property_id
+                ${whereClause}
                 GROUP BY 
                     a.account_id,
                     aba.address1,
@@ -70,9 +81,12 @@ export const getAccounts = async (req: Request, res: Response) => {
                     aba.country
                 ORDER BY a.created_at DESC
                 LIMIT $1 OFFSET $2`,
-                [pageSize, offset]
+                params
             ),
-            AppDataSource.query('SELECT COUNT(*) as total FROM accounts')
+            AppDataSource.query(
+                `SELECT COUNT(*) as total FROM accounts a ${whereClause}`,
+                search ? [`%${search}%`] : []
+            )
         ]);
 
         // Format response
