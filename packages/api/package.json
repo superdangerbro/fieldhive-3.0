@@ -12,7 +12,8 @@
     "generate-migration": "ts-node src/scripts/generate-migration.ts",
     "run-migrations": "ts-node src/scripts/run-migrations.ts",
     "revert-migration": "ts-node src/scripts/revert-migration.ts",
-    "setup-equipment": "ts-node src/scripts/setup-equipment.ts"
+    "setup-equipment": "ts-node src/scripts/setup-equipment.ts",
+    "drop-tables": "ts-node src/scripts/drop-tables.ts"
   },
   "dependencies": {
     "@types/cors": "^2.8.13",

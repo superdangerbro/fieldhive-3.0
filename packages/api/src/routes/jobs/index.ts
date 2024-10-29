@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { AppDataSource } from '../../config/database';
 import { logger } from '../../utils/logger';
+import { Setting } from '../../entities/Setting';
 
 const router = Router();
+const JOB_TYPES_SETTING_KEY = 'job_types';
 
 const GET_JOBS_QUERY = `
 SELECT 
@@ -14,20 +16,19 @@ SELECT
     j.created_at,
     j.updated_at,
     jsonb_build_object(
-        'job_type_id', jt.job_type_id, 
-        'name', jt.name
+        'job_type_id', j.job_type_id,
+        'name', j.job_type_id
     ) as job_type,
     jsonb_build_object(
-        'property_id', p.property_id, 
-        'name', p.name, 
-        'address', CONCAT_WS(', ', p.address1, p.city, p.province)
+        'property_id', p.property_id,
+        'name', p.name,
+        'address', CONCAT_WS(', ', NULLIF(p.address1, ''), NULLIF(p.city, ''), NULLIF(p.province, ''))
     ) as property,
     jsonb_build_object(
         'account_id', a.account_id,
         'name', a.name
     ) as account
 FROM jobs j
-LEFT JOIN job_types jt ON jt.job_type_id = j.job_type_id
 LEFT JOIN properties p ON p.property_id = j.property_id
 LEFT JOIN properties_accounts_join pa ON pa.property_id = p.property_id
 LEFT JOIN accounts a ON a.account_id = pa.account_id`;
@@ -105,19 +106,13 @@ router.post('/', async (req, res) => {
             });
         }
 
-        // Verify property and job type exist
-        const [propertyExists, jobTypeExists] = await Promise.all([
-            AppDataSource.query(
-                'SELECT property_id FROM properties WHERE property_id = $1',
-                [property_id]
-            ),
-            AppDataSource.query(
-                'SELECT job_type_id FROM job_types WHERE job_type_id = $1',
-                [job_type_id]
-            )
-        ]);
+        // Verify property exists
+        const [propertyExists] = await AppDataSource.query(
+            'SELECT property_id FROM properties WHERE property_id = $1',
+            [property_id]
+        );
 
-        if (!propertyExists.length) {
+        if (!propertyExists) {
             logger.error('Property not found:', property_id);
             return res.status(404).json({
                 error: 'Not found',
@@ -125,7 +120,14 @@ router.post('/', async (req, res) => {
             });
         }
 
-        if (!jobTypeExists.length) {
+        // Verify job type exists in settings
+        const settingsRepository = AppDataSource.getRepository(Setting);
+        const jobTypesSetting = await settingsRepository.findOne({
+            where: { key: JOB_TYPES_SETTING_KEY }
+        });
+
+        const jobTypes = jobTypesSetting?.value || [];
+        if (!jobTypes.includes(job_type_id)) {
             logger.error('Job type not found:', job_type_id);
             return res.status(404).json({
                 error: 'Not found',

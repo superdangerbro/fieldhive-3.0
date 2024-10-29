@@ -1,256 +1,100 @@
-import { Account, Property, CreateAccountDto, CreatePropertyRequest } from '@fieldhive/shared';
-import { Contact } from '../components/properties/types';
+// API base URL
+const API_BASE = 'http://localhost:3001/api';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+// API endpoints
+export const API_ENDPOINTS = {
+    ACCOUNTS: `${API_BASE}/accounts`,
+    DASHBOARD: `${API_BASE}/dashboard`,
+    EQUIPMENT_TYPES: `${API_BASE}/equipment_types`,
+    FIELD_EQUIPMENT: `${API_BASE}/field_equipment`,
+    FIELDS: `${API_BASE}/fields`,
+    HEALTH: `${API_BASE}/health`,
+    INSPECTIONS: `${API_BASE}/inspections`,
+    JOB_TYPES: `${API_BASE}/job_types`,
+    JOBS: `${API_BASE}/jobs`,
+    PROPERTIES: `${API_BASE}/properties`,
+    SENSORS: `${API_BASE}/sensors`
+};
 
-interface AccountsResponse {
-  accounts: Account[];
-  total: number;
-}
-
-interface PropertiesResponse {
-  properties: Property[];
-  total: number;
-}
-
-export interface JobType {
-  id: string;
-  name: string;
-}
-
-export interface JobTypesResponse {
-  jobTypes: JobType[];
-}
-
-export interface Job {
-  job_id: string;
-  job_type: {
-    job_type_id: string;
-    name: string;
-  };
-  property: {
-    property_id: string;
-    name: string;
-    address: string;
-  };
-  account: {
-    account_id: string;
-    name: string;
-  };
-  status: string;
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface JobsResponse {
-  jobs: Job[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
-export async function getAccounts(): Promise<AccountsResponse> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/accounts`);
+// Generic API functions
+export async function fetchData(endpoint: string) {
+    const response = await fetch(endpoint);
     if (!response.ok) {
-      throw new Error('Failed to fetch accounts');
+        throw new Error(`HTTP error! status: ${response.status}`);
     }
     return response.json();
-  } catch (error) {
-    console.error('Error fetching accounts:', error);
-    return { accounts: [], total: 0 };
-  }
 }
 
-export async function getProperties(page: number, pageSize: number): Promise<PropertiesResponse> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/properties?page=${page}&pageSize=${pageSize}`);
+export async function postData(endpoint: string, data: any) {
+    const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+    });
     if (!response.ok) {
-      throw new Error('Failed to fetch properties');
+        throw new Error(`HTTP error! status: ${response.status}`);
     }
     return response.json();
-  } catch (error) {
-    console.error('Error fetching properties:', error);
-    return { properties: [], total: 0 };
-  }
 }
 
-export async function createAccount(accountData: CreateAccountDto): Promise<Account> {
-  const response = await fetch(`${API_BASE_URL}/accounts`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(accountData),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to create account: ${error}`);
-  }
-
-  return response.json();
-}
-
-export async function updateAccount(accountId: string, accountData: CreateAccountDto): Promise<Account> {
-  const response = await fetch(`${API_BASE_URL}/accounts/${accountId}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(accountData),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to update account: ${error}`);
-  }
-
-  return response.json();
-}
-
-export async function createProperty(data: CreatePropertyRequest): Promise<Property> {
-  console.log('API createProperty payload:', JSON.stringify(data, null, 2));
-  
-  const response = await fetch(`${API_BASE_URL}/properties`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Create property error response:', errorText);
-    throw new Error(`Failed to create property: ${errorText}`);
-  }
-
-  return response.json();
-}
-
-export async function updateProperty(propertyId: string, propertyData: CreatePropertyRequest): Promise<Property> {
-  const response = await fetch(`${API_BASE_URL}/properties/${propertyId}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(propertyData),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Update property error response:', errorText);
-    throw new Error(`Failed to update property: ${errorText}`);
-  }
-
-  return response.json();
-}
-
-export async function getJobTypes(): Promise<JobTypesResponse> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/job-types`);
+export async function putData(endpoint: string, data: any) {
+    const response = await fetch(endpoint, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+    });
     if (!response.ok) {
-      throw new Error('Failed to fetch job types');
+        throw new Error(`HTTP error! status: ${response.status}`);
     }
     return response.json();
-  } catch (error) {
-    console.error('Error fetching job types:', error);
-    return { jobTypes: [] };
-  }
 }
 
-export async function addJobType(jobTypeData: { name: string }): Promise<JobType> {
-  const response = await fetch(`${API_BASE_URL}/job-types`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(jobTypeData),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to add job type: ${error}`);
-  }
-
-  return response.json();
-}
-
-export async function deleteJobType(jobTypeId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/job-types/${jobTypeId}`, {
-    method: 'DELETE',
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to delete job type: ${error}`);
-  }
-}
-
-export async function getJobs(page: number, pageSize: number): Promise<JobsResponse> {
-  console.log(`Fetching jobs from ${API_BASE_URL}/jobs?page=${page}&pageSize=${pageSize}`);
-  try {
-    const response = await fetch(`${API_BASE_URL}/jobs?page=${page}&pageSize=${pageSize}`);
-    console.log('Jobs API response status:', response.status);
+export async function deleteData(endpoint: string) {
+    const response = await fetch(endpoint, {
+        method: 'DELETE',
+    });
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error response text:', errorText);
-      throw new Error(`Failed to fetch jobs: ${errorText}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
     }
-    const data = await response.json();
-    console.log('Jobs API response data:', data);
-    return data;
-  } catch (error) {
-    console.error('Error fetching jobs:', error);
-    throw error;
-  }
+    return response.json();
 }
 
-export async function createJob(data: { property_id: string; job_type_id: string; notes?: string }): Promise<Job> {
-  console.log('Creating job with data:', data);
-  const response = await fetch(`${API_BASE_URL}/jobs`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
+// Account APIs
+export const getAccounts = () => fetchData(API_ENDPOINTS.ACCOUNTS);
+export const createAccount = (data: any) => postData(API_ENDPOINTS.ACCOUNTS, data);
+export const updateAccount = (id: string, data: any) => putData(`${API_ENDPOINTS.ACCOUNTS}/${id}`, data);
+export const deleteAccount = (id: string) => deleteData(`${API_ENDPOINTS.ACCOUNTS}/${id}`);
 
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Create job error response:', error);
-    throw new Error(`Failed to create job: ${error}`);
-  }
+// Job APIs
+export const getJobs = () => fetchData(API_ENDPOINTS.JOBS);
+export const createJob = (data: any) => postData(API_ENDPOINTS.JOBS, data);
+export const updateJob = (id: string, data: any) => putData(`${API_ENDPOINTS.JOBS}/${id}`, data);
+export const deleteJob = (id: string) => deleteData(`${API_ENDPOINTS.JOBS}/${id}`);
 
-  return response.json();
-}
+// Job Type APIs
+export const getJobTypes = () => fetchData(API_ENDPOINTS.JOB_TYPES);
+export const createJobType = (data: any) => postData(API_ENDPOINTS.JOB_TYPES, data);
+export const updateJobType = (id: string, data: any) => putData(`${API_ENDPOINTS.JOB_TYPES}/${id}`, data);
+export const deleteJobType = (id: string) => deleteData(`${API_ENDPOINTS.JOB_TYPES}/${id}`);
 
-export async function updateJob(jobId: string, data: { status?: string; notes?: string }): Promise<Job> {
-  const response = await fetch(`${API_BASE_URL}/jobs/${jobId}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
+// Property APIs
+export const getProperties = () => fetchData(API_ENDPOINTS.PROPERTIES);
+export const createProperty = (data: any) => postData(API_ENDPOINTS.PROPERTIES, data);
+export const updateProperty = (id: string, data: any) => putData(`${API_ENDPOINTS.PROPERTIES}/${id}`, data);
+export const deleteProperty = (id: string) => deleteData(`${API_ENDPOINTS.PROPERTIES}/${id}`);
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to update job: ${error}`);
-  }
+// Equipment Type APIs
+export const getEquipmentTypes = () => fetchData(API_ENDPOINTS.EQUIPMENT_TYPES);
+export const saveEquipmentTypes = (data: any) => postData(API_ENDPOINTS.EQUIPMENT_TYPES, data);
+export const getEquipmentStatuses = () => fetchData(`${API_ENDPOINTS.EQUIPMENT_TYPES}/status`);
+export const saveEquipmentStatuses = (data: any) => postData(`${API_ENDPOINTS.EQUIPMENT_TYPES}/status`, data);
 
-  return response.json();
-}
-
-export async function deleteJob(jobId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/jobs/${jobId}`, {
-    method: 'DELETE',
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to delete job: ${error}`);
-  }
-}
+// Field Equipment APIs
+export const getFieldEquipment = () => fetchData(API_ENDPOINTS.FIELD_EQUIPMENT);
+export const createFieldEquipment = (data: any) => postData(API_ENDPOINTS.FIELD_EQUIPMENT, data);
+export const updateFieldEquipment = (id: string, data: any) => putData(`${API_ENDPOINTS.FIELD_EQUIPMENT}/${id}`, data);
+export const deleteFieldEquipment = (id: string) => deleteData(`${API_ENDPOINTS.FIELD_EQUIPMENT}/${id}`);

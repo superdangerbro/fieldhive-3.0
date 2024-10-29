@@ -14,21 +14,12 @@ import {
     Stepper,
     Step,
     StepLabel,
-    Autocomplete,
-    Link
+    Autocomplete
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { getAccounts, getProperties, getJobTypes } from '../../services/api';
-import { Property, PropertyType, PropertyStatus } from '@fieldhive/shared/src/types/property';
+import { Property } from '@fieldhive/shared/src/types/property';
 import { Account } from '@fieldhive/shared/src/types/account';
-
-// Match the API's JobType interface with aliased id
-interface ApiJobType {
-    id: string; // This is actually job_type_id aliased as id in the API
-    name: string;
-    createdAt?: string;
-    updatedAt?: string;
-}
 
 interface AddJobDialogProps {
     open: boolean;
@@ -48,7 +39,7 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
     const [propertySearchQuery, setPropertySearchQuery] = useState('');
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
-    const [jobTypes, setJobTypes] = useState<ApiJobType[]>([]);
+    const [jobTypes, setJobTypes] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -64,10 +55,9 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
 
         const fetchJobTypes = async () => {
             try {
-                console.log('Fetching job types...');
                 const response = await getJobTypes();
-                console.log('Job types response:', response);
-                setJobTypes(response.jobTypes);
+                const types = response?.jobTypes?.map((type: any) => type.name) || [];
+                setJobTypes(types);
             } catch (error) {
                 console.error('Error fetching job types:', error);
                 setError('Failed to fetch job types');
@@ -81,7 +71,7 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
     useEffect(() => {
         const fetchProperties = async () => {
             try {
-                const response = await getProperties(1, 100);
+                const response = await getProperties();
                 if (selectedAccount) {
                     setProperties(response.properties.filter((p: Property) => 
                         p.accounts.some(account => account.accountId === selectedAccount.id)
@@ -119,13 +109,9 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
 
     const handleSubmit = () => {
         if (!selectedProperty) return;
-        console.log('Submitting job with data:', {
-            property_id: selectedProperty.id,
-            job_type_id: selectedJobType
-        });
         onSubmit({
             property_id: selectedProperty.id,
-            job_type_id: selectedJobType
+            job_type_id: selectedJobType // Using the job type name as the ID
         });
         handleClose();
     };
@@ -194,7 +180,6 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
                     </Box>
                 );
             case 2:
-                console.log('Available job types:', jobTypes);
                 return (
                     <TextField
                         select
@@ -205,8 +190,8 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
                         sx={{ mt: 2 }}
                     >
                         {jobTypes.map((type) => (
-                            <MenuItem key={type.id} value={type.id}>
-                                {type.name}
+                            <MenuItem key={type} value={type}>
+                                {type}
                             </MenuItem>
                         ))}
                     </TextField>
