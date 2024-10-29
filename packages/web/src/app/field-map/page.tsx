@@ -6,8 +6,8 @@ import { Box, CircularProgress } from '@mui/material';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 // Dynamically import the map component to avoid SSR issues
-const TechnicianMap = dynamic(
-  () => import('../../components/technician/TechnicianMap'),
+const FieldMap = dynamic(
+  () => import('./components/FieldMap'),
   {
     loading: () => (
       <Box
@@ -26,7 +26,7 @@ const TechnicianMap = dynamic(
   }
 );
 
-export default function TechnicianPage() {
+export default function FieldMapPage() {
   return (
     <Box
       sx={{
@@ -38,7 +38,7 @@ export default function TechnicianPage() {
         flexDirection: 'column',
       }}
     >
-      <TechnicianMap />
+      <FieldMap />
     </Box>
   );
 }

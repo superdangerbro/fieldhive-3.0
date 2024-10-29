@@ -36,7 +36,7 @@ interface MapStore {
 const INITIAL_VIEW_STATE = {
   longitude: -123.1207,
   latitude: 49.2827,
-  zoom: 12
+  zoom: 11
 };
 
 const MAP_STYLES = [
@@ -48,7 +48,7 @@ const MAP_STYLES = [
 export const useMapStore = create<MapStore>((set, get) => ({
   viewState: INITIAL_VIEW_STATE,
   mapStyle: MAP_STYLES[0], // Start with night style
-  isTracking: true, // Start with tracking enabled
+  isTracking: false, // Start with tracking disabled until geolocation is ready
   userLocation: null,
   watchId: null,
   mapRef: null,

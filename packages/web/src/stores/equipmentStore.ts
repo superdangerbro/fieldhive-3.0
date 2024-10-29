@@ -1,42 +1,62 @@
 import { create } from 'zustand';
-import { MapRef } from 'react-map-gl';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+import { API_ENDPOINTS } from '../services/api';
 
 interface Equipment {
   equipment_id: string;
   equipment_type_id: string;
-  equipment_type_name: string;
-  job_id: string;
   location: {
     type: 'Point';
     coordinates: [number, number];
   };
-  is_georeferenced: boolean;
+  status: string;
+  data: Record<string, any>;
   created_at: string;
   updated_at: string;
   equipment_type: {
-    id: string;
     name: string;
+    fields: Array<{
+      name: string;
+      type: string;
+      required: boolean;
+      options?: string[];
+      numberConfig?: {
+        min?: number;
+        max?: number;
+        step?: number;
+      };
+      showWhen?: Array<{
+        field: string;
+        value: any;
+        makeRequired?: boolean;
+      }>;
+    }>;
   };
-  job: {
-    id: string;
-    status: string;
-    job_type: string;
-  };
-  property: {
-    id: string;
+}
+
+interface EquipmentType {
+  name: string;
+  fields: Array<{
     name: string;
-    address: string;
-  };
-  account: {
-    id: string;
-    name: string;
-  };
+    type: string;
+    required: boolean;
+    options?: string[];
+    numberConfig?: {
+      min?: number;
+      max?: number;
+      step?: number;
+    };
+    showWhen?: Array<{
+      field: string;
+      value: any;
+      makeRequired?: boolean;
+    }>;
+  }>;
 }
 
 interface EquipmentStore {
   equipment: Equipment[];
+  equipmentTypes: EquipmentType[];
+  equipmentStatuses: string[];
   selectedEquipment: Equipment | null;
   isPlacingEquipment: boolean;
   placementLocation: [number, number] | null;
@@ -44,6 +64,9 @@ interface EquipmentStore {
   isMarkerDialogOpen: boolean;
   currentBounds: [number, number, number, number] | null;
   
+  // Equipment management
+  fetchEquipmentTypes: () => Promise<void>;
+  fetchEquipmentStatuses: () => Promise<void>;
   setSelectedEquipment: (equipment: Equipment | null) => void;
   setCurrentBounds: (bounds: [number, number, number, number]) => void;
   fetchEquipmentInBounds: (bounds: [number, number, number, number]) => Promise<void>;
@@ -56,7 +79,11 @@ interface EquipmentStore {
   setPlacementLocation: (location: [number, number] | null) => void;
   confirmPlacementLocation: () => void;
   closeAddEquipmentDialog: () => void;
-  submitNewEquipment: (data: { jobId: string; equipmentTypeId: string }) => Promise<void>;
+  submitNewEquipment: (data: { 
+    equipment_type_id: string;
+    status: string;
+    data: Record<string, any>;
+  }) => Promise<void>;
 
   // Marker dialog actions
   openMarkerDialog: (equipment: Equipment) => void;
@@ -65,6 +92,8 @@ interface EquipmentStore {
 
 export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
   equipment: [],
+  equipmentTypes: [],
+  equipmentStatuses: [],
   selectedEquipment: null,
   isPlacingEquipment: false,
   placementLocation: null,
@@ -72,6 +101,28 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
   isMarkerDialogOpen: false,
   currentBounds: null,
   
+  fetchEquipmentTypes: async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.EQUIPMENT_TYPES);
+      if (!response.ok) throw new Error('Failed to fetch equipment types');
+      const types = await response.json();
+      set({ equipmentTypes: types });
+    } catch (error) {
+      console.error('Error fetching equipment types:', error);
+    }
+  },
+
+  fetchEquipmentStatuses: async () => {
+    try {
+      const response = await fetch(`${API_ENDPOINTS.EQUIPMENT_TYPES}/status`);
+      if (!response.ok) throw new Error('Failed to fetch equipment statuses');
+      const statuses = await response.json();
+      set({ equipmentStatuses: statuses });
+    } catch (error) {
+      console.error('Error fetching equipment statuses:', error);
+    }
+  },
+
   setSelectedEquipment: (equipment) => set({ selectedEquipment: equipment }),
   
   setCurrentBounds: (bounds) => set({ currentBounds: bounds }),
@@ -79,7 +130,7 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
   fetchEquipmentInBounds: async (bounds) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/field-equipment?bounds=${bounds.join(',')}`
+        `${API_ENDPOINTS.FIELD_EQUIPMENT}?bounds=${bounds.join(',')}`
       );
 
       if (!response.ok) {
@@ -95,7 +146,7 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
 
   deleteEquipment: async (equipmentId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/field-equipment/${equipmentId}`, {
+      const response = await fetch(`${API_ENDPOINTS.FIELD_EQUIPMENT}/${equipmentId}`, {
         method: 'DELETE',
       });
 
@@ -122,8 +173,8 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
 
   updateEquipmentType: async (equipmentId, equipmentTypeId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/field-equipment/${equipmentId}`, {
-        method: 'PATCH',
+      const response = await fetch(`${API_ENDPOINTS.FIELD_EQUIPMENT}/${equipmentId}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -154,7 +205,6 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
   },
   
   startPlacingEquipment: () => {
-    console.log('Starting equipment placement mode');
     set({ 
       isPlacingEquipment: true,
       placementLocation: null 
@@ -162,7 +212,6 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
   },
 
   cancelPlacingEquipment: () => {
-    console.log('Canceling equipment placement');
     set({ 
       isPlacingEquipment: false,
       placementLocation: null,
@@ -171,23 +220,12 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
   },
 
   setPlacementLocation: (location) => {
-    if (location) {
-      console.log('Setting placement location:', {
-        longitude: location[0].toFixed(6),
-        latitude: location[1].toFixed(6)
-      });
-    }
     set({ placementLocation: location });
   },
 
   confirmPlacementLocation: () => {
     const { placementLocation } = get();
     if (placementLocation) {
-      console.log('Equipment location confirmed:', {
-        longitude: placementLocation[0].toFixed(6),
-        latitude: placementLocation[1].toFixed(6)
-      });
-      
       set({
         isPlacingEquipment: false,
         isAddEquipmentDialogOpen: true
@@ -208,39 +246,29 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
       throw new Error('No placement location set');
     }
 
-    console.log('Submitting new equipment:', {
-      ...data,
-      location: {
-        type: 'Point',
-        coordinates: placementLocation
-      }
-    });
-
     try {
-      const response = await fetch(`${API_BASE_URL}/field-equipment`, {
+      const response = await fetch(API_ENDPOINTS.FIELD_EQUIPMENT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          job_id: data.jobId,
-          equipment_type_id: data.equipmentTypeId,
+          equipment_type_id: data.equipment_type_id,
+          status: data.status,
           location: {
             type: 'Point',
             coordinates: placementLocation
           },
-          is_georeferenced: true
+          ...data.data
         })
       });
 
       if (!response.ok) {
         const error = await response.text();
-        console.error('Failed to add equipment:', error);
         throw new Error(`Failed to add equipment: ${error}`);
       }
 
       const result = await response.json();
-      console.log('Equipment added successfully:', result);
 
       // Refresh equipment in current bounds
       if (currentBounds) {
