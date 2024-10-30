@@ -77,6 +77,13 @@ export const theme = createTheme({
                     },
                     '&::-webkit-scrollbar-track, & *::-webkit-scrollbar-track': {
                         backgroundColor: '#0f172a'
+                    },
+                    // Ensure proper stacking for 3D components
+                    '& .deck-canvas': {
+                        zIndex: 1
+                    },
+                    '& .mapboxgl-map': {
+                        zIndex: 0
                     }
                 }
             }
@@ -86,7 +93,8 @@ export const theme = createTheme({
                 root: {
                     textTransform: 'none',
                     borderRadius: 8,
-                    fontWeight: 500
+                    fontWeight: 500,
+                    zIndex: 10 // Ensure buttons appear above map layers
                 },
                 contained: {
                     backgroundImage: 'linear-gradient(to bottom right, #6366f1, #4f46e5)',
@@ -102,7 +110,8 @@ export const theme = createTheme({
                     backgroundImage: 'linear-gradient(to bottom right, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.8))',
                     backdropFilter: 'blur(12px)',
                     borderRadius: 12,
-                    border: '1px solid rgba(148, 163, 184, 0.1)'
+                    border: '1px solid rgba(148, 163, 184, 0.1)',
+                    zIndex: 5 // Ensure dialogs and popovers appear above map
                 }
             }
         },
@@ -122,7 +131,8 @@ export const theme = createTheme({
         MuiAutocomplete: {
             styleOverrides: {
                 paper: {
-                    borderRadius: 8
+                    borderRadius: 8,
+                    zIndex: 1301 // Above most other components
                 },
                 listbox: {
                     padding: 4,
@@ -149,6 +159,18 @@ export const theme = createTheme({
         MuiDataGrid: {
             styleOverrides: {
                 root: dataGridStyles
+            }
+        },
+        // Add support for 3D map controls
+        MuiTooltip: {
+            styleOverrides: {
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    backdropFilter: 'blur(4px)',
+                    borderRadius: 6,
+                    fontSize: '0.75rem',
+                    zIndex: 1400
+                }
             }
         }
     },

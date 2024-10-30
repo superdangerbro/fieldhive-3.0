@@ -1,11 +1,10 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
 import { Box, Button, Chip, IconButton, Tooltip } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import { getProperties } from '../../services/api';
+import { getProperties, deleteProperty } from '../../services/api';
 import { Property, PropertyStatus, PropertyType } from '@fieldhive/shared';
 import EditPropertyDialog from './EditPropertyDialog';
 import AddPropertyDialog from './AddPropertyDialog';
@@ -28,9 +27,9 @@ const getStatusColor = (status: PropertyStatus) => {
 };
 
 const formatPropertyType = (type: PropertyType) => {
-  return type.split('_').map(word => 
+  return type?.split('_').map(word => 
     word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-  ).join(' ');
+  ).join(' ') || 'Unknown';
 };
 
 const PropertiesTable: React.FC<PropertiesTableProps> = ({ refreshTrigger }) => {
@@ -38,12 +37,24 @@ const PropertiesTable: React.FC<PropertiesTableProps> = ({ refreshTrigger }) => 
   const [pageSize, setPageSize] = useState(5);
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
-  const [totalRows, setTotalRows] = useState(0);
   const [editProperty, setEditProperty] = useState<Property | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
 
   const handleEdit = (property: Property) => {
     setEditProperty(property);
+  };
+
+  const handleDelete = async (property: Property) => {
+    try {
+      await deleteProperty(property.id);
+      fetchProperties();
+    } catch (error: any) {
+      if (error.message?.includes('jobs exist')) {
+        alert('Cannot delete property with existing jobs');
+      } else {
+        alert('Failed to delete property');
+      }
+    }
   };
 
   const handleEditSuccess = () => {
@@ -85,7 +96,7 @@ const PropertiesTable: React.FC<PropertiesTableProps> = ({ refreshTrigger }) => 
       width: 120,
       renderCell: (params) => (
         <Chip
-          label={params.value}
+          label={params.value || 'Unknown'}
           color={getStatusColor(params.value) as any}
           size="small"
           sx={{ textTransform: 'capitalize' }}
@@ -95,17 +106,32 @@ const PropertiesTable: React.FC<PropertiesTableProps> = ({ refreshTrigger }) => 
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 100,
+      width: 120,
       renderCell: (params) => (
-        <Tooltip title="Edit Property">
-          <IconButton
-            onClick={() => handleEdit(params.row)}
-            size="small"
-            sx={{ color: 'primary.main' }}
-          >
-            <EditIcon />
-          </IconButton>
-        </Tooltip>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Tooltip title="Edit Property">
+            <IconButton
+              onClick={() => handleEdit(params.row)}
+              size="small"
+              sx={{ color: 'primary.main' }}
+            >
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Delete Property">
+            <IconButton
+              onClick={() => {
+                if (window.confirm('Are you sure you want to delete this property?')) {
+                  handleDelete(params.row);
+                }
+              }}
+              size="small"
+              sx={{ color: 'error.main' }}
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
       )
     }
   ];
@@ -113,13 +139,12 @@ const PropertiesTable: React.FC<PropertiesTableProps> = ({ refreshTrigger }) => 
   const fetchProperties = async () => {
     try {
       setLoading(true);
-      const response = await getProperties(page + 1, pageSize);
+      const response = await getProperties();
+      console.log('Properties response:', response); // Debug log
       setProperties(response.properties || []);
-      setTotalRows(response.total || 0);
     } catch (error) {
       console.error('Failed to fetch properties:', error);
       setProperties([]);
-      setTotalRows(0);
     } finally {
       setLoading(false);
     }
@@ -127,7 +152,7 @@ const PropertiesTable: React.FC<PropertiesTableProps> = ({ refreshTrigger }) => 
 
   useEffect(() => {
     fetchProperties();
-  }, [page, pageSize, refreshTrigger]);
+  }, [refreshTrigger]);
 
   return (
     <Box>
@@ -150,9 +175,7 @@ const PropertiesTable: React.FC<PropertiesTableProps> = ({ refreshTrigger }) => 
           rows={properties}
           columns={columns}
           getRowId={(row) => row.id}
-          rowCount={totalRows}
           loading={loading}
-          paginationMode="server"
           page={page}
           pageSize={pageSize}
           onPageChange={(newPage) => setPage(newPage)}

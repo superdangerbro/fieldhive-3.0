@@ -59,6 +59,7 @@ export interface UpdatePropertyRequest {
     boundary?: Polygon;
     type?: PropertyType;
     status?: PropertyStatus;
+    accountId?: string;
 }
 
 // API Response Types

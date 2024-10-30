@@ -1,260 +1,242 @@
-'use client';
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Button,
-    TextField,
-    Box,
-    Grid,
-    MenuItem,
-    CircularProgress,
-    Alert,
-    Snackbar
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  Box,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Stack,
+  Divider,
+  Typography,
+  IconButton,
+  Autocomplete
 } from '@mui/material';
-import { updateProperty } from '../../services/api';
-import { Property, PropertyType, PropertyStatus, UpdatePropertyRequest } from '@fieldhive/shared';
+import { Property, PropertyType, PropertyStatus, Account } from '@fieldhive/shared';
+import { updateProperty, getAccounts } from '../../services/api';
+import MapIcon from '@mui/icons-material/Map';
+import Map, { Marker } from 'react-map-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
-export interface EditPropertyDialogProps {
-    open: boolean;
-    property: Property | null;
-    onClose: () => void;
-    onSuccess: () => void;
+interface EditPropertyDialogProps {
+  open: boolean;
+  property: Property | null;
+  onClose: () => void;
+  onSuccess: () => void;
 }
 
-type PropertyFormData = {
-    name: string;
-    address: string;
-    type: PropertyType;
-    status: PropertyStatus;
-    location: {
-        latitude: string;
-        longitude: string;
-    };
-};
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-export default function EditPropertyDialog({ open, property, onClose, onSuccess }: EditPropertyDialogProps) {
-    const [formData, setFormData] = useState<PropertyFormData>({
-        name: '',
-        address: '',
-        type: PropertyType.RESIDENTIAL,
-        status: PropertyStatus.ACTIVE,
-        location: {
-            latitude: '',
-            longitude: ''
-        }
-    });
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+export default function EditPropertyDialog({
+  open,
+  property,
+  onClose,
+  onSuccess
+}: EditPropertyDialogProps) {
+  const [formData, setFormData] = useState<Partial<Property>>(property || {});
+  const [showMap, setShowMap] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(
+    property?.accounts?.[0] ? {
+      id: property.accounts[0].accountId,
+      name: property.accounts[0].name
+    } as Account : null
+  );
 
-    useEffect(() => {
-        if (property) {
-            setFormData({
-                name: property.name,
-                address: property.address,
-                type: property.type,
-                status: property.status,
-                location: {
-                    latitude: property.location.coordinates[1].toString(),
-                    longitude: property.location.coordinates[0].toString()
-                }
-            });
-        }
-    }, [property]);
+  React.useEffect(() => {
+    if (open) {
+      setFormData(property || {});
+      loadAccounts();
+    }
+  }, [open, property]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        if (name.startsWith('location.')) {
-            const field = name.replace('location.', '') as keyof PropertyFormData['location'];
-            setFormData(prev => ({
-                ...prev,
-                location: {
-                    ...prev.location,
-                    [field]: value
-                }
-            }));
-        } else {
-            setFormData(prev => ({
-                ...prev,
-                [name]: value
-            }));
-        }
-    };
+  const loadAccounts = async () => {
+    try {
+      const response = await getAccounts();
+      setAccounts(response.accounts);
+    } catch (error) {
+      console.error('Failed to load accounts:', error);
+    }
+  };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!property) return;
+  const handleSubmit = async () => {
+    if (!property?.id) return;
 
-        setLoading(true);
-        setError(null);
+    try {
+      await updateProperty(property.id, {
+        ...formData,
+        accountId: selectedAccount?.id
+      });
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error('Failed to update property:', error);
+      alert('Failed to update property');
+    }
+  };
 
-        try {
-            const updateData: UpdatePropertyRequest = {
-                name: formData.name,
-                address: formData.address,
-                type: formData.type,
-                status: formData.status,
-                location: {
-                    type: 'Point',
-                    coordinates: [
-                        parseFloat(formData.location.longitude),
-                        parseFloat(formData.location.latitude)
-                    ]
-                }
-            };
+  const handleMapClick = (event: any) => {
+    setFormData(prev => ({
+      ...prev,
+      location: {
+        type: 'Point',
+        coordinates: [event.lngLat.lng, event.lngLat.lat]
+      }
+    }));
+  };
 
-            await updateProperty(property.id, updateData);
-            onSuccess();
-            handleClose();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to update property');
-        } finally {
-            setLoading(false);
-        }
-    };
+  return (
+    <>
+      <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Property</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Autocomplete
+              options={accounts}
+              getOptionLabel={(option) => option.name}
+              value={selectedAccount}
+              onChange={(_, newValue) => setSelectedAccount(newValue)}
+              renderInput={(params) => (
+                <TextField {...params} label="Parent Account" />
+              )}
+            />
 
-    const handleClose = () => {
-        setError(null);
-        onClose();
-    };
+            <TextField
+              label="Property Name"
+              value={formData.name || ''}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              fullWidth
+            />
 
-    return (
-        <>
-            <Dialog 
-                open={open} 
-                onClose={handleClose}
-                maxWidth="sm"
-                fullWidth
+            <TextField
+              label="Address"
+              value={formData.address || ''}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              fullWidth
+            />
+
+            <FormControl fullWidth>
+              <InputLabel>Type</InputLabel>
+              <Select
+                value={formData.type || ''}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value as PropertyType })}
+                label="Type"
+              >
+                {Object.values(PropertyType).map((type) => (
+                  <MenuItem key={type} value={type}>
+                    {type.split('_').map(word => 
+                      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                    ).join(' ')}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={formData.status || ''}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as PropertyStatus })}
+                label="Status"
+              >
+                {Object.values(PropertyStatus).map((status) => (
+                  <MenuItem key={status} value={status}>
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <Divider sx={{ my: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Location
+              </Typography>
+            </Divider>
+
+            <Stack spacing={2} direction="row" alignItems="center">
+              <Stack spacing={2} flex={1}>
+                <TextField
+                  label="Latitude"
+                  value={formData.location?.coordinates?.[1] || ''}
+                  InputProps={{ readOnly: true }}
+                  fullWidth
+                />
+                <TextField
+                  label="Longitude"
+                  value={formData.location?.coordinates?.[0] || ''}
+                  InputProps={{ readOnly: true }}
+                  fullWidth
+                />
+              </Stack>
+              <IconButton 
+                color="primary" 
+                onClick={() => setShowMap(true)}
+                sx={{ 
+                  width: 48, 
+                  height: 48,
+                  border: '1px solid',
+                  borderColor: 'divider'
+                }}
+              >
+                <MapIcon />
+              </IconButton>
+            </Stack>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSubmit} variant="contained">Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog 
+        open={showMap} 
+        onClose={() => setShowMap(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Edit Location</DialogTitle>
+        <DialogContent>
+          <Box sx={{ height: 400, position: 'relative' }}>
+            <Map
+              initialViewState={{
+                longitude: formData.location?.coordinates?.[0] || -123.1207,
+                latitude: formData.location?.coordinates?.[1] || 49.2827,
+                zoom: 14
+              }}
+              style={{ width: '100%', height: '100%' }}
+              mapStyle="mapbox://styles/mapbox/dark-v10"
+              mapboxAccessToken={MAPBOX_TOKEN}
+              onClick={handleMapClick}
             >
-                <DialogTitle>Edit Property</DialogTitle>
-                <form onSubmit={handleSubmit}>
-                    <DialogContent>
-                        <Box sx={{ mt: 1 }}>
-                            <Grid container spacing={2}>
-                                <Grid item xs={12}>
-                                    <TextField
-                                        name="name"
-                                        label="Property Name"
-                                        fullWidth
-                                        required
-                                        value={formData.name}
-                                        onChange={handleChange}
-                                        disabled={loading}
-                                    />
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <TextField
-                                        name="address"
-                                        label="Address"
-                                        fullWidth
-                                        required
-                                        value={formData.address}
-                                        onChange={handleChange}
-                                        disabled={loading}
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        select
-                                        name="type"
-                                        label="Property Type"
-                                        fullWidth
-                                        required
-                                        value={formData.type}
-                                        onChange={handleChange}
-                                        disabled={loading}
-                                    >
-                                        {Object.values(PropertyType).map((type) => (
-                                            <MenuItem key={type} value={type}>
-                                                {type.split('_').map(word => 
-                                                    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-                                                ).join(' ')}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        select
-                                        name="status"
-                                        label="Status"
-                                        fullWidth
-                                        required
-                                        value={formData.status}
-                                        onChange={handleChange}
-                                        disabled={loading}
-                                    >
-                                        {Object.values(PropertyStatus).map((status) => (
-                                            <MenuItem key={status} value={status}>
-                                                {status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <TextField
-                                        name="location.latitude"
-                                        label="Latitude"
-                                        fullWidth
-                                        required
-                                        type="number"
-                                        value={formData.location.latitude}
-                                        onChange={handleChange}
-                                        disabled={loading}
-                                        inputProps={{
-                                            step: 'any'
-                                        }}
-                                    />
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <TextField
-                                        name="location.longitude"
-                                        label="Longitude"
-                                        fullWidth
-                                        required
-                                        type="number"
-                                        value={formData.location.longitude}
-                                        onChange={handleChange}
-                                        disabled={loading}
-                                        inputProps={{
-                                            step: 'any'
-                                        }}
-                                    />
-                                </Grid>
-                            </Grid>
-                        </Box>
-                    </DialogContent>
-                    <DialogActions sx={{ px: 3, pb: 2 }}>
-                        <Button onClick={handleClose} color="inherit" disabled={loading}>
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={loading}
-                            sx={{
-                                backgroundImage: 'linear-gradient(to right, #6366f1, #4f46e5)',
-                                textTransform: 'none'
-                            }}
-                        >
-                            {loading ? <CircularProgress size={24} color="inherit" /> : 'Save Changes'}
-                        </Button>
-                    </DialogActions>
-                </form>
-            </Dialog>
-            <Snackbar 
-                open={!!error} 
-                autoHideDuration={6000} 
-                onClose={() => setError(null)}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-            >
-                <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
-                    {error}
-                </Alert>
-            </Snackbar>
-        </>
-    );
+              {formData.location?.coordinates && (
+                <Marker
+                  longitude={formData.location.coordinates[0]}
+                  latitude={formData.location.coordinates[1]}
+                  draggable
+                  onDragEnd={(event) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      location: {
+                        type: 'Point',
+                        coordinates: [event.lngLat.lng, event.lngLat.lat]
+                      }
+                    }));
+                  }}
+                />
+              )}
+            </Map>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowMap(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
 }
