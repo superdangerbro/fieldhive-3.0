@@ -5,10 +5,12 @@ import { Box } from '@mui/material';
 import JobSearch from '../../components/jobs/JobSearch';
 import JobDetails from '../../components/jobs/JobDetails';
 import JobsTable from '../../components/jobs/JobsTable';
+import JobsHeader from '../../components/jobs/JobsHeader';
 import AddJobDialog from '../../components/jobs/AddJobDialog';
 import EditJobDialog from '../../components/jobs/EditJobDialog';
 import type { Job } from '@fieldhive/shared';
 import { useJobs } from '../../stores/jobStore';
+import { createJob } from '../../services/api';
 
 export default function JobsPage() {
   const { selectedJob, setSelectedJob } = useJobs();
@@ -17,9 +19,14 @@ export default function JobsPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [jobs, setJobs] = useState<Job[]>([]);
 
-  const handleAddJob = () => {
-    setRefreshTrigger(prev => prev + 1);
-    setIsAddDialogOpen(false);
+  const handleAddJob = async (data: any) => {
+    try {
+      await createJob(data);
+      setRefreshTrigger(prev => prev + 1);
+      setIsAddDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to create job:', error);
+    }
   };
 
   const handleEditSuccess = () => {
@@ -51,6 +58,7 @@ export default function JobsPage() {
         onUpdate={handleUpdate}
         onJobSelect={handleJobSelect}
       />
+      <JobsHeader />
       <JobSearch
         jobs={jobs}
         selectedJob={selectedJob}

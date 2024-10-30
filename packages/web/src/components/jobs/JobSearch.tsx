@@ -6,8 +6,7 @@ import {
     Button,
     Autocomplete,
     TextField,
-    Typography,
-    Paper
+    Typography
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { Job } from '@fieldhive/shared';
@@ -21,48 +20,43 @@ interface JobSearchProps {
 
 export default function JobSearch({ jobs, selectedJob, onJobSelect, onAddClick }: JobSearchProps) {
     return (
-        <Paper sx={{ p: 2, mb: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Autocomplete
-                    fullWidth
-                    options={jobs}
-                    value={selectedJob}
-                    onChange={(_, newValue) => onJobSelect(newValue)}
-                    getOptionLabel={(option) => option.title}
-                    renderInput={(params) => (
-                        <TextField
-                            {...params}
-                            placeholder="Search jobs..."
-                            sx={{
-                                '& .MuiOutlinedInput-root': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                                    '&:hover': {
-                                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                    },
-                                }
-                            }}
-                        />
-                    )}
-                    renderOption={(props, option) => (
-                        <li {...props}>
-                            <Box>
-                                <Typography variant="body1">{option.title}</Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                    {option.property?.name} - {option.status}
-                                </Typography>
-                            </Box>
-                        </li>
-                    )}
-                />
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={onAddClick}
-                    sx={{ whiteSpace: 'nowrap' }}
-                >
-                    Add Job
-                </Button>
-            </Box>
-        </Paper>
+        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+            <Autocomplete
+                sx={{ flexGrow: 1 }}
+                options={jobs}
+                value={selectedJob}
+                onChange={(_, newValue) => onJobSelect(newValue)}
+                getOptionLabel={(option) => option.title}
+                isOptionEqualToValue={(option, value) => option.job_id === value.job_id}
+                renderInput={(params) => (
+                    <TextField
+                        {...params}
+                        label="Search Jobs"
+                        placeholder="Type to search..."
+                    />
+                )}
+                renderOption={(props, option) => (
+                    <li {...props}>
+                        <Box>
+                            <Typography variant="body1">{option.title}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                {option.property?.name} - {option.status}
+                            </Typography>
+                        </Box>
+                    </li>
+                )}
+            />
+            <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={onAddClick}
+                sx={{
+                    backgroundImage: 'linear-gradient(to right, #6366f1, #4f46e5)',
+                    textTransform: 'none'
+                }}
+            >
+                Add Job
+            </Button>
+        </Box>
     );
 }

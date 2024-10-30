@@ -6,6 +6,7 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import { getProperties } from '../../services/api';
 import type { Property } from '@fieldhive/shared';
+import { StatusChip } from './PropertyDetails';
 
 interface PropertiesTableProps {
   refreshTrigger?: number;
@@ -55,7 +56,11 @@ const defaultColumns: GridColDef[] = [
   {
     field: 'status',
     headerName: 'Status',
-    width: 120
+    width: 120,
+    renderCell: (params) => {
+      const status = params.value?.charAt(0).toUpperCase() + params.value?.slice(1).toLowerCase() || 'Active';
+      return <StatusChip status={status} />;
+    }
   }
 ];
 
@@ -102,7 +107,6 @@ export default function PropertiesTable({
   const fetchProperties = async () => {
     try {
       setLoading(true);
-      console.log('API URL:', process.env.NEXT_PUBLIC_API_URL);
       const response = await getProperties({
         limit: pageSize,
         offset: page * pageSize,
@@ -181,7 +185,7 @@ export default function PropertiesTable({
       <DataGrid
         rows={properties}
         columns={columns}
-        getRowId={(row) => row.property_id}
+        getRowId={(row) => (row as any).property_id || row.id}
         rowCount={totalRows}
         loading={loading}
         paginationMode="server"
@@ -193,7 +197,7 @@ export default function PropertiesTable({
         disableSelectionOnClick
         disableColumnMenu
         onRowClick={(params) => onPropertySelect(params.row as Property)}
-        selectionModel={selectedProperty ? [selectedProperty.property_id] : []}
+        selectionModel={selectedProperty ? [(selectedProperty as any).property_id || selectedProperty.id] : []}
         sx={{
           '& .MuiDataGrid-row': {
             cursor: 'pointer'

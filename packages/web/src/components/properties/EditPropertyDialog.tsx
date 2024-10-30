@@ -13,10 +13,14 @@ import {
     CircularProgress,
     Alert,
     Snackbar,
-    Typography
+    Typography,
+    FormControlLabel,
+    Checkbox,
+    Collapse
 } from '@mui/material';
 import { updateProperty } from '../../services/api';
 import type { Property, UpdatePropertyDto } from '@fieldhive/shared';
+import AccountSelector, { MinimalAccount } from './AccountSelector';
 
 export interface EditPropertyDialogProps {
     open: boolean;
@@ -25,70 +29,74 @@ export interface EditPropertyDialogProps {
     onSuccess: () => void;
 }
 
+type AddressFormData = {
+    address1: string;
+    address2: string;
+    city: string;
+    province: string;
+    postal_code: string;
+    country: string;
+};
+
 type PropertyFormData = {
     name: string;
-    billing_address: {
-        address1: string;
-        address2?: string;
-        city: string;
-        province: string;
-        postal_code: string;
-        country: string;
-    };
-    service_address: {
-        address1: string;
-        address2?: string;
-        city: string;
-        province: string;
-        postal_code: string;
-        country: string;
-    };
+    billing_address: AddressFormData;
+    service_address: AddressFormData;
+    accounts: MinimalAccount[];
+};
+
+const emptyAddress: AddressFormData = {
+    address1: '',
+    address2: '',
+    city: '',
+    province: '',
+    postal_code: '',
+    country: 'Canada'
+};
+
+const initialFormData: PropertyFormData = {
+    name: '',
+    billing_address: { ...emptyAddress },
+    service_address: { ...emptyAddress },
+    accounts: []
 };
 
 export default function EditPropertyDialog({ open, property, onClose, onSuccess }: EditPropertyDialogProps) {
-    const [formData, setFormData] = useState<PropertyFormData>({
-        name: '',
-        billing_address: {
-            address1: '',
-            address2: '',
-            city: '',
-            province: '',
-            postal_code: '',
-            country: 'Canada'
-        },
-        service_address: {
-            address1: '',
-            address2: '',
-            city: '',
-            province: '',
-            postal_code: '',
-            country: 'Canada'
-        }
-    });
+    const [formData, setFormData] = useState<PropertyFormData>(initialFormData);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [sameAsService, setSameAsService] = useState(false);
 
     useEffect(() => {
         if (property) {
+            const billingAddress = property.billing_address || { ...emptyAddress };
+            const serviceAddress = property.service_address || { ...emptyAddress };
+
             setFormData({
                 name: property.name,
-                billing_address: property.billing_address || {
-                    address1: '',
-                    address2: '',
-                    city: '',
-                    province: '',
-                    postal_code: '',
-                    country: 'Canada'
+                billing_address: {
+                    address1: billingAddress.address1 || '',
+                    address2: billingAddress.address2 || '',
+                    city: billingAddress.city || '',
+                    province: billingAddress.province || '',
+                    postal_code: billingAddress.postal_code || '',
+                    country: billingAddress.country || 'Canada'
                 },
-                service_address: property.service_address || {
-                    address1: '',
-                    address2: '',
-                    city: '',
-                    province: '',
-                    postal_code: '',
-                    country: 'Canada'
-                }
+                service_address: {
+                    address1: serviceAddress.address1 || '',
+                    address2: serviceAddress.address2 || '',
+                    city: serviceAddress.city || '',
+                    province: serviceAddress.province || '',
+                    postal_code: serviceAddress.postal_code || '',
+                    country: serviceAddress.country || 'Canada'
+                },
+                accounts: property.accounts?.map(a => ({
+                    account_id: a.account_id,
+                    name: a.name
+                })) || []
             });
+        } else {
+            setFormData(initialFormData);
         }
     }, [property]);
 
@@ -105,12 +113,14 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
             }));
         } else if (name.startsWith('service_address.')) {
             const field = name.replace('service_address.', '');
+            const newServiceAddress = {
+                ...formData.service_address,
+                [field]: value
+            };
             setFormData(prev => ({
                 ...prev,
-                service_address: {
-                    ...prev.service_address,
-                    [field]: value
-                }
+                service_address: newServiceAddress,
+                billing_address: sameAsService ? newServiceAddress : prev.billing_address
             }));
         } else {
             setFormData(prev => ({
@@ -118,6 +128,23 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
                 [name]: value
             }));
         }
+    };
+
+    const handleSameAsServiceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setSameAsService(e.target.checked);
+        if (e.target.checked) {
+            setFormData(prev => ({
+                ...prev,
+                billing_address: { ...prev.service_address }
+            }));
+        }
+    };
+
+    const handleAccountsChange = (accounts: MinimalAccount[]) => {
+        setFormData(prev => ({
+            ...prev,
+            accounts
+        }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -130,8 +157,9 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
         try {
             const propertyData: UpdatePropertyDto = {
                 name: formData.name,
-                billing_address: formData.billing_address,
-                service_address: formData.service_address
+                billing_address: sameAsService ? formData.service_address : formData.billing_address,
+                service_address: formData.service_address,
+                accounts: formData.accounts.map(a => a.account_id)
             };
 
             await updateProperty(property.property_id, propertyData);
@@ -146,6 +174,8 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
 
     const handleClose = () => {
         setError(null);
+        setFormData(initialFormData);
+        setSameAsService(false);
         onClose();
     };
 
@@ -177,60 +207,9 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
                                 </Grid>
 
                                 <Grid item xs={12}>
-                                    <Typography variant="h6">Billing Address</Typography>
-                                </Grid>
-
-                                <Grid item xs={12}>
-                                    <TextField
-                                        name="billing_address.address1"
-                                        label="Address Line 1"
-                                        fullWidth
-                                        required
-                                        value={formData.billing_address.address1}
-                                        onChange={handleChange}
-                                        disabled={loading}
-                                    />
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <TextField
-                                        name="billing_address.address2"
-                                        label="Address Line 2"
-                                        fullWidth
-                                        value={formData.billing_address.address2}
-                                        onChange={handleChange}
-                                        disabled={loading}
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        name="billing_address.city"
-                                        label="City"
-                                        fullWidth
-                                        required
-                                        value={formData.billing_address.city}
-                                        onChange={handleChange}
-                                        disabled={loading}
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        name="billing_address.province"
-                                        label="Province"
-                                        fullWidth
-                                        required
-                                        value={formData.billing_address.province}
-                                        onChange={handleChange}
-                                        disabled={loading}
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        name="billing_address.postal_code"
-                                        label="Postal Code"
-                                        fullWidth
-                                        required
-                                        value={formData.billing_address.postal_code}
-                                        onChange={handleChange}
+                                    <AccountSelector
+                                        selectedAccounts={formData.accounts}
+                                        onChange={handleAccountsChange}
                                         disabled={loading}
                                     />
                                 </Grid>
@@ -293,6 +272,81 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
                                         disabled={loading}
                                     />
                                 </Grid>
+
+                                <Grid item xs={12}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Typography variant="h6">Billing Address</Typography>
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={sameAsService}
+                                                    onChange={handleSameAsServiceChange}
+                                                    disabled={loading}
+                                                />
+                                            }
+                                            label="Same as service address"
+                                        />
+                                    </Box>
+                                </Grid>
+
+                                <Collapse in={!sameAsService} sx={{ width: '100%' }}>
+                                    <Grid container spacing={3} sx={{ mt: 0 }}>
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                name="billing_address.address1"
+                                                label="Address Line 1"
+                                                fullWidth
+                                                required
+                                                value={formData.billing_address.address1}
+                                                onChange={handleChange}
+                                                disabled={loading || sameAsService}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                name="billing_address.address2"
+                                                label="Address Line 2"
+                                                fullWidth
+                                                value={formData.billing_address.address2}
+                                                onChange={handleChange}
+                                                disabled={loading || sameAsService}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                name="billing_address.city"
+                                                label="City"
+                                                fullWidth
+                                                required
+                                                value={formData.billing_address.city}
+                                                onChange={handleChange}
+                                                disabled={loading || sameAsService}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                name="billing_address.province"
+                                                label="Province"
+                                                fullWidth
+                                                required
+                                                value={formData.billing_address.province}
+                                                onChange={handleChange}
+                                                disabled={loading || sameAsService}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                name="billing_address.postal_code"
+                                                label="Postal Code"
+                                                fullWidth
+                                                required
+                                                value={formData.billing_address.postal_code}
+                                                onChange={handleChange}
+                                                disabled={loading || sameAsService}
+                                            />
+                                        </Grid>
+                                    </Grid>
+                                </Collapse>
                             </Grid>
                         </Box>
                     </DialogContent>

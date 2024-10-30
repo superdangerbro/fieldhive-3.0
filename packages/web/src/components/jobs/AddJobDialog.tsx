@@ -17,7 +17,7 @@ import {
     Autocomplete
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
-import { getAccounts, getProperties } from '../../services/api';
+import { getAccounts, getProperties, getJobTypes } from '../../services/api';
 import { Property } from '@fieldhive/shared';
 import { Account } from '@fieldhive/shared';
 import { CreateJobDto } from '@fieldhive/shared';
@@ -29,15 +29,6 @@ interface AddJobDialogProps {
 }
 
 const steps = ['Select Account', 'Select Property', 'Job Details'];
-
-// Hardcoded job types until we implement settings management
-const JOB_TYPES = [
-    'Inspection',
-    'Maintenance',
-    'Repair',
-    'Installation',
-    'Emergency'
-];
 
 export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogProps) {
     const router = useRouter();
@@ -51,34 +42,39 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
     const [propertySearchQuery, setPropertySearchQuery] = useState('');
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
+    const [jobTypes, setJobTypes] = useState<{id: string, name: string}[]>([]);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const fetchAccounts = async () => {
+        const fetchData = async () => {
             try {
-                const response = await getAccounts();
-                setAccounts(response.accounts);
+                const [accountsResponse, jobTypesResponse] = await Promise.all([
+                    getAccounts({ limit: 100, offset: 0 }), // Added pagination params
+                    getJobTypes()
+                ]);
+                setAccounts(accountsResponse.accounts);
+                setJobTypes(jobTypesResponse.jobTypes);
             } catch (error) {
-                console.error('Error fetching accounts:', error);
-                setError('Failed to fetch accounts');
+                console.error('Error fetching data:', error);
+                setError('Failed to fetch data');
             }
         };
 
-        fetchAccounts();
-    }, []);
+        if (open) {
+            fetchData();
+        }
+    }, [open]);
 
     useEffect(() => {
         const fetchProperties = async () => {
+            if (!selectedAccount) {
+                setProperties([]);
+                return;
+            }
+
             try {
-                const response = await getProperties();
-                if (selectedAccount) {
-                    // Filter properties that belong to the selected account
-                    setProperties(response.properties.filter((p: Property) => 
-                        selectedAccount.properties?.some(prop => prop.id === p.id)
-                    ));
-                } else {
-                    setProperties([]);
-                }
+                const response = await getProperties({ accountId: selectedAccount.account_id });
+                setProperties(response.properties);
             } catch (error) {
                 console.error('Error fetching properties:', error);
                 setError('Failed to fetch properties');
@@ -112,7 +108,7 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
         onSubmit({
             title,
             description,
-            propertyId: selectedProperty.id,
+            propertyId: selectedProperty.property_id,
             jobTypeId: selectedJobType,
             status: 'pending'
         });
@@ -142,7 +138,10 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
                             options={accounts}
                             getOptionLabel={(option) => option.name}
                             value={selectedAccount}
-                            onChange={(_, newValue) => setSelectedAccount(newValue)}
+                            onChange={(_, newValue) => {
+                                setSelectedAccount(newValue);
+                                setSelectedProperty(null); // Reset property when account changes
+                            }}
                             inputValue={accountSearchQuery}
                             onInputChange={(_, newValue) => setAccountSearchQuery(newValue)}
                             renderInput={(params) => (
@@ -200,9 +199,9 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
                             value={selectedJobType}
                             onChange={(e) => setSelectedJobType(e.target.value)}
                         >
-                            {JOB_TYPES.map((type) => (
-                                <MenuItem key={type} value={type}>
-                                    {type}
+                            {jobTypes.map((type) => (
+                                <MenuItem key={type.id} value={type.id}>
+                                    {type.name}
                                 </MenuItem>
                             ))}
                         </TextField>

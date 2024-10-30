@@ -1,7 +1,23 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, FormControl, InputLabel, Select, MenuItem, Box, Checkbox, FormControlLabel, Typography, List, ListItem } from '@mui/material';
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    List,
+    ListItem,
+    ListItemText,
+    Checkbox,
+    Box,
+    Typography
+} from '@mui/material';
 import { EquipmentTypeConfig, FormField } from './types';
 
 interface Props {
@@ -12,37 +28,39 @@ interface Props {
     onCopyFields: (sourceType: string, fields: FormField[]) => void;
 }
 
-export default function CopyFieldsDialog({ open, onClose, equipmentTypes, currentType, onCopyFields }: Props) {
+export default function CopyFieldsDialog({
+    open,
+    onClose,
+    equipmentTypes,
+    currentType,
+    onCopyFields
+}: Props) {
     const [selectedType, setSelectedType] = useState('');
-    const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set());
+    const [selectedFields, setSelectedFields] = useState<string[]>([]);
 
-    const handleTypeChange = (type: string) => {
-        setSelectedType(type);
-        setSelectedFields(new Set());
+    const sourceType = equipmentTypes.find(t => t.name === selectedType);
+    const availableTypes = equipmentTypes.filter(t => t.name !== currentType);
+
+    const handleTypeChange = (typeName: string) => {
+        setSelectedType(typeName);
+        setSelectedFields([]);
     };
 
-    const handleFieldToggle = (fieldName: string) => {
-        const newSelected = new Set(selectedFields);
-        if (newSelected.has(fieldName)) {
-            newSelected.delete(fieldName);
-        } else {
-            newSelected.add(fieldName);
-        }
-        setSelectedFields(newSelected);
-    };
-
-    const handleSelectAll = () => {
-        const sourceType = equipmentTypes.find(t => t.name === selectedType);
-        if (sourceType) {
-            setSelectedFields(new Set(sourceType.fields.map(f => f.name)));
-        }
+    const handleToggleField = (fieldName: string) => {
+        setSelectedFields(prev => {
+            if (prev.includes(fieldName)) {
+                return prev.filter(f => f !== fieldName);
+            }
+            return [...prev, fieldName];
+        });
     };
 
     const handleCopy = () => {
-        const sourceType = equipmentTypes.find(t => t.name === selectedType);
         if (sourceType) {
-            const fieldsToCopy = sourceType.fields.filter(f => selectedFields.has(f.name));
-            onCopyFields(selectedType, fieldsToCopy);
+            const fieldsToCopy = sourceType.fields.filter(f => 
+                selectedFields.includes(f.name)
+            );
+            onCopyFields(sourceType.name, fieldsToCopy);
             onClose();
         }
     };
@@ -53,65 +71,60 @@ export default function CopyFieldsDialog({ open, onClose, equipmentTypes, curren
             <DialogContent>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
                     <FormControl fullWidth>
-                        <InputLabel>Source Type</InputLabel>
+                        <InputLabel>Source Equipment Type</InputLabel>
                         <Select
                             value={selectedType}
-                            label="Source Type"
                             onChange={(e) => handleTypeChange(e.target.value)}
+                            label="Source Equipment Type"
                         >
-                            {equipmentTypes
-                                .filter(t => t.name !== currentType)
-                                .map(type => (
-                                    <MenuItem key={type.name} value={type.name}>
-                                        {type.name}
-                                    </MenuItem>
-                                ))
-                            }
+                            {availableTypes.map((type) => (
+                                <MenuItem key={type.name} value={type.name}>
+                                    {type.name}
+                                </MenuItem>
+                            ))}
                         </Select>
                     </FormControl>
 
-                    {selectedType && (
+                    {sourceType && sourceType.fields.length > 0 ? (
                         <>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Typography variant="subtitle1">Select Fields to Copy</Typography>
-                                <Button onClick={handleSelectAll}>Select All</Button>
-                            </Box>
+                            <Typography variant="subtitle2" sx={{ mt: 2 }}>
+                                Select Fields to Copy
+                            </Typography>
                             <List>
-                                {equipmentTypes
-                                    .find(t => t.name === selectedType)
-                                    ?.fields.map(field => (
-                                        <ListItem key={field.name} dense>
-                                            <FormControlLabel
-                                                control={
-                                                    <Checkbox
-                                                        checked={selectedFields.has(field.name)}
-                                                        onChange={() => handleFieldToggle(field.name)}
-                                                    />
-                                                }
-                                                label={
-                                                    <Box>
-                                                        <Typography>{field.name}</Typography>
-                                                        <Typography variant="caption" color="textSecondary">
-                                                            {field.type}
-                                                            {field.required && ' (Required)'}
-                                                        </Typography>
-                                                    </Box>
-                                                }
-                                            />
-                                        </ListItem>
-                                    ))
-                                }
+                                {sourceType.fields.map((field) => (
+                                    <ListItem
+                                        key={field.name}
+                                        dense
+                                        button
+                                        onClick={() => handleToggleField(field.name)}
+                                    >
+                                        <Checkbox
+                                            edge="start"
+                                            checked={selectedFields.includes(field.name)}
+                                            tabIndex={-1}
+                                            disableRipple
+                                        />
+                                        <ListItemText
+                                            primary={field.name}
+                                            secondary={`Type: ${field.type}`}
+                                        />
+                                    </ListItem>
+                                ))}
                             </List>
                         </>
-                    )}
+                    ) : selectedType ? (
+                        <Typography color="text.secondary">
+                            No fields available in the selected type
+                        </Typography>
+                    ) : null}
                 </Box>
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Cancel</Button>
-                <Button 
-                    onClick={handleCopy} 
+                <Button
+                    onClick={handleCopy}
                     variant="contained"
-                    disabled={selectedFields.size === 0}
+                    disabled={!selectedType || selectedFields.length === 0}
                 >
                     Copy Selected Fields
                 </Button>

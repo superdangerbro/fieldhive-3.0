@@ -1,19 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-    Dialog, 
-    DialogTitle, 
-    DialogContent, 
-    DialogActions, 
-    Button, 
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
     FormControl,
     InputLabel,
     Select,
     MenuItem,
     TextField,
     Box,
-    Typography,
     FormControlLabel,
     Checkbox
 } from '@mui/material';
@@ -27,43 +26,45 @@ interface Props {
     currentFieldName: string;
 }
 
-export default function RuleDialog({ open, onClose, onSave, fields, currentFieldName }: Props) {
+export default function RuleDialog({
+    open,
+    onClose,
+    onSave,
+    fields,
+    currentFieldName
+}: Props) {
     const [selectedField, setSelectedField] = useState('');
     const [value, setValue] = useState<any>('');
     const [makeRequired, setMakeRequired] = useState(false);
 
-    // Filter out the current field and get available fields
-    const availableFields = fields.filter(field => field.name !== currentFieldName);
+    const availableFields = fields.filter(f => f.name !== currentFieldName);
+    const selectedFieldConfig = fields.find(f => f.name === selectedField);
 
     const handleSave = () => {
-        if (selectedField && value !== '') {
-            onSave({ 
-                field: selectedField, 
-                value,
-                makeRequired 
-            });
-            setSelectedField('');
-            setValue('');
-            setMakeRequired(false);
-            onClose();
-        }
+        onSave({
+            field: selectedField,
+            value,
+            makeRequired
+        });
+        setSelectedField('');
+        setValue('');
+        setMakeRequired(false);
     };
 
-    const getValueInput = () => {
-        const field = fields.find(f => f.name === selectedField);
-        if (!field) return null;
+    const renderValueInput = () => {
+        if (!selectedFieldConfig) return null;
 
-        switch (field.type) {
+        switch (selectedFieldConfig.type) {
             case 'select':
                 return (
-                    <FormControl fullWidth sx={{ mt: 2 }}>
+                    <FormControl fullWidth>
                         <InputLabel>Value</InputLabel>
                         <Select
                             value={value}
                             onChange={(e) => setValue(e.target.value)}
                             label="Value"
                         >
-                            {field.options?.map((option) => (
+                            {selectedFieldConfig.options?.map((option) => (
                                 <MenuItem key={option} value={option}>
                                     {option}
                                 </MenuItem>
@@ -71,46 +72,45 @@ export default function RuleDialog({ open, onClose, onSave, fields, currentField
                         </Select>
                     </FormControl>
                 );
-            case 'boolean':
+
+            case 'checkbox':
                 return (
-                    <FormControl fullWidth sx={{ mt: 2 }}>
-                        <InputLabel>Value</InputLabel>
-                        <Select
-                            value={value}
-                            onChange={(e) => setValue(e.target.value)}
-                            label="Value"
-                        >
-                            <MenuItem value="true">True</MenuItem>
-                            <MenuItem value="false">False</MenuItem>
-                        </Select>
-                    </FormControl>
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                checked={value}
+                                onChange={(e) => setValue(e.target.checked)}
+                            />
+                        }
+                        label="Value"
+                    />
                 );
+
             case 'number-input':
             case 'number-stepper':
             case 'slider':
                 return (
                     <TextField
-                        fullWidth
-                        label="Value"
                         type="number"
+                        label="Value"
                         value={value}
                         onChange={(e) => setValue(Number(e.target.value))}
-                        sx={{ mt: 2 }}
+                        fullWidth
                         inputProps={{
-                            min: field.numberConfig?.min,
-                            max: field.numberConfig?.max,
-                            step: field.numberConfig?.step
+                            min: selectedFieldConfig.numberConfig?.min,
+                            max: selectedFieldConfig.numberConfig?.max,
+                            step: selectedFieldConfig.numberConfig?.step
                         }}
                     />
                 );
+
             default:
                 return (
                     <TextField
-                        fullWidth
                         label="Value"
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
-                        sx={{ mt: 2 }}
+                        fullWidth
                     />
                 );
         }
@@ -118,22 +118,15 @@ export default function RuleDialog({ open, onClose, onSave, fields, currentField
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>Add Display Rule</DialogTitle>
+            <DialogTitle>Add Conditional Rule</DialogTitle>
             <DialogContent>
-                <Box sx={{ mt: 1 }}>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                        Show this field when another field matches a specific value
-                    </Typography>
-
-                    <FormControl fullWidth sx={{ mt: 2 }}>
-                        <InputLabel>Field</InputLabel>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+                    <FormControl fullWidth>
+                        <InputLabel>When Field</InputLabel>
                         <Select
                             value={selectedField}
-                            onChange={(e) => {
-                                setSelectedField(e.target.value);
-                                setValue('');
-                            }}
-                            label="Field"
+                            onChange={(e) => setSelectedField(e.target.value)}
+                            label="When Field"
                         >
                             {availableFields.map((field) => (
                                 <MenuItem key={field.name} value={field.name}>
@@ -143,25 +136,22 @@ export default function RuleDialog({ open, onClose, onSave, fields, currentField
                         </Select>
                     </FormControl>
 
-                    {selectedField && getValueInput()}
+                    {selectedField && renderValueInput()}
 
-                    {selectedField && (
-                        <FormControlLabel
-                            control={
-                                <Checkbox
-                                    checked={makeRequired}
-                                    onChange={(e) => setMakeRequired(e.target.checked)}
-                                />
-                            }
-                            label="Make field required when shown"
-                            sx={{ mt: 2 }}
-                        />
-                    )}
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                checked={makeRequired}
+                                onChange={(e) => setMakeRequired(e.target.checked)}
+                            />
+                        }
+                        label="Make field required when condition is met"
+                    />
                 </Box>
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Cancel</Button>
-                <Button 
+                <Button
                     onClick={handleSave}
                     variant="contained"
                     disabled={!selectedField || value === ''}

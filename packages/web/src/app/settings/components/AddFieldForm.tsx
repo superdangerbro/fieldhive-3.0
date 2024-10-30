@@ -1,22 +1,8 @@
 'use client';
 
 import React from 'react';
-import { 
-    Box, 
-    TextField, 
-    Button, 
-    FormControl, 
-    InputLabel, 
-    Select, 
-    MenuItem, 
-    FormControlLabel, 
-    Checkbox,
-    Typography,
-    Chip
-} from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
+import { Box, Button, TextField, Select, MenuItem, FormControlLabel, Checkbox, FormControl, InputLabel } from '@mui/material';
 import { NewFieldState } from './types';
-import NumberFieldConfig from './NumberFieldConfig';
 
 interface Props {
     typeName: string;
@@ -25,134 +11,107 @@ interface Props {
     onAddField: (typeName: string) => void;
 }
 
-const FIELD_TYPES = [
-    'string',
-    'textarea',
-    'number-input',
-    'number-stepper',
-    'slider',
-    'select',
-    'boolean'
-];
-
 export default function AddFieldForm({ typeName, field, onFieldChange, onAddField }: Props) {
-    const handleAddOption = () => {
-        if (field.newOption && !field.options.includes(field.newOption)) {
-            onFieldChange(typeName, {
-                ...field,
-                options: [...field.options, field.newOption],
-                newOption: ''
-            });
-        }
-    };
-
-    const handleRemoveOption = (optionToRemove: string) => {
-        onFieldChange(typeName, {
-            ...field,
-            options: field.options.filter(option => option !== optionToRemove)
-        });
+    const handleChange = (updates: Partial<NewFieldState>) => {
+        onFieldChange(typeName, { ...field, ...updates });
     };
 
     return (
-        <Box sx={{ mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
-                Add Field
-            </Typography>
-            
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ mb: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', gap: 2 }}>
                 <TextField
                     label="Field Name"
                     value={field.name}
-                    onChange={(e) => onFieldChange(typeName, { ...field, name: e.target.value })}
-                    fullWidth
+                    onChange={(e) => handleChange({ name: e.target.value })}
+                    sx={{ flex: 1 }}
                 />
-
-                <FormControl fullWidth>
+                <FormControl sx={{ minWidth: 200 }}>
                     <InputLabel>Field Type</InputLabel>
                     <Select
                         value={field.type}
-                        onChange={(e) => onFieldChange(typeName, { 
-                            ...field, 
-                            type: e.target.value,
-                            // Reset type-specific configs when type changes
-                            options: e.target.value === 'select' ? [] : field.options,
-                            numberConfig: ['number-input', 'number-stepper', 'slider'].includes(e.target.value) 
-                                ? { min: 0, step: 1 }
-                                : field.numberConfig
-                        })}
+                        onChange={(e) => handleChange({ type: e.target.value })}
                         label="Field Type"
                     >
-                        {FIELD_TYPES.map((type) => (
-                            <MenuItem key={type} value={type}>
-                                {type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                            </MenuItem>
-                        ))}
+                        <MenuItem value="string">Text</MenuItem>
+                        <MenuItem value="number-input">Number Input</MenuItem>
+                        <MenuItem value="number-stepper">Number Stepper</MenuItem>
+                        <MenuItem value="slider">Slider</MenuItem>
+                        <MenuItem value="select">Select</MenuItem>
+                        <MenuItem value="checkbox">Checkbox</MenuItem>
+                        <MenuItem value="date">Date</MenuItem>
                     </Select>
                 </FormControl>
-
                 <FormControlLabel
                     control={
                         <Checkbox
                             checked={field.required}
-                            onChange={(e) => onFieldChange(typeName, { ...field, required: e.target.checked })}
+                            onChange={(e) => handleChange({ required: e.target.checked })}
                         />
                     }
                     label="Required"
                 />
-
-                {/* Select Options */}
-                {field.type === 'select' && (
-                    <Box>
-                        <Typography variant="subtitle2" gutterBottom>
-                            Options
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                            <TextField
-                                label="New Option"
-                                value={field.newOption}
-                                onChange={(e) => onFieldChange(typeName, { ...field, newOption: e.target.value })}
-                                onKeyPress={(e) => e.key === 'Enter' && handleAddOption()}
-                                fullWidth
-                            />
-                            <Button
-                                variant="contained"
-                                onClick={handleAddOption}
-                                startIcon={<AddIcon />}
-                            >
-                                Add
-                            </Button>
-                        </Box>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                            {field.options.map((option) => (
-                                <Chip
-                                    key={option}
-                                    label={option}
-                                    onDelete={() => handleRemoveOption(option)}
-                                    color="primary"
-                                    variant="outlined"
-                                />
-                            ))}
-                        </Box>
-                    </Box>
-                )}
-
-                {/* Number Configuration */}
-                {['number-input', 'number-stepper', 'slider'].includes(field.type) && (
-                    <NumberFieldConfig
-                        config={field.numberConfig}
-                        onChange={(config) => onFieldChange(typeName, { ...field, numberConfig: config })}
-                    />
-                )}
-
-                <Button
-                    variant="contained"
-                    onClick={() => onAddField(typeName)}
-                    disabled={!field.name}
-                    startIcon={<AddIcon />}
-                >
-                    Add Field
-                </Button>
             </Box>
+
+            {field.type === 'select' && (
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                    <TextField
+                        label="New Option"
+                        value={field.newOption}
+                        onChange={(e) => handleChange({ newOption: e.target.value })}
+                        sx={{ flex: 1 }}
+                    />
+                    <Button
+                        variant="outlined"
+                        onClick={() => {
+                            if (field.newOption && !field.options.includes(field.newOption)) {
+                                handleChange({
+                                    options: [...field.options, field.newOption],
+                                    newOption: ''
+                                });
+                            }
+                        }}
+                    >
+                        Add Option
+                    </Button>
+                </Box>
+            )}
+
+            {['number-input', 'number-stepper', 'slider'].includes(field.type) && (
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    <TextField
+                        type="number"
+                        label="Min"
+                        value={field.numberConfig.min ?? ''}
+                        onChange={(e) => handleChange({
+                            numberConfig: { ...field.numberConfig, min: Number(e.target.value) }
+                        })}
+                    />
+                    <TextField
+                        type="number"
+                        label="Max"
+                        value={field.numberConfig.max ?? ''}
+                        onChange={(e) => handleChange({
+                            numberConfig: { ...field.numberConfig, max: Number(e.target.value) }
+                        })}
+                    />
+                    <TextField
+                        type="number"
+                        label="Step"
+                        value={field.numberConfig.step ?? ''}
+                        onChange={(e) => handleChange({
+                            numberConfig: { ...field.numberConfig, step: Number(e.target.value) }
+                        })}
+                    />
+                </Box>
+            )}
+
+            <Button
+                variant="contained"
+                onClick={() => onAddField(typeName)}
+                disabled={!field.name}
+            >
+                Add Field
+            </Button>
         </Box>
     );
 }

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Button, TextField, Typography, List, ListItem, ListItemText, ListItemSecondaryAction, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import { getJobTypes, createJobType } from '@/services/api';
+import { getSetting, updateSetting } from '../../services/api';
 
 export default function JobsTab() {
     const [jobTypes, setJobTypes] = useState<string[]>([]);
@@ -18,9 +18,9 @@ export default function JobsTab() {
 
     const loadJobTypes = async () => {
         try {
-            const response = await getJobTypes();
-            // Extract names from the jobTypes array
-            const types = response?.jobTypes?.map((type: any) => type.name) || [];
+            const response = await getSetting('job_types');
+            // Extract job types from the response
+            const types = response?.jobTypes?.map((type: any) => type.name) || response || [];
             setJobTypes(types);
         } catch (error) {
             console.error('Error loading job types:', error);
@@ -31,7 +31,7 @@ export default function JobsTab() {
         if (newJobType.trim()) {
             try {
                 const updatedTypes = [...jobTypes, newJobType.trim()];
-                await createJobType({ value: updatedTypes });
+                await updateSetting('job_types', updatedTypes);
                 await loadJobTypes();
                 setNewJobType('');
             } catch (error) {
@@ -43,7 +43,7 @@ export default function JobsTab() {
     const handleDeleteJobType = async (index: number) => {
         try {
             const updatedTypes = jobTypes.filter((_, i) => i !== index);
-            await createJobType({ value: updatedTypes });
+            await updateSetting('job_types', updatedTypes);
             await loadJobTypes();
         } catch (error) {
             console.error('Error deleting job type:', error);
@@ -61,7 +61,7 @@ export default function JobsTab() {
                 const updatedTypes = jobTypes.map((type, index) => 
                     index === editingIndex ? editValue.trim() : type
                 );
-                await createJobType({ value: updatedTypes });
+                await updateSetting('job_types', updatedTypes);
                 await loadJobTypes();
                 setEditingIndex(null);
                 setEditValue('');

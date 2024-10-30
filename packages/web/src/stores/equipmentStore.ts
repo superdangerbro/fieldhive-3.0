@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { API_ENDPOINTS } from '../services/api';
+import { getSetting, updateSetting } from '../services/api';
 
 interface Equipment {
   equipment_id: string;
@@ -103,10 +103,8 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
   
   fetchEquipmentTypes: async () => {
     try {
-      const response = await fetch(API_ENDPOINTS.EQUIPMENT_TYPES);
-      if (!response.ok) throw new Error('Failed to fetch equipment types');
-      const types = await response.json();
-      set({ equipmentTypes: types });
+      const types = await getSetting('equipment_types');
+      set({ equipmentTypes: types || [] });
     } catch (error) {
       console.error('Error fetching equipment types:', error);
     }
@@ -114,10 +112,8 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
 
   fetchEquipmentStatuses: async () => {
     try {
-      const response = await fetch(`${API_ENDPOINTS.EQUIPMENT_TYPES}/status`);
-      if (!response.ok) throw new Error('Failed to fetch equipment statuses');
-      const statuses = await response.json();
-      set({ equipmentStatuses: statuses });
+      const statuses = await getSetting('equipment_statuses');
+      set({ equipmentStatuses: statuses || [] });
     } catch (error) {
       console.error('Error fetching equipment statuses:', error);
     }
@@ -129,16 +125,19 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
 
   fetchEquipmentInBounds: async (bounds) => {
     try {
-      const response = await fetch(
-        `${API_ENDPOINTS.FIELD_EQUIPMENT}?bounds=${bounds.join(',')}`
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch equipment');
+      const equipment = await getSetting('equipment');
+      if (!equipment) {
+        set({ equipment: [] });
+        return;
       }
 
-      const equipment = await response.json();
-      set({ equipment });
+      const [west, south, east, north] = bounds;
+      const filteredEquipment = equipment.filter((e: Equipment) => {
+        const [lng, lat] = e.location.coordinates;
+        return lng >= west && lng <= east && lat >= south && lat <= north;
+      });
+
+      set({ equipment: filteredEquipment });
     } catch (error) {
       console.error('Error fetching equipment:', error);
     }
@@ -146,13 +145,7 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
 
   deleteEquipment: async (equipmentId) => {
     try {
-      const response = await fetch(`${API_ENDPOINTS.FIELD_EQUIPMENT}/${equipmentId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete equipment');
-      }
+      await updateSetting('delete_equipment', { id: equipmentId });
 
       // Refresh equipment in current bounds
       const { currentBounds } = get();
@@ -173,19 +166,10 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
 
   updateEquipmentType: async (equipmentId, equipmentTypeId) => {
     try {
-      const response = await fetch(`${API_ENDPOINTS.FIELD_EQUIPMENT}/${equipmentId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          equipment_type_id: equipmentTypeId
-        })
+      await updateSetting('update_equipment', {
+        id: equipmentId,
+        equipment_type_id: equipmentTypeId
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update equipment type');
-      }
 
       // Refresh equipment in current bounds
       const { currentBounds } = get();
@@ -247,28 +231,15 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
     }
 
     try {
-      const response = await fetch(API_ENDPOINTS.FIELD_EQUIPMENT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      await updateSetting('add_equipment', {
+        equipment_type_id: data.equipment_type_id,
+        status: data.status,
+        location: {
+          type: 'Point',
+          coordinates: placementLocation
         },
-        body: JSON.stringify({
-          equipment_type_id: data.equipment_type_id,
-          status: data.status,
-          location: {
-            type: 'Point',
-            coordinates: placementLocation
-          },
-          ...data.data
-        })
+        ...data.data
       });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to add equipment: ${error}`);
-      }
-
-      const result = await response.json();
 
       // Refresh equipment in current bounds
       if (currentBounds) {
@@ -279,8 +250,6 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
         isAddEquipmentDialogOpen: false,
         placementLocation: null
       });
-
-      return result;
     } catch (error) {
       console.error('Failed to add equipment:', error);
       throw error;

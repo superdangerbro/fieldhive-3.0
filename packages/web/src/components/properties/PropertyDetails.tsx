@@ -39,6 +39,18 @@ interface PropertyDetailsProps {
 
 const STATUS_OPTIONS = ['Active', 'Inactive', 'Archived'];
 
+export function StatusChip({ status }: { status: string }) {
+  return (
+    <Chip 
+      label={status}
+      size="small"
+      color={status === 'Active' ? 'success' : 
+            status === 'Inactive' ? 'warning' : 
+            status === 'Archived' ? 'error' : 'default'}
+    />
+  );
+}
+
 export default function PropertyDetails({ property, onEdit, onUpdate, onPropertySelect }: PropertyDetailsProps) {
   const [tabValue, setTabValue] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -92,9 +104,10 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
     
     setStatusLoading(true);
     try {
-      await updateProperty(property.property_id, {
+      const updatedProperty = await updateProperty(property.property_id, {
         status: event.target.value
       });
+      onPropertySelect(updatedProperty);
       if (onUpdate) {
         onUpdate();
       }
@@ -127,52 +140,99 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
     <>
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+            <Box sx={{ flex: 1 }}>
               <Typography variant="h5" component="div" gutterBottom>
                 {property.name}
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    value={getDisplayStatus(property.status)}
-                    onChange={handleStatusChange}
-                    label="Status"
-                    disabled={statusLoading}
-                  >
-                    {STATUS_OPTIONS.map((status) => (
-                      <MenuItem key={status} value={status}>
-                        <Chip 
-                          label={status}
-                          size="small"
-                          color={status === 'Active' ? 'success' : 
-                                status === 'Inactive' ? 'warning' : 
-                                status === 'Archived' ? 'error' : 'default'}
-                          sx={{ pointerEvents: 'none' }}
-                        />
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Typography variant="subtitle2" color="text.secondary">Account Owner</Typography>
+                  <Typography variant="body2">
+                    {property.accounts && property.accounts.length > 0 
+                      ? property.accounts.map(account => account.name).join(', ')
+                      : 'No accounts assigned'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Typography variant="subtitle2" color="text.secondary">Total Jobs</Typography>
+                  <Typography variant="body2">0</Typography>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Typography variant="subtitle2" color="text.secondary">Key Contacts</Typography>
+                  <Typography variant="body2">None</Typography>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Typography variant="subtitle2" color="text.secondary">Last Activity</Typography>
+                  <Typography variant="body2">Never</Typography>
+                </Grid>
+              </Grid>
+
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>Service Address</Typography>
+                  <Typography variant="body2">
+                    {property.service_address ? (
+                      <>
+                        {property.service_address.address1}<br />
+                        {property.service_address.city}, {property.service_address.province}<br />
+                        {property.service_address.postal_code}
+                      </>
+                    ) : (
+                      'No service address set'
+                    )}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>Billing Address</Typography>
+                  <Typography variant="body2">
+                    {property.billing_address ? (
+                      <>
+                        {property.billing_address.address1}<br />
+                        {property.billing_address.city}, {property.billing_address.province}<br />
+                        {property.billing_address.postal_code}
+                      </>
+                    ) : (
+                      'No billing address set'
+                    )}
+                  </Typography>
+                </Grid>
+              </Grid>
             </Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <IconButton onClick={() => onEdit(property)} color="primary">
-                <EditIcon />
-              </IconButton>
-              <IconButton 
-                color="error"
-                onClick={handleDeleteClick}
-                sx={{ 
-                  '&:hover': {
-                    backgroundColor: 'error.light',
-                    color: 'error.contrastText'
-                  }
-                }}
-              >
-                <DeleteIcon />
-              </IconButton>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <IconButton onClick={() => onEdit(property)} color="primary">
+                  <EditIcon />
+                </IconButton>
+                <IconButton 
+                  color="error"
+                  onClick={handleDeleteClick}
+                  sx={{ 
+                    '&:hover': {
+                      backgroundColor: 'error.light',
+                      color: 'error.contrastText'
+                    }
+                  }}
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </Box>
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={getDisplayStatus(property.status)}
+                  onChange={handleStatusChange}
+                  label="Status"
+                  disabled={statusLoading}
+                  sx={{ '& .MuiSelect-select': { py: 1 } }}
+                >
+                  {STATUS_OPTIONS.map((status) => (
+                    <MenuItem key={status} value={status}>
+                      <StatusChip status={status} />
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Box>
           </Box>
 
@@ -180,7 +240,6 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
             <Tabs value={tabValue} onChange={handleTabChange}>
               <Tab label="Jobs" />
               <Tab label="Equipment" />
-              <Tab label="Addresses" />
             </Tabs>
           </Box>
 
@@ -190,47 +249,6 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
 
           <TabPanel value={tabValue} index={1}>
             <Typography color="text.secondary">Equipment list will go here</Typography>
-          </TabPanel>
-
-          <TabPanel value={tabValue} index={2}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="subtitle1">Billing Address</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {property.billing_address ? (
-                        <>
-                          {property.billing_address.address1}<br />
-                          {property.billing_address.city}, {property.billing_address.province}<br />
-                          {property.billing_address.postal_code}
-                        </>
-                      ) : (
-                        'No billing address set'
-                      )}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="subtitle1">Service Address</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {property.service_address ? (
-                        <>
-                          {property.service_address.address1}<br />
-                          {property.service_address.city}, {property.service_address.province}<br />
-                          {property.service_address.postal_code}
-                        </>
-                      ) : (
-                        'No service address set'
-                      )}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
           </TabPanel>
         </CardContent>
       </Card>

@@ -1,43 +1,33 @@
 import { Address } from './address';
+import { BaseModel } from './index';
 import { Property } from './property';
-export interface Account {
-    account_id: string;
+export type AccountType = 'Customer' | 'Vendor' | 'Partner' | 'Individual' | 'Company' | 'Property Manager';
+export type AccountStatus = 'Active' | 'Inactive' | 'Archived';
+export interface Account extends BaseModel {
     name: string;
-    type: string;
-    status: string;
+    type: AccountType;
+    status: AccountStatus;
     billing_address?: Address;
-    properties?: Property[];
+    account_id: string;
     created_at: string;
     updated_at: string;
+    properties?: Property[];
 }
 export interface CreateAccountDto {
     name: string;
-    type: string;
-    status?: string;
-    address?: {
-        address1: string;
-        address2?: string;
-        city: string;
-        province: string;
-        postal_code: string;
-        country: string;
-    };
+    type: AccountType;
+    billing_address?: Address;
 }
 export interface UpdateAccountDto {
     name?: string;
-    type?: string;
-    status?: string;
-    address?: {
-        address1: string;
-        address2?: string;
-        city: string;
-        province: string;
-        postal_code: string;
-        country: string;
-    };
+    type?: AccountType;
+    status?: AccountStatus;
+    billing_address?: Address;
 }
 export interface AccountsResponse {
     accounts: Account[];
     total: number;
+    limit: number;
+    offset: number;
 }
 //# sourceMappingURL=account.d.ts.map

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Card, CardContent, Typography, Grid, Chip, Tabs, Tab, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import type { Account } from '@fieldhive/shared';
+import type { Account, Property } from '@fieldhive/shared';
 import { updateAccount, deleteAccount, archiveAccount } from '../../services/api';
 
 interface AccountDetailsProps {
@@ -120,8 +120,10 @@ const AccountDetails = ({ account, onEdit, onUpdate, onAccountSelect }: AccountD
               </Typography>
               <Grid container spacing={2}>
                 <Grid item xs={4}>
-                  <Typography variant="subtitle2" color="text.secondary">Billing Address</Typography>
-                  <Typography variant="body2">
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Billing Address
+                  </Typography>
+                  <Typography variant="body2" component="div">
                     {account.billing_address ? (
                       <>
                         {account.billing_address.address1}<br />
@@ -134,11 +136,15 @@ const AccountDetails = ({ account, onEdit, onUpdate, onAccountSelect }: AccountD
                   </Typography>
                 </Grid>
                 <Grid item xs={4}>
-                  <Typography variant="subtitle2" color="text.secondary">Key Contacts</Typography>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Key Contacts
+                  </Typography>
                   <Typography variant="body2">Coming soon</Typography>
                 </Grid>
                 <Grid item xs={4}>
-                  <Typography variant="subtitle2" color="text.secondary">Admin Users</Typography>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Admin Users
+                  </Typography>
                   <Typography variant="body2">Coming soon</Typography>
                 </Grid>
               </Grid>
@@ -211,15 +217,15 @@ const AccountDetails = ({ account, onEdit, onUpdate, onAccountSelect }: AccountD
 
           <Box role="tabpanel" hidden={tabValue !== 0} sx={{ p: 3 }}>
             {tabValue === 0 && (
-              <Typography color="text.secondary">
-                {account.properties && account.properties.length > 0 ? (
+              <Box>
+                {account.properties?.length ? (
                   <Grid container spacing={2}>
-                    {account.properties.map((property) => (
+                    {account.properties.map((property: Property) => (
                       <Grid item xs={12} key={property.property_id}>
                         <Card variant="outlined">
                           <CardContent>
                             <Typography variant="subtitle1">{property.name}</Typography>
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" color="text.secondary" component="div">
                               {property.service_address ? (
                                 <>
                                   {property.service_address.address1}<br />
@@ -236,15 +242,15 @@ const AccountDetails = ({ account, onEdit, onUpdate, onAccountSelect }: AccountD
                     ))}
                   </Grid>
                 ) : (
-                  'No properties associated with this account'
+                  <Typography>No properties associated with this account</Typography>
                 )}
-              </Typography>
+              </Box>
             )}
           </Box>
 
           <Box role="tabpanel" hidden={tabValue !== 1} sx={{ p: 3 }}>
             {tabValue === 1 && (
-              <Typography color="text.secondary">Jobs list will go here</Typography>
+              <Typography>Jobs list will go here</Typography>
             )}
           </Box>
 
@@ -254,8 +260,10 @@ const AccountDetails = ({ account, onEdit, onUpdate, onAccountSelect }: AccountD
                 <Grid item xs={12}>
                   <Card variant="outlined">
                     <CardContent>
-                      <Typography variant="subtitle1">Billing Address</Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="subtitle1" gutterBottom>
+                        Billing Address
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" component="div">
                         {account.billing_address ? (
                           <>
                             {account.billing_address.address1}<br />

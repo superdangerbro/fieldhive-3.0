@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Box, Drawer, List, ListItem, ListItemIcon, ListItemText, AppBar, Toolbar, Typography, IconButton } from '@mui/material';
+import { Box, Drawer, List, ListItem, ListItemIcon, ListItemText, AppBar, Toolbar, Typography, IconButton, Collapse } from '@mui/material';
 import MapIcon from '@mui/icons-material/Map';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -9,6 +9,8 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import WorkIcon from '@mui/icons-material/Work';
 import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -16,19 +18,75 @@ const drawerWidth = 240;
 
 const menuItems = [
   { text: 'Accounts', icon: <AccountBalanceIcon />, path: '/accounts' },
-  { text: 'Properties', icon: <BusinessIcon />, path: '/properties' },
+  { 
+    text: 'Properties', 
+    icon: <BusinessIcon />, 
+    path: '/properties',
+    subItems: [
+      { text: 'Jobs', icon: <WorkIcon />, path: '/jobs' }
+    ]
+  },
   { text: 'Field Map', icon: <MapIcon />, path: '/field-map' },
   { text: 'Field Map 3D', icon: <MapIcon />, path: '/field-map-3d' },
-  { text: 'Jobs', icon: <WorkIcon />, path: '/jobs' },
   { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
+  const [openSubMenu, setOpenSubMenu] = useState<string | null>('Properties');
 
   const toggleDrawer = () => {
     setIsDrawerOpen(!isDrawerOpen);
+  };
+
+  const handleSubMenuClick = (text: string) => {
+    if (isDrawerOpen) {
+      setOpenSubMenu(openSubMenu === text ? null : text);
+    }
+  };
+
+  const renderMenuItem = (item: any, isSubItem = false) => {
+    const isSelected = pathname === item.path;
+    const hasSubItems = item.subItems && item.subItems.length > 0;
+    const isOpen = openSubMenu === item.text;
+
+    if (hasSubItems) {
+      return (
+        <Box key={item.text}>
+          <ListItem 
+            button 
+            onClick={() => handleSubMenuClick(item.text)}
+            selected={isSelected || (item.subItems && item.subItems.some((sub: any) => pathname === sub.path))}
+            sx={{ pl: isSubItem ? 4 : 2 }}
+          >
+            <ListItemIcon>{item.icon}</ListItemIcon>
+            {isDrawerOpen && (
+              <>
+                <ListItemText primary={item.text} />
+                {isOpen ? <ExpandLess /> : <ExpandMore />}
+              </>
+            )}
+          </ListItem>
+          {hasSubItems && (
+            <Collapse in={isOpen && isDrawerOpen} timeout="auto" unmountOnExit>
+              <List component="div" disablePadding>
+                {item.subItems.map((subItem: any) => renderMenuItem(subItem, true))}
+              </List>
+            </Collapse>
+          )}
+        </Box>
+      );
+    }
+
+    return (
+      <Link key={item.text} href={item.path} passHref style={{ textDecoration: 'none', color: 'inherit' }}>
+        <ListItem button selected={isSelected} sx={{ pl: isSubItem ? 4 : 2 }}>
+          <ListItemIcon>{item.icon}</ListItemIcon>
+          {isDrawerOpen && <ListItemText primary={item.text} />}
+        </ListItem>
+      </Link>
+    );
   };
 
   return (
@@ -79,14 +137,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Toolbar />
         <Box sx={{ overflow: 'auto' }}>
           <List>
-            {menuItems.map((item) => (
-              <Link key={item.text} href={item.path} passHref style={{ textDecoration: 'none', color: 'inherit' }}>
-                <ListItem button selected={pathname === item.path}>
-                  <ListItemIcon>{item.icon}</ListItemIcon>
-                  {isDrawerOpen && <ListItemText primary={item.text} />}
-                </ListItem>
-              </Link>
-            ))}
+            {menuItems.map((item) => renderMenuItem(item))}
           </List>
         </Box>
       </Drawer>

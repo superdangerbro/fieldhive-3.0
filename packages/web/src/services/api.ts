@@ -1,5 +1,13 @@
 import { Property, CreatePropertyDto, UpdatePropertyDto, PropertiesResponse, Account, CreateAccountDto, UpdateAccountDto, AccountsResponse, Job, JobsResponse, UpdateJobDto, CreateJobDto } from '@fieldhive/shared';
 
+export const API_ENDPOINTS = {
+    PROPERTIES: '/properties',
+    ACCOUNTS: '/accounts',
+    JOBS: '/jobs',
+    SETTINGS: '/settings',
+    EQUIPMENT: '/equipment'
+};
+
 class Api {
     private baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -75,11 +83,12 @@ class Api {
     }
 
     // Property methods
-    async getProperties(params?: { search?: string; limit?: number; offset?: number }): Promise<PropertiesResponse> {
+    async getProperties(params?: { search?: string; limit?: number; offset?: number; accountId?: string }): Promise<PropertiesResponse> {
         const searchParams = new URLSearchParams();
         if (params?.search) searchParams.append('search', params.search);
         if (params?.limit) searchParams.append('limit', params.limit.toString());
         if (params?.offset) searchParams.append('offset', params.offset.toString());
+        if (params?.accountId) searchParams.append('accountId', params.accountId);
 
         const response = await fetch(`${this.baseUrl}/properties?${searchParams}`);
         if (!response.ok) {
@@ -159,7 +168,7 @@ class Api {
     }
 
     async getJobTypes(): Promise<{ jobTypes: { id: string; name: string }[] }> {
-        const response = await fetch(`${this.baseUrl}/settings/job-types`);
+        const response = await fetch(`${this.baseUrl}/settings/job_types`);
         if (!response.ok) {
             throw new Error('Failed to fetch job types');
         }
@@ -172,7 +181,11 @@ class Api {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(data),
+            body: JSON.stringify({
+                ...data,
+                property_id: data.propertyId,
+                job_type_id: data.jobTypeId
+            }),
         });
         if (!response.ok) {
             throw new Error('Failed to create job');
@@ -203,6 +216,46 @@ class Api {
         }
         return response.json();
     }
+
+    // Settings methods
+    async getSetting(key: string): Promise<any> {
+        const response = await fetch(`${this.baseUrl}/settings/${key}`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch setting: ${key}`);
+        }
+        return response.json();
+    }
+
+    async updateSetting(key: string, value: any): Promise<any> {
+        const response = await fetch(`${this.baseUrl}/settings/${key}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ value }),
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to update setting: ${key}`);
+        }
+        return response.json();
+    }
+
+    // Equipment settings methods
+    async getEquipmentTypes(): Promise<any> {
+        return this.getSetting('equipment_types');
+    }
+
+    async saveEquipmentTypes(types: any): Promise<any> {
+        return this.updateSetting('equipment_types', types);
+    }
+
+    async getEquipmentStatuses(): Promise<any> {
+        return this.getSetting('equipment_statuses');
+    }
+
+    async saveEquipmentStatuses(statuses: any): Promise<any> {
+        return this.updateSetting('equipment_statuses', statuses);
+    }
 }
 
 export const api = new Api();
@@ -217,8 +270,18 @@ export const getProperties = api.getProperties.bind(api);
 export const createProperty = api.createProperty.bind(api);
 export const updateProperty = api.updateProperty.bind(api);
 export const deleteProperty = api.deleteProperty.bind(api);
+export const archiveProperty = api.archiveProperty.bind(api);
 export const getJobs = api.getJobs.bind(api);
 export const getJobTypes = api.getJobTypes.bind(api);
 export const createJob = api.createJob.bind(api);
 export const updateJob = api.updateJob.bind(api);
 export const deleteJob = api.deleteJob.bind(api);
+export const getSetting = api.getSetting.bind(api);
+export const updateSetting = api.updateSetting.bind(api);
+export const getEquipmentTypes = api.getEquipmentTypes.bind(api);
+export const saveEquipmentTypes = api.saveEquipmentTypes.bind(api);
+export const getEquipmentStatuses = api.getEquipmentStatuses.bind(api);
+export const saveEquipmentStatuses = api.saveEquipmentStatuses.bind(api);
+
+// Export useApi hook
+export const useApi = () => api;

@@ -30,7 +30,7 @@ export default function PropertiesPage() {
 
   const handlePropertySelect = (property: Property | null) => {
     // If the property is deleted, remove it from persistence
-    if (!property || !properties.find(p => p.property_id === property.property_id)) {
+    if (!property || !properties.find(p => p.id === property.id)) {
       setSelectedProperty(null);
     } else {
       setSelectedProperty(property);
@@ -48,7 +48,7 @@ export default function PropertiesPage() {
   const handlePropertiesLoad = (loadedProperties: Property[]) => {
     setProperties(loadedProperties);
     // If the selected property no longer exists in the loaded properties, clear it
-    if (selectedProperty && !loadedProperties.find(p => p.property_id === selectedProperty.property_id)) {
+    if (selectedProperty && !loadedProperties.find(p => p.id === selectedProperty.id)) {
       setSelectedProperty(null);
     }
   };

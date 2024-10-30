@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import {
     TextField,
@@ -9,18 +11,19 @@ import {
     ListItemText
 } from '@mui/material';
 import { Property } from '@fieldhive/shared';
-import { useApi } from '../../../services/api';
+import { getProperties } from '../../../services/api';
 
 interface PropertySearchProps {
-    onSelect: (property: Property) => void;
+    onManageFloorPlans: () => void;
+    isFloorPlansOpen: boolean;
+    onFloorPlansOpenChange: (open: boolean) => void;
 }
 
-export default function PropertySearch({ onSelect }: PropertySearchProps) {
+export function PropertySearch({ onManageFloorPlans, isFloorPlansOpen, onFloorPlansOpenChange }: PropertySearchProps) {
     const [open, setOpen] = useState(false);
     const [options, setOptions] = useState<Property[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const api = useApi();
 
     useEffect(() => {
         let active = true;
@@ -32,11 +35,14 @@ export default function PropertySearch({ onSelect }: PropertySearchProps) {
 
         setLoading(true);
 
-        api.searchProperties({ search: searchTerm })
+        getProperties({ search: searchTerm })
             .then((response) => {
                 if (active) {
                     setOptions(response.properties);
                 }
+            })
+            .catch(error => {
+                console.error('Error searching properties:', error);
             })
             .finally(() => {
                 if (active) {
@@ -47,63 +53,81 @@ export default function PropertySearch({ onSelect }: PropertySearchProps) {
         return () => {
             active = false;
         };
-    }, [searchTerm, api]);
+    }, [searchTerm]);
 
     const getOptionLabel = (option: Property) => {
         const address = [
-            option.serviceAddress?.address1,
-            option.serviceAddress?.address2,
-            option.serviceAddress?.city,
-            option.serviceAddress?.province
+            option.service_address?.address1,
+            option.service_address?.address2,
+            option.service_address?.city,
+            option.service_address?.province
         ].filter(Boolean).join(', ');
         return `${option.name} - ${address}`;
     };
 
     return (
-        <Autocomplete
-            open={open}
-            onOpen={() => setOpen(true)}
-            onClose={() => setOpen(false)}
-            isOptionEqualToValue={(option, value) => option.id === value.id}
-            getOptionLabel={getOptionLabel}
-            options={options}
-            loading={loading}
-            onChange={(event, value) => {
-                if (value) {
-                    onSelect(value);
-                }
-            }}
-            onInputChange={(event, value) => {
-                setSearchTerm(value);
-            }}
-            renderInput={(params) => (
-                <TextField
-                    {...params}
-                    placeholder="Search properties..."
-                    InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                            <React.Fragment>
-                                {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                {params.InputProps.endAdornment}
-                            </React.Fragment>
-                        ),
-                    }}
-                />
-            )}
-            renderOption={(props, option) => (
-                <ListItem {...props}>
-                    <ListItemText
-                        primary={option.name}
-                        secondary={[
-                            option.serviceAddress?.address1,
-                            option.serviceAddress?.address2,
-                            option.serviceAddress?.city,
-                            option.serviceAddress?.province
-                        ].filter(Boolean).join(', ')}
+        <Box sx={{ position: 'absolute', top: 24, left: 24, width: 400, zIndex: 1000 }}>
+            <Autocomplete
+                open={open}
+                onOpen={() => setOpen(true)}
+                onClose={() => setOpen(false)}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                getOptionLabel={getOptionLabel}
+                options={options}
+                loading={loading}
+                onChange={(event, value) => {
+                    if (value) {
+                        onFloorPlansOpenChange(true);
+                    }
+                }}
+                onInputChange={(event, value) => {
+                    setSearchTerm(value);
+                }}
+                renderInput={(params) => (
+                    <TextField
+                        {...params}
+                        placeholder="Search properties..."
+                        InputProps={{
+                            ...params.InputProps,
+                            endAdornment: (
+                                <React.Fragment>
+                                    {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                </React.Fragment>
+                            ),
+                        }}
+                        sx={{
+                            backgroundColor: 'background.paper',
+                            borderRadius: 1,
+                            boxShadow: 2,
+                            '& .MuiOutlinedInput-root': {
+                                '& fieldset': {
+                                    borderColor: 'transparent'
+                                },
+                                '&:hover fieldset': {
+                                    borderColor: 'transparent'
+                                },
+                                '&.Mui-focused fieldset': {
+                                    borderColor: 'transparent'
+                                }
+                            }
+                        }}
                     />
-                </ListItem>
-            )}
-        />
+                )}
+                renderOption={(props, option) => (
+                    <ListItem {...props}>
+                        <ListItemText
+                            primary={option.name}
+                            secondary={[
+                                option.service_address?.address1,
+                                option.service_address?.address2,
+                                option.service_address?.city,
+                                option.service_address?.province
+                            ].filter(Boolean).join(', ')}
+                        />
+                    </ListItem>
+                )}
+            />
+        </Box>
     );
 }

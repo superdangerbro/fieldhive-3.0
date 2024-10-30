@@ -9,45 +9,98 @@ export const updateProperty = async (req: Request, res: Response) => {
         name, 
         status,
         billing_address,
-        service_address
+        service_address,
+        accounts
     } = req.body as UpdatePropertyDto;
 
     try {
         await AppDataSource.transaction(async (transactionalEntityManager) => {
-            // Update billing address if provided
-            if (billing_address) {
-                await transactionalEntityManager.query(
-                    `UPDATE addresses 
-                    SET address1 = $1, address2 = $2, city = $3, province = $4, postal_code = $5, country = $6
-                    WHERE address_id = (SELECT billing_address_id FROM properties WHERE property_id = $7)`,
-                    [
-                        billing_address.address1,
-                        billing_address.address2 || null,
-                        billing_address.city,
-                        billing_address.province,
-                        billing_address.postal_code,
-                        billing_address.country || 'Canada',
-                        id
-                    ]
+            // Update or create service address if provided
+            if (service_address) {
+                const [existingServiceAddress] = await transactionalEntityManager.query(
+                    `SELECT service_address_id FROM properties WHERE property_id = $1`,
+                    [id]
                 );
+
+                if (existingServiceAddress?.service_address_id) {
+                    await transactionalEntityManager.query(
+                        `UPDATE addresses 
+                        SET address1 = $1, address2 = $2, city = $3, province = $4, postal_code = $5, country = $6
+                        WHERE address_id = $7`,
+                        [
+                            service_address.address1,
+                            service_address.address2 || null,
+                            service_address.city,
+                            service_address.province,
+                            service_address.postal_code,
+                            service_address.country || 'Canada',
+                            existingServiceAddress.service_address_id
+                        ]
+                    );
+                } else {
+                    const [newAddress] = await transactionalEntityManager.query(
+                        `INSERT INTO addresses (address1, address2, city, province, postal_code, country)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        RETURNING address_id`,
+                        [
+                            service_address.address1,
+                            service_address.address2 || null,
+                            service_address.city,
+                            service_address.province,
+                            service_address.postal_code,
+                            service_address.country || 'Canada'
+                        ]
+                    );
+
+                    await transactionalEntityManager.query(
+                        `UPDATE properties SET service_address_id = $1 WHERE property_id = $2`,
+                        [newAddress.address_id, id]
+                    );
+                }
             }
 
-            // Update service address if provided
-            if (service_address) {
-                await transactionalEntityManager.query(
-                    `UPDATE addresses 
-                    SET address1 = $1, address2 = $2, city = $3, province = $4, postal_code = $5, country = $6
-                    WHERE address_id = (SELECT service_address_id FROM properties WHERE property_id = $7)`,
-                    [
-                        service_address.address1,
-                        service_address.address2 || null,
-                        service_address.city,
-                        service_address.province,
-                        service_address.postal_code,
-                        service_address.country || 'Canada',
-                        id
-                    ]
+            // Update or create billing address if provided
+            if (billing_address) {
+                const [existingBillingAddress] = await transactionalEntityManager.query(
+                    `SELECT billing_address_id FROM properties WHERE property_id = $1`,
+                    [id]
                 );
+
+                if (existingBillingAddress?.billing_address_id) {
+                    await transactionalEntityManager.query(
+                        `UPDATE addresses 
+                        SET address1 = $1, address2 = $2, city = $3, province = $4, postal_code = $5, country = $6
+                        WHERE address_id = $7`,
+                        [
+                            billing_address.address1,
+                            billing_address.address2 || null,
+                            billing_address.city,
+                            billing_address.province,
+                            billing_address.postal_code,
+                            billing_address.country || 'Canada',
+                            existingBillingAddress.billing_address_id
+                        ]
+                    );
+                } else {
+                    const [newAddress] = await transactionalEntityManager.query(
+                        `INSERT INTO addresses (address1, address2, city, province, postal_code, country)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        RETURNING address_id`,
+                        [
+                            billing_address.address1,
+                            billing_address.address2 || null,
+                            billing_address.city,
+                            billing_address.province,
+                            billing_address.postal_code,
+                            billing_address.country || 'Canada'
+                        ]
+                    );
+
+                    await transactionalEntityManager.query(
+                        `UPDATE properties SET billing_address_id = $1 WHERE property_id = $2`,
+                        [newAddress.address_id, id]
+                    );
+                }
             }
 
             // Update property
@@ -60,7 +113,28 @@ export const updateProperty = async (req: Request, res: Response) => {
                 [name, status, id]
             );
 
-            // Get updated property with addresses
+            // Update accounts if provided
+            if (accounts) {
+                // First, remove all existing account associations
+                await transactionalEntityManager.query(
+                    `DELETE FROM properties_accounts WHERE property_id = $1`,
+                    [id]
+                );
+
+                // Then, add new account associations
+                if (accounts.length > 0) {
+                    const values = accounts.map((_, index) => 
+                        `($1, $${index + 2})`
+                    ).join(', ');
+
+                    await transactionalEntityManager.query(
+                        `INSERT INTO properties_accounts (property_id, account_id) VALUES ${values}`,
+                        [id, ...accounts]
+                    );
+                }
+            }
+
+            // Get updated property with addresses and accounts
             const [updatedProperty] = await transactionalEntityManager.query(
                 `SELECT 
                     p.*,
@@ -81,7 +155,21 @@ export const updateProperty = async (req: Request, res: Response) => {
                         'province', sa.province,
                         'postal_code', sa.postal_code,
                         'country', sa.country
-                    ) AS service_address
+                    ) AS service_address,
+                    COALESCE(
+                        (
+                            SELECT json_agg(
+                                json_build_object(
+                                    'account_id', a.account_id,
+                                    'name', a.name
+                                )
+                            )
+                            FROM properties_accounts pa
+                            JOIN accounts a ON a.account_id = pa.account_id
+                            WHERE pa.property_id = p.property_id
+                        ),
+                        '[]'::json
+                    ) as accounts
                 FROM properties p
                 LEFT JOIN addresses ba ON ba.address_id = p.billing_address_id
                 LEFT JOIN addresses sa ON sa.address_id = p.service_address_id

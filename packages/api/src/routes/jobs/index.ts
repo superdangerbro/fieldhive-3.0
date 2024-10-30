@@ -121,21 +121,6 @@ router.post('/', async (req, res) => {
             });
         }
 
-        // Verify job type exists in settings
-        const settingsRepository = AppDataSource.getRepository(Setting);
-        const jobTypesSetting = await settingsRepository.findOne({
-            where: { key: JOB_TYPES_SETTING_KEY }
-        });
-
-        const jobTypes = jobTypesSetting?.value || [];
-        if (!jobTypes.includes(job_type_id)) {
-            logger.error('Job type not found:', job_type_id);
-            return res.status(404).json({
-                error: 'Not found',
-                message: 'Job type not found'
-            });
-        }
-
         // Create job with default status
         const [job] = await AppDataSource.query(
             'INSERT INTO jobs (title, property_id, job_type_id, description, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING job_id',

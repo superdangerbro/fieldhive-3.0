@@ -3,25 +3,24 @@
 import React, { useState, useEffect } from 'react';
 import {
     Box,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
+    Card,
+    CardContent,
+    TextField,
     IconButton,
+    Tooltip,
     Menu,
     MenuItem,
-    Chip,
+    Checkbox,
+    FormControlLabel,
+    Stack,
     Typography,
-    CircularProgress
+    Chip
 } from '@mui/material';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { getJobs, deleteJob } from '../../services/api';
-import { Job } from '@fieldhive/shared';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import ViewColumnIcon from '@mui/icons-material/ViewColumn';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import { getJobs } from '../../services/api';
+import { Job, JobStatus } from '@fieldhive/shared';
 
 interface JobsTableProps {
     refreshTrigger: number;
@@ -30,24 +29,111 @@ interface JobsTableProps {
     onJobsLoad: (jobs: Job[]) => void;
 }
 
+const getStatusColor = (status: JobStatus) => {
+    switch (status) {
+        case 'pending':
+            return 'warning';
+        case 'in_progress':
+            return 'info';
+        case 'completed':
+            return 'success';
+        case 'cancelled':
+            return 'error';
+        default:
+            return undefined;
+    }
+};
+
+const defaultColumns: GridColDef[] = [
+    {
+        field: 'title',
+        headerName: 'Title',
+        flex: 1,
+        minWidth: 200
+    },
+    {
+        field: 'property',
+        headerName: 'Property',
+        flex: 1,
+        minWidth: 200,
+        valueGetter: (params) => params.value?.name || 'N/A'
+    },
+    {
+        field: 'account',
+        headerName: 'Account',
+        flex: 1,
+        minWidth: 200,
+        valueGetter: (params) => params.value?.name || 'N/A'
+    },
+    {
+        field: 'job_type',
+        headerName: 'Type',
+        width: 150,
+        valueGetter: (params) => params.value?.name || 'N/A'
+    },
+    {
+        field: 'status',
+        headerName: 'Status',
+        width: 150,
+        renderCell: (params) => (
+            <Chip
+                label={params.value.replace('_', ' ').toUpperCase()}
+                size="small"
+                color={getStatusColor(params.value as JobStatus)}
+                sx={{ color: 'white' }}
+            />
+        )
+    },
+    {
+        field: 'created_at',
+        headerName: 'Created',
+        width: 120,
+        valueGetter: (params) => new Date(params.value).toLocaleDateString()
+    }
+];
+
 export default function JobsTable({ refreshTrigger, onJobSelect, selectedJob, onJobsLoad }: JobsTableProps) {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-    const [selectedActionJob, setSelectedActionJob] = useState<Job | null>(null);
-    const [page, setPage] = useState(1);
-    const [pageSize] = useState(10);
+    const [page, setPage] = useState(0);
+    const [pageSize, setPageSize] = useState(25);
+    const [totalRows, setTotalRows] = useState(0);
+    const [filterText, setFilterText] = useState('');
+    const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns.map(col => col.field));
+    const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
 
-    useEffect(() => {
-        fetchJobs();
-    }, [refreshTrigger, page, pageSize]);
+    const handleColumnMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+        setColumnMenuAnchor(event.currentTarget);
+    };
+
+    const handleColumnMenuClose = () => {
+        setColumnMenuAnchor(null);
+    };
+
+    const toggleColumn = (field: string) => {
+        setVisibleColumns(prev => {
+            if (prev.includes(field)) {
+                return prev.filter(f => f !== field);
+            } else {
+                return [...prev, field];
+            }
+        });
+    };
+
+    const columns = defaultColumns
+        .filter(col => visibleColumns.includes(col.field))
+        .map(col => ({
+            ...col,
+            filterable: true
+        }));
 
     const fetchJobs = async () => {
         try {
             setLoading(true);
-            const response = await getJobs(page, pageSize);
+            const response = await getJobs(page + 1, pageSize);
             setJobs(response.jobs || []);
+            setTotalRows(response.total);
             onJobsLoad(response.jobs || []);
         } catch (error) {
             console.error('Failed to fetch jobs:', error);
@@ -57,135 +143,97 @@ export default function JobsTable({ refreshTrigger, onJobSelect, selectedJob, on
         }
     };
 
-    const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, job: Job) => {
-        event.stopPropagation();
-        setAnchorEl(event.currentTarget);
-        setSelectedActionJob(job);
-    };
-
-    const handleMenuClose = () => {
-        setAnchorEl(null);
-        setSelectedActionJob(null);
-    };
-
-    const handleDelete = async () => {
-        if (!selectedActionJob) return;
-
-        if (!window.confirm('Are you sure you want to delete this job?')) {
-            handleMenuClose();
-            return;
-        }
-
-        try {
-            await deleteJob(selectedActionJob.id);
-            fetchJobs();
-            if (selectedJob?.id === selectedActionJob.id) {
-                onJobSelect(null);
-            }
-        } catch (error) {
-            console.error('Failed to delete job:', error);
-        }
-        handleMenuClose();
-    };
-
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'pending':
-                return 'warning';
-            case 'in_progress':
-                return 'info';
-            case 'completed':
-                return 'success';
-            case 'cancelled':
-                return 'error';
-            default:
-                return 'default';
-        }
-    };
-
-    if (loading) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                <CircularProgress />
-            </Box>
-        );
-    }
-
-    if (error) {
-        return (
-            <Box sx={{ p: 3, textAlign: 'center' }}>
-                <Typography color="error">{error}</Typography>
-            </Box>
-        );
-    }
+    useEffect(() => {
+        fetchJobs();
+    }, [page, pageSize, refreshTrigger]);
 
     return (
-        <Paper>
-            <TableContainer>
-                <Table>
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>Title</TableCell>
-                            <TableCell>Property</TableCell>
-                            <TableCell>Status</TableCell>
-                            <TableCell>Created</TableCell>
-                            <TableCell width={50}></TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {jobs.map((job) => (
-                            <TableRow
-                                key={job.id}
-                                hover
-                                selected={selectedJob?.id === job.id}
-                                onClick={() => onJobSelect(job)}
-                                sx={{ cursor: 'pointer' }}
+        <Box sx={{ height: 600, width: '100%' }}>
+            <Card sx={{ mb: 2 }}>
+                <CardContent>
+                    <Stack 
+                        direction="row" 
+                        spacing={2} 
+                        alignItems="center"
+                        justifyContent="flex-end"
+                    >
+                        <Box sx={{ flexGrow: 1 }}>
+                            <Typography variant="body2" color="text.secondary">
+                                {totalRows} jobs found
+                            </Typography>
+                        </Box>
+                        <TextField
+                            label="Filter Records"
+                            variant="outlined"
+                            size="small"
+                            value={filterText}
+                            onChange={(e) => setFilterText(e.target.value)}
+                            sx={{ width: 300 }}
+                            InputProps={{
+                                startAdornment: <FilterListIcon sx={{ mr: 1, color: 'action.active' }} />
+                            }}
+                        />
+                        <Tooltip title="Select Columns">
+                            <IconButton 
+                                onClick={handleColumnMenuOpen}
+                                sx={{ ml: 1 }}
                             >
-                                <TableCell>
-                                    <Typography variant="body1">{job.title}</Typography>
-                                </TableCell>
-                                <TableCell>{job.property?.name || 'N/A'}</TableCell>
-                                <TableCell>
-                                    <Chip
-                                        label={job.status.replace('_', ' ').toUpperCase()}
-                                        color={getStatusColor(job.status)}
-                                        size="small"
+                                <ViewColumnIcon />
+                            </IconButton>
+                        </Tooltip>
+                        <Menu
+                            anchorEl={columnMenuAnchor}
+                            open={Boolean(columnMenuAnchor)}
+                            onClose={handleColumnMenuClose}
+                            anchorOrigin={{
+                                vertical: 'bottom',
+                                horizontal: 'right',
+                            }}
+                            transformOrigin={{
+                                vertical: 'top',
+                                horizontal: 'right',
+                            }}
+                        >
+                            {defaultColumns.map((column) => (
+                                <MenuItem key={column.field} onClick={() => toggleColumn(column.field)}>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                checked={visibleColumns.includes(column.field)}
+                                                onChange={() => toggleColumn(column.field)}
+                                            />
+                                        }
+                                        label={column.headerName}
                                     />
-                                </TableCell>
-                                <TableCell>{new Date(job.createdAt).toLocaleDateString()}</TableCell>
-                                <TableCell>
-                                    <IconButton
-                                        size="small"
-                                        onClick={(e) => handleMenuOpen(e, job)}
-                                    >
-                                        <MoreVertIcon />
-                                    </IconButton>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+                                </MenuItem>
+                            ))}
+                        </Menu>
+                    </Stack>
+                </CardContent>
+            </Card>
 
-            <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-            >
-                <MenuItem onClick={() => {
-                    if (selectedActionJob) {
-                        onJobSelect(selectedActionJob);
+            <DataGrid
+                rows={jobs}
+                columns={columns}
+                getRowId={(row) => row.job_id}
+                loading={loading}
+                paginationMode="server"
+                page={page}
+                pageSize={pageSize}
+                rowCount={totalRows}
+                rowsPerPageOptions={[25, 50, 100]}
+                onPageChange={(newPage) => setPage(newPage)}
+                onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
+                disableSelectionOnClick
+                disableColumnMenu
+                onRowClick={(params) => onJobSelect(params.row as Job)}
+                selectionModel={selectedJob ? [selectedJob.job_id] : []}
+                sx={{
+                    '& .MuiDataGrid-row': {
+                        cursor: 'pointer'
                     }
-                    handleMenuClose();
-                }}>
-                    <EditIcon sx={{ mr: 1 }} />
-                    Edit
-                </MenuItem>
-                <MenuItem onClick={handleDelete}>
-                    <DeleteIcon sx={{ mr: 1 }} />
-                    Delete
-                </MenuItem>
-            </Menu>
-        </Paper>
+                }}
+            />
+        </Box>
     );
 }

@@ -1,15 +1,24 @@
 import { BaseModel } from './index';
 import { Property } from './property';
+import { Account } from './account';
 
 export type JobStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
-export interface Job extends BaseModel {
+export interface Job {
+    job_id: string;
     title: string;
     description?: string;
-    propertyId: string;
+    property_id: string;
     property: Property;
-    jobTypeId: string;
+    job_type_id: string;
+    job_type: {
+        job_type_id: string;
+        name: string;
+    };
     status: JobStatus;
+    created_at: string;
+    updated_at: string;
+    account: Account;
 }
 
 export interface CreateJobDto {

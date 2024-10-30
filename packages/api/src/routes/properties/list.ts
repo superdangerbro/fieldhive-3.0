@@ -4,7 +4,7 @@ import { logger } from '../../utils/logger';
 
 export const listProperties = async (req: Request, res: Response) => {
     try {
-        const { limit = 25, offset = 0, search = '' } = req.query;
+        const { limit = 25, offset = 0, search = '', accountId } = req.query;
 
         const query = AppDataSource
             .createQueryBuilder()
@@ -35,8 +35,14 @@ export const listProperties = async (req: Request, res: Response) => {
             .leftJoin('addresses', 'ba', 'ba.address_id = p.billing_address_id')
             .leftJoin('addresses', 'sa', 'sa.address_id = p.service_address_id');
 
+        if (accountId) {
+            query
+                .innerJoin('properties_accounts', 'pa', 'pa.property_id = p.property_id')
+                .andWhere('pa.account_id = :accountId', { accountId });
+        }
+
         if (search) {
-            query.where(
+            query.andWhere(
                 'p.name ILIKE :search OR ba.address1 ILIKE :search OR sa.address1 ILIKE :search',
                 { search: `%${search}%` }
             );
