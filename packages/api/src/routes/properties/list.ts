@@ -1,97 +1,67 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../../config/database';
+import { logger } from '../../utils/logger';
 
-interface QueryParams {
-  lat?: string;
-  lng?: string;
-  bounds?: string; // [west, south, east, north]
-  search?: string;
-}
-
-export async function listProperties(req: Request<Record<string, never>, unknown, unknown, QueryParams>, res: Response) {
-  try {
-    const { lat, lng, bounds, search } = req.query;
-    const latNum = lat ? parseFloat(lat) : undefined;
-    const lngNum = lng ? parseFloat(lng) : undefined;
-    let boundsArray: number[] | undefined;
-    
+export const listProperties = async (req: Request, res: Response) => {
     try {
-      if (bounds) {
-        const parsed = JSON.parse(bounds);
-        if (Array.isArray(parsed) && parsed.length === 4 && parsed.every(n => typeof n === 'number')) {
-          boundsArray = parsed;
+        const { limit = 25, offset = 0, search = '' } = req.query;
+
+        const query = AppDataSource
+            .createQueryBuilder()
+            .select('p.*')
+            .addSelect(`
+                json_build_object(
+                    'address_id', ba.address_id,
+                    'address1', ba.address1,
+                    'address2', ba.address2,
+                    'city', ba.city,
+                    'province', ba.province,
+                    'postal_code', ba.postal_code,
+                    'country', ba.country
+                ) as billing_address
+            `)
+            .addSelect(`
+                json_build_object(
+                    'address_id', sa.address_id,
+                    'address1', sa.address1,
+                    'address2', sa.address2,
+                    'city', sa.city,
+                    'province', sa.province,
+                    'postal_code', sa.postal_code,
+                    'country', sa.country
+                ) as service_address
+            `)
+            .from('properties', 'p')
+            .leftJoin('addresses', 'ba', 'ba.address_id = p.billing_address_id')
+            .leftJoin('addresses', 'sa', 'sa.address_id = p.service_address_id');
+
+        if (search) {
+            query.where(
+                'p.name ILIKE :search OR ba.address1 ILIKE :search OR sa.address1 ILIKE :search',
+                { search: `%${search}%` }
+            );
         }
-      }
-    } catch (e) {
-      console.error('Error parsing bounds:', e);
+
+        const [properties, total] = await Promise.all([
+            query
+                .offset(Number(offset))
+                .limit(Number(limit))
+                .orderBy('p.name', 'ASC')
+                .getRawMany(),
+            query.getCount()
+        ]);
+
+        res.json({
+            properties,
+            total,
+            limit: Number(limit),
+            offset: Number(offset)
+        });
+    } catch (error) {
+        logger.error('Error listing properties:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: 'Failed to list properties'
+        });
     }
-
-    const query = `
-      SELECT
-        p.property_id AS id,
-        p.name,
-        p.type,
-        p.status,
-        CONCAT_WS(' ', p.address1, p.address2, p.city, p.province, p.postal_code, p.country) AS address,
-        ST_AsGeoJSON(p.location)::jsonb AS location,
-        p.created_at AS "createdAt",
-        p.updated_at AS "updatedAt",
-        COALESCE(
-          json_agg(
-            DISTINCT jsonb_build_object(
-              'accountId', a.account_id,
-              'name', a.name
-            )
-          ) FILTER (WHERE a.account_id IS NOT NULL),
-          '[]'::json
-        ) AS accounts
-      FROM properties p
-      LEFT JOIN properties_accounts_join paj ON paj.property_id = p.property_id
-      LEFT JOIN accounts a ON a.account_id = paj.account_id
-      ${boundsArray ? `
-        WHERE ST_Intersects(
-          p.location,
-          ST_MakeEnvelope($1, $2, $3, $4, 4326)
-        )
-      ` : ''}
-      GROUP BY
-        p.property_id,
-        p.name,
-        p.type,
-        p.status,
-        p.address1,
-        p.address2,
-        p.city,
-        p.province,
-        p.postal_code,
-        p.country,
-        p.location,
-        p.created_at,
-        p.updated_at
-      ORDER BY p.name ASC
-    `;
-
-    const params = boundsArray || [];
-
-    console.log('Executing query:', query.replace(/\s+/g, ' ').trim());
-    console.log('With params:', params);
-
-    const result = await AppDataSource.query(query, params);
-
-    const properties = result.map((row: any) => ({
-      ...row,
-      location: typeof row.location === 'string' ? JSON.parse(row.location) : row.location,
-      accounts: Array.isArray(row.accounts) ? row.accounts : []
-    }));
-
-    return res.json({
-      properties,
-      total: properties.length,
-      page: 1,
-      pageSize: properties.length
-    });
-  } catch (error) {
-    console.error('Error fetching properties:', error);
-    return res.status(500).json({ error: 'Internal Server Error' });
-  }
-}
+};

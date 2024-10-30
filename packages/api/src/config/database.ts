@@ -1,6 +1,11 @@
 import { DataSource } from 'typeorm';
 import { logger } from '../utils/logger';
 import { dbConfig, env } from './env';
+import { Property } from '../entities/Property';
+import { Account } from '../entities/Account';
+import { Address } from '../entities/Address';
+import { PropertiesAccounts } from '../entities/PropertiesAccounts';
+import { UsersAccounts } from '../entities/UsersAccounts';
 
 export const AppDataSource = new DataSource({
     type: 'postgres',
@@ -11,7 +16,7 @@ export const AppDataSource = new DataSource({
     database: dbConfig.database,
     synchronize: false,
     logging: env.ENABLE_QUERY_LOGGING,
-    entities: ['src/entities/**/*.ts'],
+    entities: [Property, Account, Address, PropertiesAccounts, UsersAccounts],
     migrations: ['src/migrations/**/*.ts'],
     subscribers: ['src/subscribers/**/*.ts'],
     ssl: dbConfig.ssl,

@@ -1,15 +1,6 @@
-import { createTheme, Theme, Components } from '@mui/material';
-import { dataGridStyles } from '../styles/dataGrid';
+'use client';
 
-declare module '@mui/material/styles' {
-    interface Components {
-        MuiDataGrid?: {
-            styleOverrides?: {
-                root?: any;
-            };
-        };
-    }
-}
+import { createTheme } from '@mui/material';
 
 export const theme = createTheme({
     palette: {
@@ -78,7 +69,6 @@ export const theme = createTheme({
                     '&::-webkit-scrollbar-track, & *::-webkit-scrollbar-track': {
                         backgroundColor: '#0f172a'
                     },
-                    // Ensure proper stacking for 3D components
                     '& .deck-canvas': {
                         zIndex: 1
                     },
@@ -94,7 +84,7 @@ export const theme = createTheme({
                     textTransform: 'none',
                     borderRadius: 8,
                     fontWeight: 500,
-                    zIndex: 10 // Ensure buttons appear above map layers
+                    zIndex: 10
                 },
                 contained: {
                     backgroundImage: 'linear-gradient(to bottom right, #6366f1, #4f46e5)',
@@ -111,7 +101,7 @@ export const theme = createTheme({
                     backdropFilter: 'blur(12px)',
                     borderRadius: 12,
                     border: '1px solid rgba(148, 163, 184, 0.1)',
-                    zIndex: 5 // Ensure dialogs and popovers appear above map
+                    zIndex: 5
                 }
             }
         },
@@ -132,7 +122,7 @@ export const theme = createTheme({
             styleOverrides: {
                 paper: {
                     borderRadius: 8,
-                    zIndex: 1301 // Above most other components
+                    zIndex: 1301
                 },
                 listbox: {
                     padding: 4,
@@ -158,10 +148,87 @@ export const theme = createTheme({
         },
         MuiDataGrid: {
             styleOverrides: {
-                root: dataGridStyles
+                root: {
+                    border: 'none',
+                    '& .MuiDataGrid-cell:focus': {
+                        outline: 'none',
+                    },
+                    '& .MuiDataGrid-row': {
+                        '&:hover': {
+                            backgroundColor: 'rgba(148, 163, 184, 0.08)',
+                        }
+                    },
+                    '& .MuiDataGrid-columnHeaders': {
+                        backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                    },
+                    '& .MuiDataGrid-footerContainer': {
+                        borderTop: '1px solid',
+                        borderColor: 'divider',
+                    },
+                    '& .MuiDataGrid-virtualScroller': {
+                        backgroundColor: 'transparent',
+                    },
+                    '& .MuiDataGrid-toolbarContainer': {
+                        padding: 2,
+                        gap: 2,
+                        backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                        borderTopLeftRadius: 12,
+                        borderTopRightRadius: 12,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                    },
+                    '& .MuiButton-root': {
+                        textTransform: 'none',
+                    },
+                    '& .MuiDataGrid-cell': {
+                        borderColor: 'divider',
+                    },
+                    '& .MuiDataGrid-columnSeparator': {
+                        color: 'divider',
+                    },
+                    '& .MuiDataGrid-selectedRowCount': {
+                        color: 'text.secondary',
+                    },
+                    '& .MuiDataGrid-menuIcon': {
+                        color: 'text.secondary',
+                    },
+                    '& .MuiDataGrid-sortIcon': {
+                        color: 'text.secondary',
+                    },
+                    '& .MuiDataGrid-filterIcon': {
+                        color: 'text.secondary',
+                    },
+                    '& .MuiDataGrid-toolbar': {
+                        '& .MuiButton-root': {
+                            color: 'text.secondary',
+                            '&:hover': {
+                                backgroundColor: 'rgba(148, 163, 184, 0.08)',
+                            },
+                        },
+                        '& .MuiFormControl-root': {
+                            minWidth: 200,
+                        },
+                    },
+                    '& .MuiDataGrid-columnHeaderTitle': {
+                        fontWeight: 600,
+                    },
+                    '& .MuiDataGrid-cellContent': {
+                        color: 'text.primary',
+                    },
+                    '& .MuiDataGrid-footerContainer .MuiTablePagination-root': {
+                        color: 'text.secondary',
+                    },
+                    '& .MuiDataGrid-row.Mui-selected': {
+                        backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                        '&:hover': {
+                            backgroundColor: 'rgba(99, 102, 241, 0.12)',
+                        },
+                    },
+                }
             }
         },
-        // Add support for 3D map controls
         MuiTooltip: {
             styleOverrides: {
                 tooltip: {

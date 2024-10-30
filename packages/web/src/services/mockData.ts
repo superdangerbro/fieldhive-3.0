@@ -1,99 +1,167 @@
-import { v4 as uuidv4 } from 'uuid';
-
-export interface Account {
-    id: string;
-    name: string;
-    is_company: boolean;
-    billingAddress: {
-        address1: string;
-        address2?: string;
-        city: string;
-        province: string;
-        postalCode: string;
-        country: string;
-    };
-    status: 'active' | 'inactive' | 'suspended';
-    createdAt: string;
-    updatedAt: string;
-}
+import { Account, Property } from '@fieldhive/shared';
 
 export const mockAccounts: Account[] = [
     {
-        id: uuidv4(),
+        account_id: '1',
         name: 'Acme Corporation',
-        is_company: true,
-        billingAddress: {
+        type: 'Company',
+        status: 'Active',
+        billing_address: {
+            address_id: '1',
             address1: '123 Main St',
-            address2: 'Suite 100',
-            city: 'Vancouver',
-            province: 'BC',
-            postalCode: 'V6B 4N7',
-            country: 'Canada'
+            city: 'Anytown',
+            province: 'ON',
+            postal_code: 'A1A 1A1',
+            country: 'Canada',
         },
-        status: 'active',
-        createdAt: new Date(2023, 0, 15).toISOString(),
-        updatedAt: new Date(2023, 9, 1).toISOString()
+        created_at: '2023-01-01T00:00:00Z',
+        updated_at: '2023-01-01T00:00:00Z',
     },
     {
-        id: uuidv4(),
+        account_id: '2',
         name: 'TechStart Inc',
-        is_company: true,
-        billingAddress: {
-            address1: '456 Innovation Ave',
-            city: 'Toronto',
-            province: 'ON',
-            postalCode: 'M5V 2H1',
-            country: 'Canada'
+        type: 'Company',
+        status: 'Active',
+        billing_address: {
+            address_id: '2',
+            address1: '456 Tech Blvd',
+            city: 'Silicon Valley',
+            province: 'CA',
+            postal_code: '90210',
+            country: 'USA',
         },
-        status: 'active',
-        createdAt: new Date(2023, 2, 1).toISOString(),
-        updatedAt: new Date(2023, 9, 15).toISOString()
+        created_at: '2023-02-01T00:00:00Z',
+        updated_at: '2023-02-01T00:00:00Z',
     },
     {
-        id: uuidv4(),
+        account_id: '3',
         name: 'Global Solutions Ltd',
-        is_company: true,
-        billingAddress: {
-            address1: '789 Business Blvd',
-            address2: 'Floor 15',
-            city: 'Montreal',
-            province: 'QC',
-            postalCode: 'H2Y 1N9',
-            country: 'Canada'
+        type: 'Company',
+        status: 'Inactive',
+        billing_address: {
+            address_id: '3',
+            address1: '789 International Ave',
+            city: 'London',
+            province: 'England',
+            postal_code: 'SW1A 1AA',
+            country: 'UK',
         },
-        status: 'suspended',
-        createdAt: new Date(2023, 4, 10).toISOString(),
-        updatedAt: new Date(2023, 9, 20).toISOString()
+        created_at: '2023-03-01T00:00:00Z',
+        updated_at: '2023-03-01T00:00:00Z',
     },
     {
-        id: uuidv4(),
+        account_id: '4',
         name: 'Eco Farms Co',
-        is_company: true,
-        billingAddress: {
-            address1: '321 Rural Route',
-            city: 'Calgary',
+        type: 'Company',
+        status: 'Active',
+        billing_address: {
+            address_id: '4',
+            address1: '101 Green Rd',
+            city: 'Farmville',
             province: 'AB',
-            postalCode: 'T2P 1J9',
-            country: 'Canada'
+            postal_code: 'T1T 1T1',
+            country: 'Canada',
         },
-        status: 'inactive',
-        createdAt: new Date(2023, 6, 1).toISOString(),
-        updatedAt: new Date(2023, 9, 25).toISOString()
+        created_at: '2023-04-01T00:00:00Z',
+        updated_at: '2023-04-01T00:00:00Z',
     },
     {
-        id: uuidv4(),
+        account_id: '5',
         name: 'Smart Agriculture Inc',
-        is_company: true,
-        billingAddress: {
-            address1: '654 Tech Way',
-            address2: 'Unit 200',
-            city: 'Ottawa',
-            province: 'ON',
-            postalCode: 'K1P 1J1',
-            country: 'Canada'
+        type: 'Company',
+        status: 'Active',
+        billing_address: {
+            address_id: '5',
+            address1: '202 Tech Farm Lane',
+            city: 'AgTech City',
+            province: 'SK',
+            postal_code: 'S7N 1T3',
+            country: 'Canada',
         },
-        status: 'active',
-        createdAt: new Date(2023, 7, 15).toISOString(),
-        updatedAt: new Date(2023, 9, 30).toISOString()
-    }
+        created_at: '2023-05-01T00:00:00Z',
+        updated_at: '2023-05-01T00:00:00Z',
+    },
+];
+
+export const mockProperties: Property[] = [
+    {
+        property_id: '1',
+        name: 'Downtown Office',
+        type: 'Commercial',
+        status: 'Active',
+        billing_address: {
+            address_id: '6',
+            address1: '100 Business Ave',
+            city: 'Metropolis',
+            province: 'ON',
+            postal_code: 'M5V 2T6',
+            country: 'Canada',
+        },
+        created_at: '2023-01-15T00:00:00Z',
+        updated_at: '2023-01-15T00:00:00Z',
+    },
+    {
+        property_id: '2',
+        name: 'Tech Park Campus',
+        type: 'Commercial',
+        status: 'Active',
+        billing_address: {
+            address_id: '7',
+            address1: '200 Innovation Dr',
+            city: 'Tech City',
+            province: 'BC',
+            postal_code: 'V6C 3E8',
+            country: 'Canada',
+        },
+        created_at: '2023-02-15T00:00:00Z',
+        updated_at: '2023-02-15T00:00:00Z',
+    },
+    {
+        property_id: '3',
+        name: 'Warehouse District',
+        type: 'Industrial',
+        status: 'Active',
+        billing_address: {
+            address_id: '8',
+            address1: '300 Logistics Blvd',
+            city: 'Port City',
+            province: 'NS',
+            postal_code: 'B3H 4R2',
+            country: 'Canada',
+        },
+        created_at: '2023-03-15T00:00:00Z',
+        updated_at: '2023-03-15T00:00:00Z',
+    },
+    {
+        property_id: '4',
+        name: 'Green Acres Farm',
+        type: 'Agricultural',
+        status: 'Active',
+        billing_address: {
+            address_id: '9',
+            address1: '400 Harvest Rd',
+            city: 'Rural County',
+            province: 'AB',
+            postal_code: 'T0C 2L0',
+            country: 'Canada',
+        },
+        created_at: '2023-04-15T00:00:00Z',
+        updated_at: '2023-04-15T00:00:00Z',
+    },
+    {
+        property_id: '5',
+        name: 'Smart Farm Research Center',
+        type: 'Agricultural',
+        status: 'Active',
+        billing_address: {
+            address_id: '10',
+            address1: '500 AgTech Way',
+            city: 'Innovation Valley',
+            province: 'SK',
+            postal_code: 'S7N 5A8',
+            country: 'Canada',
+        },
+        created_at: '2023-05-15T00:00:00Z',
+        updated_at: '2023-05-15T00:00:00Z',
+    },
 ];

@@ -1,208 +1,424 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Stepper,
-  Step,
-  StepLabel,
-  Alert,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+    TextField,
+    Box,
+    Grid,
+    CircularProgress,
+    Alert,
+    Snackbar,
+    Typography,
+    FormControlLabel,
+    Checkbox,
+    Autocomplete,
+    FormControl,
+    FormHelperText
 } from '@mui/material';
-import { AddressFormStep } from './steps/AddressFormStep';
-import { AccountStep } from './steps/AccountStep';
-import { LocationPickerDialog } from './LocationPickerDialog';
-import { usePropertyForm } from './hooks/usePropertyForm';
-import { usePropertySubmit } from './hooks/usePropertySubmit';
-import { usePropertyGeocoding } from './hooks/usePropertyGeocoding';
-import { getAccounts } from '../../services/api';
+import { createProperty, getAccounts } from '../../services/api';
+import type { CreatePropertyDto, Account } from '@fieldhive/shared';
 
-const steps = ['Property Details', 'Account'];
-
-const stepTitles = {
-  0: 'Enter Property Details',
-  1: 'Select or Create Account',
-};
-
-interface AddPropertyDialogProps {
-  open: boolean;
-  onClose: () => void;
-  onSuccess?: () => void;
+export interface AddPropertyDialogProps {
+    open: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
 }
 
-const AddPropertyDialog: React.FC<AddPropertyDialogProps> = ({ open, onClose, onSuccess }) => {
-  const [showLocationPicker, setShowLocationPicker] = React.useState(false);
-  const lastLocation = React.useRef<[number, number] | null>(null);
-
-  const {
-    activeStep,
-    setActiveStep,
-    accounts,
-    setAccounts,
-    selectedAccount,
-    setSelectedAccount,
-    showAddAccount,
-    setShowAddAccount,
-    formErrors,
-    setFormErrors,
-    contacts,
-    setContacts,
-    propertyData,
-    setPropertyData,
-    validateAddressForm,
-    handleFieldChange,
-    reset,
-  } = usePropertyForm();
-
-  const { handleSubmit } = usePropertySubmit({
-    propertyData,
-    selectedAccount,
-    showAddAccount,
-    contacts,
-    setFormErrors,
-    onSuccess,
-    onClose,
-  });
-
-  const { handleGeocodeAddress } = usePropertyGeocoding({
-    propertyData,
-    setPropertyData,
-    lastLocation,
-  });
-
-  // Reset form when dialog closes
-  React.useEffect(() => {
-    if (!open) {
-      reset();
-    }
-  }, [open, reset]);
-
-  const handleNext = async () => {
-    if (activeStep === 0) {
-      if (!validateAddressForm()) {
-        return;
-      }
-
-      // Try to geocode the address
-      const geocoded = await handleGeocodeAddress();
-      if (!geocoded) {
-        setShowLocationPicker(true);
-        return;
-      }
-    }
-
-    setActiveStep(prev => prev + 1);
-  };
-
-  const handleBack = () => {
-    setActiveStep(prev => prev - 1);
-    // Clear any step-specific errors when going back
-    setFormErrors({});
-  };
-
-  const handleLocationSelect = (point: Point) => {
-    setPropertyData({
-      ...propertyData,
-      location: point
-    });
-    lastLocation.current = [point.coordinates[0], point.coordinates[1]];
-    setShowLocationPicker(false);
-    setActiveStep(prev => prev + 1);
-  };
-
-  const fetchAccounts = React.useCallback(async () => {
-    try {
-      const response = await getAccounts();
-      setAccounts(response.accounts);
-    } catch (error) {
-      console.error('Error fetching accounts:', error);
-      setFormErrors({ submit: 'Failed to fetch accounts' });
-    }
-  }, [setAccounts, setFormErrors]);
-
-  const getStepContent = (step: number) => {
-    switch (step) {
-      case 0:
-        return (
-          <AddressFormStep
-            propertyData={propertyData}
-            setPropertyData={setPropertyData}
-            formErrors={formErrors}
-            handleFieldChange={handleFieldChange}
-          />
-        );
-      case 1:
-        return (
-          <AccountStep
-            selectedAccount={selectedAccount}
-            setSelectedAccount={setSelectedAccount}
-            accounts={accounts}
-            showAddAccount={showAddAccount}
-            setShowAddAccount={setShowAddAccount}
-            fetchAccounts={fetchAccounts}
-            contacts={contacts}
-            setContacts={setContacts}
-          />
-        );
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <>
-      <Dialog 
-        open={open} 
-        onClose={onClose} 
-        maxWidth="md" 
-        fullWidth
-        PaperProps={{
-          sx: {
-            backgroundColor: 'background.paper',
-            backgroundImage: 'none'
-          }
-        }}
-      >
-        <DialogTitle>{stepTitles[activeStep as keyof typeof stepTitles]}</DialogTitle>
-        <DialogContent>
-          <Stepper activeStep={activeStep} sx={{ pt: 3, pb: 5 }}>
-            {steps.map(label => (
-              <Step key={label}>
-                <StepLabel>{label}</StepLabel>
-              </Step>
-            ))}
-          </Stepper>
-          {getStepContent(activeStep)}
-          {formErrors.submit && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {formErrors.submit}
-            </Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          {activeStep > 0 && <Button onClick={handleBack}>Back</Button>}
-          <Button 
-            onClick={activeStep === steps.length - 1 ? handleSubmit : handleNext} 
-            variant="contained"
-          >
-            {activeStep === steps.length - 1 ? 'Create Property' : 'Next'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <LocationPickerDialog
-        open={showLocationPicker}
-        onClose={() => setShowLocationPicker(false)}
-        onSelect={handleLocationSelect}
-        initialLocation={lastLocation.current || [-98, 56]}
-        address={`${propertyData.serviceAddress.address1}, ${propertyData.serviceAddress.city}`}
-      />
-    </>
-  );
+type PropertyFormData = {
+    name: string;
+    showName: boolean;
+    parent_accounts: Account[];
+    billing_address: {
+        address1: string;
+        address2?: string;
+        city: string;
+        province: string;
+        postal_code: string;
+        country: string;
+    };
+    service_address: {
+        address1: string;
+        address2?: string;
+        city: string;
+        province: string;
+        postal_code: string;
+        country: string;
+    };
+    billing_matches_service: boolean;
 };
 
-export default AddPropertyDialog;
+export default function AddPropertyDialog({ open, onClose, onSuccess }: AddPropertyDialogProps) {
+    const [formData, setFormData] = useState<PropertyFormData>({
+        name: '',
+        showName: true,
+        parent_accounts: [],
+        billing_address: {
+            address1: '',
+            address2: '',
+            city: '',
+            province: '',
+            postal_code: '',
+            country: 'Canada'
+        },
+        service_address: {
+            address1: '',
+            address2: '',
+            city: '',
+            province: '',
+            postal_code: '',
+            country: 'Canada'
+        },
+        billing_matches_service: true
+    });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [accountsLoading, setAccountsLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchAccounts = async () => {
+            setAccountsLoading(true);
+            try {
+                const response = await getAccounts({ limit: 100, offset: 0 });
+                setAccounts(response.accounts);
+            } catch (error) {
+                console.error('Failed to fetch accounts:', error);
+            } finally {
+                setAccountsLoading(false);
+            }
+        };
+
+        if (open) {
+            fetchAccounts();
+        }
+    }, [open]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value, checked, type } = e.target;
+        if (name === 'showName' || name === 'billing_matches_service') {
+            setFormData(prev => ({
+                ...prev,
+                [name]: checked
+            }));
+            if (name === 'billing_matches_service' && checked) {
+                setFormData(prev => ({
+                    ...prev,
+                    billing_address: { ...prev.service_address }
+                }));
+            }
+        } else if (name.startsWith('billing_address.')) {
+            const field = name.replace('billing_address.', '');
+            setFormData(prev => ({
+                ...prev,
+                billing_address: {
+                    ...prev.billing_address,
+                    [field]: value
+                }
+            }));
+        } else if (name.startsWith('service_address.')) {
+            const field = name.replace('service_address.', '');
+            const newServiceAddress = {
+                ...formData.service_address,
+                [field]: value
+            };
+            setFormData(prev => ({
+                ...prev,
+                service_address: newServiceAddress,
+                billing_address: prev.billing_matches_service ? newServiceAddress : prev.billing_address
+            }));
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                [name]: value
+            }));
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+        
+        try {
+            const propertyData: CreatePropertyDto = {
+                name: formData.showName ? formData.name : `Property at ${formData.service_address.address1}`,
+                billing_address: formData.billing_address,
+                service_address: formData.service_address
+            };
+
+            await createProperty(propertyData);
+            onSuccess();
+            handleClose();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to create property');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleClose = () => {
+        setFormData({
+            name: '',
+            showName: true,
+            parent_accounts: [],
+            billing_address: {
+                address1: '',
+                address2: '',
+                city: '',
+                province: '',
+                postal_code: '',
+                country: 'Canada'
+            },
+            service_address: {
+                address1: '',
+                address2: '',
+                city: '',
+                province: '',
+                postal_code: '',
+                country: 'Canada'
+            },
+            billing_matches_service: true
+        });
+        setError(null);
+        onClose();
+    };
+
+    return (
+        <>
+            <Dialog 
+                open={open} 
+                onClose={handleClose}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>Add Property</DialogTitle>
+                <form onSubmit={handleSubmit}>
+                    <DialogContent>
+                        <Box sx={{ mt: 1 }}>
+                            <Grid container spacing={3}>
+                                <Grid item xs={12}>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                name="showName"
+                                                checked={formData.showName}
+                                                onChange={handleChange}
+                                                disabled={loading}
+                                            />
+                                        }
+                                        label="Show Property Name"
+                                    />
+                                </Grid>
+
+                                {formData.showName && (
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            name="name"
+                                            label="Property Name"
+                                            fullWidth
+                                            required
+                                            value={formData.name}
+                                            onChange={handleChange}
+                                            disabled={loading}
+                                        />
+                                    </Grid>
+                                )}
+
+                                <Grid item xs={12}>
+                                    <Autocomplete
+                                        multiple
+                                        options={accounts}
+                                        loading={accountsLoading}
+                                        getOptionLabel={(option) => option.name}
+                                        value={formData.parent_accounts}
+                                        onChange={(event, newValue) => {
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                parent_accounts: newValue
+                                            }));
+                                        }}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="Parent Accounts"
+                                                placeholder="Select parent accounts"
+                                            />
+                                        )}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+
+                                <Grid item xs={12}>
+                                    <Typography variant="h6">Service Address</Typography>
+                                </Grid>
+
+                                <Grid item xs={12}>
+                                    <TextField
+                                        name="service_address.address1"
+                                        label="Address Line 1"
+                                        fullWidth
+                                        required
+                                        value={formData.service_address.address1}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        name="service_address.address2"
+                                        label="Address Line 2"
+                                        fullWidth
+                                        value={formData.service_address.address2}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        name="service_address.city"
+                                        label="City"
+                                        fullWidth
+                                        required
+                                        value={formData.service_address.city}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        name="service_address.province"
+                                        label="Province"
+                                        fullWidth
+                                        required
+                                        value={formData.service_address.province}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        name="service_address.postal_code"
+                                        label="Postal Code"
+                                        fullWidth
+                                        required
+                                        value={formData.service_address.postal_code}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+
+                                <Grid item xs={12}>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                name="billing_matches_service"
+                                                checked={formData.billing_matches_service}
+                                                onChange={handleChange}
+                                                disabled={loading}
+                                            />
+                                        }
+                                        label="Billing Address matches Service Address"
+                                    />
+                                </Grid>
+
+                                {!formData.billing_matches_service && (
+                                    <>
+                                        <Grid item xs={12}>
+                                            <Typography variant="h6">Billing Address</Typography>
+                                        </Grid>
+
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                name="billing_address.address1"
+                                                label="Address Line 1"
+                                                fullWidth
+                                                required
+                                                value={formData.billing_address.address1}
+                                                onChange={handleChange}
+                                                disabled={loading}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                name="billing_address.address2"
+                                                label="Address Line 2"
+                                                fullWidth
+                                                value={formData.billing_address.address2}
+                                                onChange={handleChange}
+                                                disabled={loading}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                name="billing_address.city"
+                                                label="City"
+                                                fullWidth
+                                                required
+                                                value={formData.billing_address.city}
+                                                onChange={handleChange}
+                                                disabled={loading}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                name="billing_address.province"
+                                                label="Province"
+                                                fullWidth
+                                                required
+                                                value={formData.billing_address.province}
+                                                onChange={handleChange}
+                                                disabled={loading}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                name="billing_address.postal_code"
+                                                label="Postal Code"
+                                                fullWidth
+                                                required
+                                                value={formData.billing_address.postal_code}
+                                                onChange={handleChange}
+                                                disabled={loading}
+                                            />
+                                        </Grid>
+                                    </>
+                                )}
+                            </Grid>
+                        </Box>
+                    </DialogContent>
+                    <DialogActions sx={{ px: 3, pb: 2 }}>
+                        <Button onClick={handleClose} color="inherit" disabled={loading}>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={loading}
+                            sx={{
+                                backgroundImage: 'linear-gradient(to right, #6366f1, #4f46e5)',
+                                textTransform: 'none'
+                            }}
+                        >
+                            {loading ? <CircularProgress size={24} color="inherit" /> : 'Create Property'}
+                        </Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
+            <Snackbar 
+                open={!!error} 
+                autoHideDuration={6000} 
+                onClose={() => setError(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+                    {error}
+                </Alert>
+            </Snackbar>
+        </>
+    );
+}

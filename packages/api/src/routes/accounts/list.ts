@@ -2,110 +2,108 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../../config/database';
 
 interface QueryParams {
-  page?: string;
-  pageSize?: string;
-  search?: string;
+    limit?: string;
+    offset?: string;
+    search?: string;
 }
 
 export async function listAccounts(req: Request<Record<string, never>, unknown, unknown, QueryParams>, res: Response) {
-  try {
-    const page = parseInt(req.query.page || '1');
-    const pageSize = parseInt(req.query.pageSize || '10');
-    const search = req.query.search;
-    const offset = (page - 1) * pageSize;
+    try {
+        const limit = parseInt(req.query.limit || '10');
+        const offset = parseInt(req.query.offset || '0');
+        const search = req.query.search;
 
-    console.info(`Fetching accounts with page ${page} pageSize ${pageSize} offset ${offset} search ${search}`);
+        console.info(`Fetching accounts with limit ${limit} offset ${offset} search ${search}`);
 
-    const query = `
-      SELECT
-        a.account_id AS id,
-        a.name,
-        a.is_company AS "isCompany",
-        a.status,
-        a.created_at AS "createdAt",
-        a.updated_at AS "updatedAt",
-        json_build_object(
-          'address1', aba.address1,
-          'address2', aba.address2,
-          'city', aba.city,
-          'province', aba.province,
-          'postalCode', aba."postalCode",
-          'country', aba.country
-        ) AS "billingAddress",
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'propertyId', p.property_id,
-              'name', p.name,
-              'address1', p.address1,
-              'address2', p.address2,
-              'role', paj.role,
-              'billingAddress', CASE
-                WHEN pba.use_account_billing THEN json_build_object(
-                  'useAccountBilling', true
-                )
-                ELSE json_build_object(
-                  'useAccountBilling', false,
-                  'address', json_build_object(
-                    'address1', pba.address1,
-                    'address2', pba.address2,
-                    'city', pba.city,
-                    'province', pba.province,
-                    'postalCode', pba."postalCode",
-                    'country', pba.country
-                  )
-                )
-              END
+        const query = `
+            WITH account_data AS (
+                SELECT
+                    a.account_id,
+                    a.name,
+                    a.type,
+                    a.status,
+                    a.created_at,
+                    a.updated_at,
+                    CASE 
+                        WHEN addr.address_id IS NOT NULL THEN
+                            jsonb_build_object(
+                                'address_id', addr.address_id,
+                                'address1', addr.address1,
+                                'address2', addr.address2,
+                                'city', addr.city,
+                                'province', addr.province,
+                                'postal_code', addr.postal_code,
+                                'country', addr.country
+                            )
+                        ELSE NULL
+                    END AS billing_address,
+                    COALESCE(
+                        jsonb_agg(
+                            DISTINCT jsonb_build_object(
+                                'property_id', p.property_id,
+                                'name', p.name,
+                                'type', p.type,
+                                'status', p.status,
+                                'service_address', (
+                                    SELECT jsonb_build_object(
+                                        'address_id', sa.address_id,
+                                        'address1', sa.address1,
+                                        'address2', sa.address2,
+                                        'city', sa.city,
+                                        'province', sa.province,
+                                        'postal_code', sa.postal_code,
+                                        'country', sa.country
+                                    )
+                                    FROM addresses sa
+                                    WHERE sa.address_id = p.service_address_id
+                                )
+                            )
+                        ) FILTER (WHERE p.property_id IS NOT NULL),
+                        '[]'::jsonb
+                    ) AS properties
+                FROM accounts a
+                LEFT JOIN addresses addr ON addr.address_id = a.billing_address_id
+                LEFT JOIN properties_accounts pa ON pa.account_id = a.account_id
+                LEFT JOIN properties p ON p.property_id = pa.property_id
+                WHERE ${search ? 'a.account_id::text = $3 OR a.name ILIKE $4' : '1=1'}
+                GROUP BY
+                    a.account_id,
+                    addr.address_id,
+                    addr.address1,
+                    addr.address2,
+                    addr.city,
+                    addr.province,
+                    addr.postal_code,
+                    addr.country
             )
-          ) FILTER (WHERE p.property_id IS NOT NULL),
-          '[]'::json
-        ) AS properties
-      FROM accounts a
-      LEFT JOIN account_billing_address aba ON aba.account_id = a.account_id
-      LEFT JOIN properties_accounts_join paj ON paj.account_id = a.account_id
-      LEFT JOIN properties p ON p.property_id = paj.property_id
-      LEFT JOIN property_billing_address pba ON pba.property_id = p.property_id
-      ${search ? 'WHERE a.name ILIKE $3' : ''}
-      GROUP BY
-        a.account_id,
-        aba.address1,
-        aba.address2,
-        aba.city,
-        aba.province,
-        aba."postalCode",
-        aba.country
-      ORDER BY a.created_at DESC
-      LIMIT $1 OFFSET $2
-    `;
+            SELECT * FROM account_data
+            ORDER BY created_at DESC
+            LIMIT $1 OFFSET $2
+        `;
 
-    const countQuery = `
-      SELECT COUNT(*) AS total 
-      FROM accounts a
-      ${search ? 'WHERE a.name ILIKE $1' : ''}
-    `;
+        const countQuery = `
+            SELECT COUNT(DISTINCT account_id) AS total 
+            FROM accounts
+            WHERE ${search ? 'account_id::text = $1 OR name ILIKE $2' : '1=1'}
+        `;
 
-    const params = search 
-      ? [pageSize, offset, `%${search}%`]
-      : [pageSize, offset];
+        const params = search 
+            ? [limit, offset, search, `%${search}%`]
+            : [limit, offset];
 
-    const countParams = search ? [`%${search}%`] : [];
+        const countParams = search ? [search, `%${search}%`] : [];
 
-    console.log('Executing query:', query.replace(/\s+/g, ' ').trim());
-    console.log('With params:', params);
+        const [result, countResult] = await Promise.all([
+            AppDataSource.query(query, params),
+            AppDataSource.query(countQuery, countParams)
+        ]);
 
-    const [result, countResult] = await Promise.all([
-      AppDataSource.query(query, params),
-      AppDataSource.query(countQuery, countParams)
-    ]);
-
-    return res.json({
-      accounts: result,
-      total: parseInt(countResult[0].total),
-      page,
-      pageSize
-    });
-  } catch (error) {
-    console.error('Error fetching accounts:', error);
-    return res.status(500).json({ error: 'Internal Server Error' });
-  }
+        return res.json({
+            accounts: result,
+            total: parseInt(countResult[0].total)
+        });
+    } catch (error) {
+        console.error('Error fetching accounts:', error);
+        return res.status(500).json({ error: 'Internal Server Error' });
+    }
 }

@@ -1,14 +1,22 @@
 'use client';
 
-import React from 'react';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
 import { theme } from '../theme';
+import DashboardLayout from '../components/common/DashboardLayout';
+import { AccountProvider } from '../stores/accountStore';
 
-export function Providers({ children }: { children: React.ReactNode }) {
-    return (
-        <ThemeProvider theme={theme}>
-            <CssBaseline />
-            {children}
-        </ThemeProvider>
-    );
+export function Providers({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AccountProvider>
+        <DashboardLayout>{children}</DashboardLayout>
+      </AccountProvider>
+    </ThemeProvider>
+  );
 }

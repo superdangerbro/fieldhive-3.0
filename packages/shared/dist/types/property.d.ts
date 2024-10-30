@@ -1,80 +1,42 @@
-import { Point, Polygon } from 'geojson';
-import { AccountRole } from './account';
-export declare enum PropertyStatus {
-    ACTIVE = "active",
-    INACTIVE = "inactive",
-    ARCHIVED = "archived"
-}
-export declare enum PropertyType {
-    RESIDENTIAL = "residential",
-    COMMERCIAL = "commercial",
-    INDUSTRIAL = "industrial",
-    AGRICULTURAL = "agricultural",
-    MIXED_USE = "mixed_use"
-}
-export interface PropertyAccount {
-    accountId: string;
-    name: string;
-    role: AccountRole;
+import { Address } from './address';
+export type PropertyType = 'Residential' | 'Commercial' | 'Industrial' | 'Agricultural';
+export type PropertyStatus = 'Active' | 'Inactive' | 'Archived';
+export interface Job {
+    job_id: string;
+    job_type_id: string;
+    status: string;
+    notes?: string;
+    created_at: string;
+    updated_at: string;
 }
 export interface Property {
-    id: string;
+    property_id: string;
     name: string;
-    address: string;
-    location: Point;
-    boundary?: Polygon;
     type: PropertyType;
     status: PropertyStatus;
-    accounts: PropertyAccount[];
-    createdAt: string;
-    updatedAt: string;
+    billing_address?: Address;
+    service_address?: Address;
+    jobs?: Job[];
+    created_at: string;
+    updated_at: string;
 }
-export interface CreatePropertyRequest {
+export interface CreatePropertyDto {
     name: string;
-    address1: string;
-    address2?: string;
-    city: string;
-    province: string;
-    postal_code: string;
-    country?: string;
-    location: Point;
-    boundary?: Polygon;
     type: PropertyType;
-    accountConnections: {
-        accountId: string;
-        role: AccountRole;
-    }[];
+    billing_address?: Address;
+    service_address?: Address;
 }
-export interface UpdatePropertyRequest {
+export interface UpdatePropertyDto {
     name?: string;
-    address?: string;
-    location?: Point;
-    boundary?: Polygon;
     type?: PropertyType;
     status?: PropertyStatus;
-}
-export interface PropertyResponse extends Property {
+    billing_address?: Address;
+    service_address?: Address;
 }
 export interface PropertiesResponse {
     properties: Property[];
     total: number;
-    page: number;
-    pageSize: number;
-}
-export interface PropertySearchParams {
-    query?: string;
-    accountId?: string;
-    type?: PropertyType;
-    status?: PropertyStatus;
-    bounds?: {
-        north: number;
-        south: number;
-        east: number;
-        west: number;
-    };
-    page?: number;
-    limit?: number;
-    sortBy?: keyof Property;
-    sortOrder?: 'asc' | 'desc';
+    limit: number;
+    offset: number;
 }
 //# sourceMappingURL=property.d.ts.map

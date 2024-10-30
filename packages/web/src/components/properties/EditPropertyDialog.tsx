@@ -1,242 +1,329 @@
-import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Box,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Stack,
-  Divider,
-  Typography,
-  IconButton,
-  Autocomplete
-} from '@mui/material';
-import { Property, PropertyType, PropertyStatus, Account } from '@fieldhive/shared';
-import { updateProperty, getAccounts } from '../../services/api';
-import MapIcon from '@mui/icons-material/Map';
-import Map, { Marker } from 'react-map-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+'use client';
 
-interface EditPropertyDialogProps {
-  open: boolean;
-  property: Property | null;
-  onClose: () => void;
-  onSuccess: () => void;
+import React, { useState, useEffect } from 'react';
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+    TextField,
+    Box,
+    Grid,
+    CircularProgress,
+    Alert,
+    Snackbar,
+    Typography
+} from '@mui/material';
+import { updateProperty } from '../../services/api';
+import type { Property, UpdatePropertyDto } from '@fieldhive/shared';
+
+export interface EditPropertyDialogProps {
+    open: boolean;
+    property: Property | null;
+    onClose: () => void;
+    onSuccess: () => void;
 }
 
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+type PropertyFormData = {
+    name: string;
+    billing_address: {
+        address1: string;
+        address2?: string;
+        city: string;
+        province: string;
+        postal_code: string;
+        country: string;
+    };
+    service_address: {
+        address1: string;
+        address2?: string;
+        city: string;
+        province: string;
+        postal_code: string;
+        country: string;
+    };
+};
 
-export default function EditPropertyDialog({
-  open,
-  property,
-  onClose,
-  onSuccess
-}: EditPropertyDialogProps) {
-  const [formData, setFormData] = useState<Partial<Property>>(property || {});
-  const [showMap, setShowMap] = useState(false);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(
-    property?.accounts?.[0] ? {
-      id: property.accounts[0].accountId,
-      name: property.accounts[0].name
-    } as Account : null
-  );
+export default function EditPropertyDialog({ open, property, onClose, onSuccess }: EditPropertyDialogProps) {
+    const [formData, setFormData] = useState<PropertyFormData>({
+        name: '',
+        billing_address: {
+            address1: '',
+            address2: '',
+            city: '',
+            province: '',
+            postal_code: '',
+            country: 'Canada'
+        },
+        service_address: {
+            address1: '',
+            address2: '',
+            city: '',
+            province: '',
+            postal_code: '',
+            country: 'Canada'
+        }
+    });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-  React.useEffect(() => {
-    if (open) {
-      setFormData(property || {});
-      loadAccounts();
-    }
-  }, [open, property]);
+    useEffect(() => {
+        if (property) {
+            setFormData({
+                name: property.name,
+                billing_address: property.billing_address || {
+                    address1: '',
+                    address2: '',
+                    city: '',
+                    province: '',
+                    postal_code: '',
+                    country: 'Canada'
+                },
+                service_address: property.service_address || {
+                    address1: '',
+                    address2: '',
+                    city: '',
+                    province: '',
+                    postal_code: '',
+                    country: 'Canada'
+                }
+            });
+        }
+    }, [property]);
 
-  const loadAccounts = async () => {
-    try {
-      const response = await getAccounts();
-      setAccounts(response.accounts);
-    } catch (error) {
-      console.error('Failed to load accounts:', error);
-    }
-  };
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        if (name.startsWith('billing_address.')) {
+            const field = name.replace('billing_address.', '');
+            setFormData(prev => ({
+                ...prev,
+                billing_address: {
+                    ...prev.billing_address,
+                    [field]: value
+                }
+            }));
+        } else if (name.startsWith('service_address.')) {
+            const field = name.replace('service_address.', '');
+            setFormData(prev => ({
+                ...prev,
+                service_address: {
+                    ...prev.service_address,
+                    [field]: value
+                }
+            }));
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                [name]: value
+            }));
+        }
+    };
 
-  const handleSubmit = async () => {
-    if (!property?.id) return;
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!property) return;
 
-    try {
-      await updateProperty(property.id, {
-        ...formData,
-        accountId: selectedAccount?.id
-      });
-      onSuccess();
-      onClose();
-    } catch (error) {
-      console.error('Failed to update property:', error);
-      alert('Failed to update property');
-    }
-  };
+        setLoading(true);
+        setError(null);
+        
+        try {
+            const propertyData: UpdatePropertyDto = {
+                name: formData.name,
+                billing_address: formData.billing_address,
+                service_address: formData.service_address
+            };
 
-  const handleMapClick = (event: any) => {
-    setFormData(prev => ({
-      ...prev,
-      location: {
-        type: 'Point',
-        coordinates: [event.lngLat.lng, event.lngLat.lat]
-      }
-    }));
-  };
+            await updateProperty(property.property_id, propertyData);
+            onSuccess();
+            handleClose();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to update property');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  return (
-    <>
-      <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit Property</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Autocomplete
-              options={accounts}
-              getOptionLabel={(option) => option.name}
-              value={selectedAccount}
-              onChange={(_, newValue) => setSelectedAccount(newValue)}
-              renderInput={(params) => (
-                <TextField {...params} label="Parent Account" />
-              )}
-            />
+    const handleClose = () => {
+        setError(null);
+        onClose();
+    };
 
-            <TextField
-              label="Property Name"
-              value={formData.name || ''}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              fullWidth
-            />
+    if (!property) return null;
 
-            <TextField
-              label="Address"
-              value={formData.address || ''}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              fullWidth
-            />
-
-            <FormControl fullWidth>
-              <InputLabel>Type</InputLabel>
-              <Select
-                value={formData.type || ''}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value as PropertyType })}
-                label="Type"
-              >
-                {Object.values(PropertyType).map((type) => (
-                  <MenuItem key={type} value={type}>
-                    {type.split('_').map(word => 
-                      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-                    ).join(' ')}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={formData.status || ''}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as PropertyStatus })}
-                label="Status"
-              >
-                {Object.values(PropertyStatus).map((status) => (
-                  <MenuItem key={status} value={status}>
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <Divider sx={{ my: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                Location
-              </Typography>
-            </Divider>
-
-            <Stack spacing={2} direction="row" alignItems="center">
-              <Stack spacing={2} flex={1}>
-                <TextField
-                  label="Latitude"
-                  value={formData.location?.coordinates?.[1] || ''}
-                  InputProps={{ readOnly: true }}
-                  fullWidth
-                />
-                <TextField
-                  label="Longitude"
-                  value={formData.location?.coordinates?.[0] || ''}
-                  InputProps={{ readOnly: true }}
-                  fullWidth
-                />
-              </Stack>
-              <IconButton 
-                color="primary" 
-                onClick={() => setShowMap(true)}
-                sx={{ 
-                  width: 48, 
-                  height: 48,
-                  border: '1px solid',
-                  borderColor: 'divider'
-                }}
-              >
-                <MapIcon />
-              </IconButton>
-            </Stack>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained">Save</Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog 
-        open={showMap} 
-        onClose={() => setShowMap(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Edit Location</DialogTitle>
-        <DialogContent>
-          <Box sx={{ height: 400, position: 'relative' }}>
-            <Map
-              initialViewState={{
-                longitude: formData.location?.coordinates?.[0] || -123.1207,
-                latitude: formData.location?.coordinates?.[1] || 49.2827,
-                zoom: 14
-              }}
-              style={{ width: '100%', height: '100%' }}
-              mapStyle="mapbox://styles/mapbox/dark-v10"
-              mapboxAccessToken={MAPBOX_TOKEN}
-              onClick={handleMapClick}
+    return (
+        <>
+            <Dialog 
+                open={open} 
+                onClose={handleClose}
+                maxWidth="md"
+                fullWidth
             >
-              {formData.location?.coordinates && (
-                <Marker
-                  longitude={formData.location.coordinates[0]}
-                  latitude={formData.location.coordinates[1]}
-                  draggable
-                  onDragEnd={(event) => {
-                    setFormData(prev => ({
-                      ...prev,
-                      location: {
-                        type: 'Point',
-                        coordinates: [event.lngLat.lng, event.lngLat.lat]
-                      }
-                    }));
-                  }}
-                />
-              )}
-            </Map>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowMap(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
-    </>
-  );
+                <DialogTitle>Edit Property</DialogTitle>
+                <form onSubmit={handleSubmit}>
+                    <DialogContent>
+                        <Box sx={{ mt: 1 }}>
+                            <Grid container spacing={3}>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        name="name"
+                                        label="Property Name"
+                                        fullWidth
+                                        required
+                                        value={formData.name}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+
+                                <Grid item xs={12}>
+                                    <Typography variant="h6">Billing Address</Typography>
+                                </Grid>
+
+                                <Grid item xs={12}>
+                                    <TextField
+                                        name="billing_address.address1"
+                                        label="Address Line 1"
+                                        fullWidth
+                                        required
+                                        value={formData.billing_address.address1}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        name="billing_address.address2"
+                                        label="Address Line 2"
+                                        fullWidth
+                                        value={formData.billing_address.address2}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        name="billing_address.city"
+                                        label="City"
+                                        fullWidth
+                                        required
+                                        value={formData.billing_address.city}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        name="billing_address.province"
+                                        label="Province"
+                                        fullWidth
+                                        required
+                                        value={formData.billing_address.province}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        name="billing_address.postal_code"
+                                        label="Postal Code"
+                                        fullWidth
+                                        required
+                                        value={formData.billing_address.postal_code}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+
+                                <Grid item xs={12}>
+                                    <Typography variant="h6">Service Address</Typography>
+                                </Grid>
+
+                                <Grid item xs={12}>
+                                    <TextField
+                                        name="service_address.address1"
+                                        label="Address Line 1"
+                                        fullWidth
+                                        required
+                                        value={formData.service_address.address1}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        name="service_address.address2"
+                                        label="Address Line 2"
+                                        fullWidth
+                                        value={formData.service_address.address2}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        name="service_address.city"
+                                        label="City"
+                                        fullWidth
+                                        required
+                                        value={formData.service_address.city}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        name="service_address.province"
+                                        label="Province"
+                                        fullWidth
+                                        required
+                                        value={formData.service_address.province}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        name="service_address.postal_code"
+                                        label="Postal Code"
+                                        fullWidth
+                                        required
+                                        value={formData.service_address.postal_code}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    />
+                                </Grid>
+                            </Grid>
+                        </Box>
+                    </DialogContent>
+                    <DialogActions sx={{ px: 3, pb: 2 }}>
+                        <Button onClick={handleClose} color="inherit" disabled={loading}>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={loading}
+                            sx={{
+                                backgroundImage: 'linear-gradient(to right, #6366f1, #4f46e5)',
+                                textTransform: 'none'
+                            }}
+                        >
+                            {loading ? <CircularProgress size={24} color="inherit" /> : 'Save Changes'}
+                        </Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
+            <Snackbar 
+                open={!!error} 
+                autoHideDuration={6000} 
+                onClose={() => setError(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+                    {error}
+                </Alert>
+            </Snackbar>
+        </>
+    );
 }

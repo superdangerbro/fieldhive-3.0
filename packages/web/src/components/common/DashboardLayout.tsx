@@ -1,12 +1,14 @@
 'use client';
 
-import React from 'react';
-import { Box, Drawer, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Drawer, List, ListItem, ListItemIcon, ListItemText, AppBar, Toolbar, Typography, IconButton } from '@mui/material';
 import MapIcon from '@mui/icons-material/Map';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import BusinessIcon from '@mui/icons-material/Business';
 import SettingsIcon from '@mui/icons-material/Settings';
 import WorkIcon from '@mui/icons-material/Work';
+import MenuIcon from '@mui/icons-material/Menu';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -23,34 +25,85 @@ const menuItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [isDrawerOpen, setIsDrawerOpen] = useState(true);
+
+  const toggleDrawer = () => {
+    setIsDrawerOpen(!isDrawerOpen);
+  };
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      <AppBar 
+        position="fixed" 
+        sx={{ 
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          backgroundColor: 'background.paper',
+          color: 'text.primary',
+          boxShadow: 1
+        }}
+      >
+        <Toolbar>
+          <IconButton
+            color="inherit"
+            aria-label="toggle drawer"
+            onClick={toggleDrawer}
+            edge="start"
+          >
+            {isDrawerOpen ? <ChevronLeftIcon /> : <MenuIcon />}
+          </IconButton>
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+            FieldHive
+          </Typography>
+        </Toolbar>
+      </AppBar>
       <Drawer
         variant="permanent"
+        open={isDrawerOpen}
         sx={{
-          width: drawerWidth,
+          width: isDrawerOpen ? drawerWidth : 64,
           flexShrink: 0,
           '& .MuiDrawer-paper': {
-            width: drawerWidth,
+            width: isDrawerOpen ? drawerWidth : 64,
             boxSizing: 'border-box',
+            overflowX: 'hidden',
+            transition: (theme) => theme.transitions.create('width', {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.enteringScreen,
+            }),
+            border: 'none',
+            borderRight: '1px solid',
+            borderColor: 'divider',
           },
         }}
       >
-        <Box sx={{ overflow: 'auto', mt: 8 }}>
+        <Toolbar />
+        <Box sx={{ overflow: 'auto' }}>
           <List>
             {menuItems.map((item) => (
               <Link key={item.text} href={item.path} passHref style={{ textDecoration: 'none', color: 'inherit' }}>
                 <ListItem button selected={pathname === item.path}>
                   <ListItemIcon>{item.icon}</ListItemIcon>
-                  <ListItemText primary={item.text} />
+                  {isDrawerOpen && <ListItemText primary={item.text} />}
                 </ListItem>
               </Link>
             ))}
           </List>
         </Box>
       </Drawer>
-      <Box component="main" sx={{ flexGrow: 1, p: 0, height: '100vh', overflow: 'hidden' }}>
+      <Box 
+        component="main" 
+        sx={{
+          flexGrow: 1,
+          height: '100vh',
+          overflow: 'auto',
+          transition: (theme) => theme.transitions.create('margin', {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
+          marginLeft: 0,
+        }}
+      >
+        <Toolbar />
         {children}
       </Box>
     </Box>

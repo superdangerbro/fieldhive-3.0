@@ -1,93 +1,96 @@
-import { Router } from 'express';
+import { Request, Response } from 'express';
 import { AppDataSource } from '../../config/database';
 import { logger } from '../../utils/logger';
-import { UpdatePropertyRequest, PropertyResponse } from '@fieldhive/shared';
+import { UpdatePropertyDto } from '@fieldhive/shared';
 
-const router = Router();
+export const updateProperty = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { 
+        name, 
+        status,
+        billing_address,
+        service_address
+    } = req.body as UpdatePropertyDto;
 
-// Update property
-router.patch('/:id', async (req, res) => {
     try {
-        const { id } = req.params;
-        const updates = req.body as UpdatePropertyRequest;
-
-        // Start a transaction
-        await AppDataSource.query('BEGIN');
-
-        try {
-            // Update property
-            const [property] = await AppDataSource.query(
-                `UPDATE properties 
-                SET 
-                    name = COALESCE($1, name),
-                    address = COALESCE($2, address),
-                    location = CASE 
-                        WHEN $3::jsonb IS NOT NULL 
-                        THEN ST_SetSRID(ST_GeomFromGeoJSON($3), 4326)
-                        ELSE location
-                    END,
-                    boundary = CASE 
-                        WHEN $4::jsonb IS NOT NULL 
-                        THEN ST_SetSRID(ST_GeomFromGeoJSON($4), 4326)
-                        ELSE boundary
-                    END,
-                    type = COALESCE($5, type),
-                    status = COALESCE($6, status),
-                    updated_at = NOW()
-                WHERE property_id = $7
-                RETURNING 
-                    property_id as id,
-                    name,
-                    address,
-                    ST_AsGeoJSON(location)::jsonb as location,
-                    ST_AsGeoJSON(boundary)::jsonb as boundary,
-                    type,
-                    status,
-                    created_at as "createdAt",
-                    updated_at as "updatedAt"`,
-                [
-                    updates.name,
-                    updates.address,
-                    updates.location ? JSON.stringify(updates.location) : null,
-                    updates.boundary ? JSON.stringify(updates.boundary) : null,
-                    updates.type,
-                    updates.status,
-                    id
-                ]
-            );
-
-            if (!property) {
-                await AppDataSource.query('ROLLBACK');
-                return res.status(404).json({
-                    error: 'Not found',
-                    message: 'Property not found'
-                });
+        await AppDataSource.transaction(async (transactionalEntityManager) => {
+            // Update billing address if provided
+            if (billing_address) {
+                await transactionalEntityManager.query(
+                    `UPDATE addresses 
+                    SET address1 = $1, address2 = $2, city = $3, province = $4, postal_code = $5, country = $6
+                    WHERE address_id = (SELECT billing_address_id FROM properties WHERE property_id = $7)`,
+                    [
+                        billing_address.address1,
+                        billing_address.address2 || null,
+                        billing_address.city,
+                        billing_address.province,
+                        billing_address.postal_code,
+                        billing_address.country || 'Canada',
+                        id
+                    ]
+                );
             }
 
-            // Get account connections
-            const accounts = await AppDataSource.query(
+            // Update service address if provided
+            if (service_address) {
+                await transactionalEntityManager.query(
+                    `UPDATE addresses 
+                    SET address1 = $1, address2 = $2, city = $3, province = $4, postal_code = $5, country = $6
+                    WHERE address_id = (SELECT service_address_id FROM properties WHERE property_id = $7)`,
+                    [
+                        service_address.address1,
+                        service_address.address2 || null,
+                        service_address.city,
+                        service_address.province,
+                        service_address.postal_code,
+                        service_address.country || 'Canada',
+                        id
+                    ]
+                );
+            }
+
+            // Update property
+            await transactionalEntityManager.query(
+                `UPDATE properties 
+                SET name = COALESCE($1, name), 
+                    status = COALESCE($2, status),
+                    updated_at = NOW()
+                WHERE property_id = $3`,
+                [name, status, id]
+            );
+
+            // Get updated property with addresses
+            const [updatedProperty] = await transactionalEntityManager.query(
                 `SELECT 
-                    a.account_id as "accountId",
-                    a.name,
-                    paj.role
-                FROM accounts a
-                JOIN properties_accounts_join paj ON paj.account_id = a.account_id
-                WHERE paj.property_id = $1`,
+                    p.*,
+                    json_build_object(
+                        'address_id', ba.address_id,
+                        'address1', ba.address1,
+                        'address2', ba.address2,
+                        'city', ba.city,
+                        'province', ba.province,
+                        'postal_code', ba.postal_code,
+                        'country', ba.country
+                    ) AS billing_address,
+                    json_build_object(
+                        'address_id', sa.address_id,
+                        'address1', sa.address1,
+                        'address2', sa.address2,
+                        'city', sa.city,
+                        'province', sa.province,
+                        'postal_code', sa.postal_code,
+                        'country', sa.country
+                    ) AS service_address
+                FROM properties p
+                LEFT JOIN addresses ba ON ba.address_id = p.billing_address_id
+                LEFT JOIN addresses sa ON sa.address_id = p.service_address_id
+                WHERE p.property_id = $1`,
                 [id]
             );
 
-            await AppDataSource.query('COMMIT');
-
-            const response: PropertyResponse = {
-                ...property,
-                accounts
-            };
-
-            res.json(response);
-        } catch (error) {
-            await AppDataSource.query('ROLLBACK');
-            throw error;
-        }
+            res.json(updatedProperty);
+        });
     } catch (error) {
         logger.error('Error updating property:', error);
         res.status(500).json({
@@ -95,6 +98,4 @@ router.patch('/:id', async (req, res) => {
             message: 'Failed to update property'
         });
     }
-});
-
-export default router;
+};

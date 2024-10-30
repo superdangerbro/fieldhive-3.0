@@ -1,42 +1,26 @@
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    CreateDateColumn,
-    UpdateDateColumn,
-    ManyToMany
-} from 'typeorm';
-import type { AccountStatus } from '@fieldhive/shared';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { Property } from './Property';
+import { Address } from './Address';
 
 @Entity('accounts')
 export class Account {
-    @PrimaryGeneratedColumn('uuid')
+    @PrimaryGeneratedColumn('uuid', { name: 'account_id' })
     id: string;
 
     @Column()
     name: string;
 
-    @Column({ name: 'is_company', default: false })
-    isCompany: boolean;
+    @Column({ type: 'varchar' })
+    type: string;
 
-    @Column({
-        type: 'text',
-        default: 'active'
-    })
-    status: AccountStatus;
+    @Column({ type: 'varchar', default: 'Active' })
+    status: string;
 
-    @Column('jsonb', { name: 'billing_address' })
-    billingAddress: {
-        address1: string;
-        address2?: string;
-        city: string;
-        province: string;
-        postalCode: string;
-        country: string;
-    };
+    @ManyToOne(() => Address, { nullable: true })
+    @JoinColumn({ name: 'billing_address_id' })
+    billingAddress: Address | null;
 
-    @ManyToMany(() => Property, property => property.accounts)
+    @OneToMany(() => Property, property => property.account)
     properties: Property[];
 
     @CreateDateColumn({ name: 'created_at' })

@@ -1,11 +1,11 @@
-'use client';
-
 import './globals.css';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import { theme } from '../theme';
-import DashboardLayout from '../components/common/DashboardLayout';
+import { Providers } from './providers';
+
+export const metadata = {
+  title: 'FieldHive',
+  description: 'Field Service Management',
+};
 
 export default function RootLayout({
   children,
@@ -13,15 +13,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <head>
-        <link href='https://api.mapbox.com/mapbox-gl-js/v2.8.1/mapbox-gl.css' rel='stylesheet' />
-      </head>
-      <body>
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <DashboardLayout>{children}</DashboardLayout>
-        </ThemeProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

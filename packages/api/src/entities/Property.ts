@@ -1,18 +1,15 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToMany, JoinTable } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Point, Polygon } from 'geojson';
 import { PropertyType, PropertyStatus } from '@fieldhive/shared';
 import { Account } from './Account';
 
 @Entity('properties')
 export class Property {
-    @PrimaryGeneratedColumn('uuid')
+    @PrimaryGeneratedColumn('uuid', { name: 'property_id' })
     id: string;
 
     @Column()
     name: string;
-
-    @Column()
-    address: string;
 
     @Column({
         type: 'geometry',
@@ -40,19 +37,9 @@ export class Property {
     })
     status: PropertyStatus;
 
-    @ManyToMany(() => Account, account => account.properties)
-    @JoinTable({
-        name: 'properties_accounts_join',
-        joinColumn: {
-            name: 'property_id',
-            referencedColumnName: 'id'
-        },
-        inverseJoinColumn: {
-            name: 'account_id',
-            referencedColumnName: 'id'
-        }
-    })
-    accounts: Account[];
+    @ManyToOne(() => Account, account => account.properties)
+    @JoinColumn({ name: 'account_id' })
+    account: Account;
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;

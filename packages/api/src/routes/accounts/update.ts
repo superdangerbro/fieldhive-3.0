@@ -1,131 +1,120 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../../config/database';
-import { logger } from '../../utils/logger';
 import { UpdateAccountDto } from '@fieldhive/shared';
 
-export const updateAccount = async (req: Request, res: Response) => {
+export async function updateAccount(req: Request, res: Response) {
+    const { id } = req.params;
+    const updates = req.body as UpdateAccountDto;
+
     try {
-        const { id } = req.params;
-        const updates = req.body as UpdateAccountDto;
+        await AppDataSource.transaction(async (transactionalEntityManager) => {
+            // Build update query dynamically based on provided fields
+            const updateFields = [];
+            const values = [];
+            let paramCount = 1;
 
-        // Start a transaction
-        await AppDataSource.query('BEGIN');
-
-        try {
-            // Update account
-            const [account] = await AppDataSource.query(
-                `UPDATE accounts 
-                SET 
-                    name = COALESCE($1, name),
-                    is_company = COALESCE($2, is_company),
-                    status = COALESCE($3, status),
-                    updated_at = NOW()
-                WHERE account_id = $4
-                RETURNING 
-                    account_id as id,
-                    name,
-                    is_company as "isCompany",
-                    status,
-                    created_at as "createdAt",
-                    updated_at as "updatedAt"`,
-                [updates.name, updates.isCompany, updates.status, id]
-            );
-
-            if (!account) {
-                await AppDataSource.query('ROLLBACK');
-                return res.status(404).json({
-                    error: 'Not found',
-                    message: 'Account not found'
-                });
+            if (updates.name !== undefined) {
+                updateFields.push(`name = $${paramCount}`);
+                values.push(updates.name);
+                paramCount++;
+            }
+            if (updates.type !== undefined) {
+                updateFields.push(`type = $${paramCount}`);
+                values.push(updates.type);
+                paramCount++;
+            }
+            if (updates.status !== undefined) {
+                updateFields.push(`status = $${paramCount}`);
+                values.push(updates.status);
+                paramCount++;
             }
 
-            // Update billing address if provided
-            if (updates.billingAddress) {
-                await AppDataSource.query(
-                    `UPDATE account_billing_address
-                    SET 
-                        address1 = $1,
-                        address2 = $2,
-                        city = $3,
-                        province = $4,
-                        "postalCode" = $5,
-                        country = $6,
-                        updated_at = NOW()
-                    WHERE account_id = $7`,
-                    [
-                        updates.billingAddress.address1,
-                        updates.billingAddress.address2,
-                        updates.billingAddress.city,
-                        updates.billingAddress.province,
-                        updates.billingAddress.postalCode,
-                        updates.billingAddress.country,
-                        id
-                    ]
+            // Add updated_at timestamp
+            updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+
+            // Add account_id as the last parameter
+            values.push(id);
+
+            if (updateFields.length > 0) {
+                await transactionalEntityManager.query(
+                    `UPDATE accounts 
+                    SET ${updateFields.join(', ')}
+                    WHERE account_id = $${paramCount}`,
+                    values
                 );
             }
 
-            // Get billing address
-            const [billingAddress] = await AppDataSource.query(
-                `SELECT 
-                    address1,
-                    address2,
-                    city,
-                    province,
-                    "postalCode",
-                    country
-                FROM account_billing_address
-                WHERE account_id = $1`,
-                [id]
-            );
+            // Update or create billing address
+            if (updates.address) {
+                const existingAddress = await transactionalEntityManager.query(
+                    `SELECT address_id FROM addresses WHERE address_id = (
+                        SELECT billing_address_id FROM accounts WHERE account_id = $1
+                    )`,
+                    [id]
+                );
 
-            // Get associated properties
-            const properties = await AppDataSource.query(
-                `SELECT 
-                    p.property_id as "propertyId",
-                    p.name,
-                    p.address,
-                    paj.role,
-                    CASE
-                        WHEN pba.use_account_billing THEN json_build_object(
-                            'useAccountBilling', true
-                        )
-                        ELSE json_build_object(
-                            'useAccountBilling', false,
-                            'address', json_build_object(
-                                'address1', pba.address1,
-                                'address2', pba.address2,
-                                'city', pba.city,
-                                'province', pba.province,
-                                'postalCode', pba."postalCode",
-                                'country', pba.country
-                            )
-                        )
-                    END as "billingAddress"
-                FROM properties p
-                JOIN properties_accounts_join paj ON paj.property_id = p.property_id
-                LEFT JOIN property_billing_address pba ON pba.property_id = p.property_id
-                WHERE paj.account_id = $1`,
-                [id]
-            );
+                if (existingAddress.length > 0) {
+                    await transactionalEntityManager.query(
+                        `UPDATE addresses 
+                        SET address1 = $1, address2 = $2, city = $3, province = $4, 
+                            postal_code = $5, country = $6, updated_at = CURRENT_TIMESTAMP
+                        WHERE address_id = $7`,
+                        [
+                            updates.address.address1,
+                            updates.address.address2,
+                            updates.address.city,
+                            updates.address.province,
+                            updates.address.postal_code,
+                            updates.address.country,
+                            existingAddress[0].address_id
+                        ]
+                    );
+                } else {
+                    const [newAddress] = await transactionalEntityManager.query(
+                        `INSERT INTO addresses (
+                            address1, address2, city, province, postal_code, country
+                        ) VALUES ($1, $2, $3, $4, $5, $6)
+                        RETURNING address_id`,
+                        [
+                            updates.address.address1,
+                            updates.address.address2,
+                            updates.address.city,
+                            updates.address.province,
+                            updates.address.postal_code,
+                            updates.address.country
+                        ]
+                    );
 
-            await AppDataSource.query('COMMIT');
-
-            const response = {
-                ...account,
-                billingAddress,
-                properties
-            };
-
-            res.json(response);
-        } catch (error) {
-            await AppDataSource.query('ROLLBACK');
-            throw error;
-        }
-    } catch (error) {
-        logger.error('Error updating account:', error);
-        res.status(500).json({
-            error: 'Internal server error',
-            message: 'Failed to update account'
+                    await transactionalEntityManager.query(
+                        `UPDATE accounts 
+                        SET billing_address_id = $1
+                        WHERE account_id = $2`,
+                        [newAddress.address_id, id]
+                    );
+                }
+            }
         });
+
+        // Get updated account with address
+        const [account] = await AppDataSource.query(
+            `SELECT 
+                a.*,
+                addr.address_id,
+                addr.address1,
+                addr.address2,
+                addr.city,
+                addr.province,
+                addr.postal_code,
+                addr.country
+            FROM accounts a
+            LEFT JOIN addresses addr ON addr.address_id = a.billing_address_id
+            WHERE a.account_id = $1`,
+            [id]
+        );
+
+        res.json(account);
+    } catch (error) {
+        console.error('Error updating account:', error);
+        res.status(500).json({ error: 'Failed to update account' });
     }
-};
+}
