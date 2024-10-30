@@ -87,4 +87,7 @@ export interface DashboardConfig {
     refreshInterval: number;
     autoRefresh: boolean;
 }
+export * from './property';
+export * from './job';
+export * from './address';
 //# sourceMappingURL=index.d.ts.map

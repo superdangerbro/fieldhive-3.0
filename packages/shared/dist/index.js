@@ -23,4 +23,5 @@ __exportStar(require("./types/websocket"), exports);
 __exportStar(require("./types/dashboard"), exports);
 __exportStar(require("./types/equipment"), exports);
 __exportStar(require("./types/field"), exports);
+__exportStar(require("./types/job"), exports);
 //# sourceMappingURL=index.js.map

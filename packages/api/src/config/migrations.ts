@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { logger } from '../utils/logger';
 import { Property } from '../entities/Property';
 import { Address } from '../entities/Address';
+import { Job } from '../entities/Job';
 
 // Load environment variables
 const envPath = resolve(__dirname, '../../.env');
@@ -28,7 +29,7 @@ export const MigrationDataSource = new DataSource({
   // Disable synchronization for migrations
   synchronize: false,
   logging: true,
-  entities: [Property, Address],
+  entities: [Property, Address, Job],
   migrations: [resolve(__dirname, '../migrations/*{.ts,.js}')],
   ssl: {
     rejectUnauthorized: false

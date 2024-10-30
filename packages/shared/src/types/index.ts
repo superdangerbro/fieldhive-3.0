@@ -101,3 +101,7 @@ export interface DashboardConfig {
   refreshInterval: number; // in seconds
   autoRefresh: boolean;
 }
+
+export * from './property';
+export * from './job';
+export * from './address';

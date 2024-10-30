@@ -7,6 +7,8 @@ import { listProperties } from './properties/list';
 import { createProperty } from './properties/create';
 import { updateProperty } from './properties/update';
 import { deleteProperty, archiveProperty } from './properties/delete';
+import jobsRouter from './jobs';
+import settingsRouter from './settings';
 
 const router = Router();
 
@@ -23,5 +25,11 @@ router.post('/properties', createProperty);
 router.put('/properties/:id', updateProperty);
 router.delete('/properties/:id', deleteProperty);
 router.post('/properties/:id/archive', archiveProperty);
+
+// Jobs routes
+router.use('/jobs', jobsRouter);
+
+// Settings routes
+router.use('/settings', settingsRouter);
 
 export default router;

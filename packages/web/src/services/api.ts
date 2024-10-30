@@ -1,4 +1,4 @@
-import { Property, CreatePropertyDto, UpdatePropertyDto, PropertiesResponse, PropertySearchParams, Account, CreateAccountDto, UpdateAccountDto, AccountsResponse } from '@fieldhive/shared';
+import { Property, CreatePropertyDto, UpdatePropertyDto, PropertiesResponse, Account, CreateAccountDto, UpdateAccountDto, AccountsResponse, Job, JobsResponse, UpdateJobDto, CreateJobDto } from '@fieldhive/shared';
 
 class Api {
     private baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -144,6 +144,65 @@ class Api {
         
         return response.json();
     }
+
+    // Job methods
+    async getJobs(page: number, pageSize: number): Promise<JobsResponse> {
+        const searchParams = new URLSearchParams({
+            page: page.toString(),
+            pageSize: pageSize.toString()
+        });
+        const response = await fetch(`${this.baseUrl}/jobs?${searchParams}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch jobs');
+        }
+        return response.json();
+    }
+
+    async getJobTypes(): Promise<{ jobTypes: { id: string; name: string }[] }> {
+        const response = await fetch(`${this.baseUrl}/settings/job-types`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch job types');
+        }
+        return response.json();
+    }
+
+    async createJob(data: CreateJobDto): Promise<Job> {
+        const response = await fetch(`${this.baseUrl}/jobs`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) {
+            throw new Error('Failed to create job');
+        }
+        return response.json();
+    }
+
+    async updateJob(id: string, data: UpdateJobDto): Promise<Job> {
+        const response = await fetch(`${this.baseUrl}/jobs/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) {
+            throw new Error('Failed to update job');
+        }
+        return response.json();
+    }
+
+    async deleteJob(id: string): Promise<{ success: boolean }> {
+        const response = await fetch(`${this.baseUrl}/jobs/${id}`, {
+            method: 'DELETE',
+        });
+        if (!response.ok) {
+            throw new Error('Failed to delete job');
+        }
+        return response.json();
+    }
 }
 
 export const api = new Api();
@@ -158,3 +217,8 @@ export const getProperties = api.getProperties.bind(api);
 export const createProperty = api.createProperty.bind(api);
 export const updateProperty = api.updateProperty.bind(api);
 export const deleteProperty = api.deleteProperty.bind(api);
+export const getJobs = api.getJobs.bind(api);
+export const getJobTypes = api.getJobTypes.bind(api);
+export const createJob = api.createJob.bind(api);
+export const updateJob = api.updateJob.bind(api);
+export const deleteJob = api.deleteJob.bind(api);

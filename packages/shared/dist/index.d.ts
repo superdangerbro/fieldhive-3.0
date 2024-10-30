@@ -6,4 +6,5 @@ export * from './types/websocket';
 export * from './types/dashboard';
 export * from './types/equipment';
 export * from './types/field';
+export * from './types/job';
 //# sourceMappingURL=index.d.ts.map

@@ -9,10 +9,11 @@ const JOB_TYPES_SETTING_KEY = 'job_types';
 const GET_JOBS_QUERY = `
 SELECT 
     j.job_id,
+    j.title,
     j.job_type_id,
     j.property_id,
     j.status,
-    j.notes,
+    j.description,
     j.created_at,
     j.updated_at,
     jsonb_build_object(
@@ -30,7 +31,7 @@ SELECT
     ) as account
 FROM jobs j
 LEFT JOIN properties p ON p.property_id = j.property_id
-LEFT JOIN properties_accounts_join pa ON pa.property_id = p.property_id
+LEFT JOIN properties_accounts pa ON pa.property_id = p.property_id
 LEFT JOIN accounts a ON a.account_id = pa.account_id`;
 
 // Get all jobs with pagination
@@ -95,14 +96,14 @@ router.get('/', async (req, res) => {
 // Create new job
 router.post('/', async (req, res) => {
     try {
-        const { property_id, job_type_id, notes } = req.body;
+        const { title, property_id, job_type_id, description } = req.body;
 
-        logger.info('Creating job with data:', { property_id, job_type_id, notes });
+        logger.info('Creating job with data:', { title, property_id, job_type_id, description });
 
-        if (!property_id || !job_type_id) {
+        if (!property_id || !job_type_id || !title) {
             return res.status(400).json({
                 error: 'Bad request',
-                message: 'Property ID and Job Type ID are required'
+                message: 'Property ID, Job Type ID, and Title are required'
             });
         }
 
@@ -137,8 +138,8 @@ router.post('/', async (req, res) => {
 
         // Create job with default status
         const [job] = await AppDataSource.query(
-            'INSERT INTO jobs (property_id, job_type_id, notes, status, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING job_id',
-            [property_id, job_type_id, notes, 'pending']
+            'INSERT INTO jobs (title, property_id, job_type_id, description, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING job_id',
+            [title, property_id, job_type_id, description, 'pending']
         );
 
         logger.info('Job created:', job);
@@ -166,9 +167,9 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, notes } = req.body;
+        const { title, status, description } = req.body;
 
-        logger.info('Updating job:', { id, status, notes });
+        logger.info('Updating job:', { id, title, status, description });
 
         // Verify job exists
         const [existingJob] = await AppDataSource.query(
@@ -184,8 +185,8 @@ router.put('/:id', async (req, res) => {
         }
 
         await AppDataSource.query(
-            'UPDATE jobs SET status = COALESCE($1, status), notes = COALESCE($2, notes), updated_at = NOW() WHERE job_id = $3',
-            [status, notes, id]
+            'UPDATE jobs SET title = COALESCE($1, title), status = COALESCE($2, status), description = COALESCE($3, description), updated_at = NOW() WHERE job_id = $4',
+            [title, status, description, id]
         );
 
         // Fetch updated job with relations

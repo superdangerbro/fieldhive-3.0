@@ -37,6 +37,9 @@ export class Property {
     })
     status: PropertyStatus;
 
+    @Column({ name: 'account_id' })
+    accountId: string;
+
     @ManyToOne(() => Account, account => account.properties)
     @JoinColumn({ name: 'account_id' })
     account: Account;

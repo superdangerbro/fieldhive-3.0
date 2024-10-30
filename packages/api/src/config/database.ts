@@ -6,6 +6,7 @@ import { Account } from '../entities/Account';
 import { Address } from '../entities/Address';
 import { PropertiesAccounts } from '../entities/PropertiesAccounts';
 import { UsersAccounts } from '../entities/UsersAccounts';
+import { Job } from '../entities/Job';
 
 export const AppDataSource = new DataSource({
     type: 'postgres',
@@ -16,7 +17,7 @@ export const AppDataSource = new DataSource({
     database: dbConfig.database,
     synchronize: false,
     logging: env.ENABLE_QUERY_LOGGING,
-    entities: [Property, Account, Address, PropertiesAccounts, UsersAccounts],
+    entities: [Property, Account, Address, PropertiesAccounts, UsersAccounts, Job],
     migrations: ['src/migrations/**/*.ts'],
     subscribers: ['src/subscribers/**/*.ts'],
     ssl: dbConfig.ssl,

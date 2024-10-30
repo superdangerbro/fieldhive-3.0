@@ -5,6 +5,7 @@ import { Box, Typography, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import AddJobDialog from './AddJobDialog';
 import { createJob } from '../../services/api';
+import { CreateJobDto } from '@fieldhive/shared';
 
 export default function JobsHeader() {
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -18,7 +19,7 @@ export default function JobsHeader() {
         setIsAddDialogOpen(false);
     };
 
-    const handleAddJob = async (data: { property_id: string; job_type_id: string }) => {
+    const handleAddJob = async (data: CreateJobDto) => {
         try {
             await createJob(data);
             handleCloseAddDialog();

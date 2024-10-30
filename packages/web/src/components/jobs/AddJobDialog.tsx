@@ -17,29 +17,40 @@ import {
     Autocomplete
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
-import { getAccounts, getProperties, getJobTypes } from '../../services/api';
-import { Property } from '@fieldhive/shared/src/types/property';
-import { Account } from '@fieldhive/shared/src/types/account';
+import { getAccounts, getProperties } from '../../services/api';
+import { Property } from '@fieldhive/shared';
+import { Account } from '@fieldhive/shared';
+import { CreateJobDto } from '@fieldhive/shared';
 
 interface AddJobDialogProps {
     open: boolean;
     onClose: () => void;
-    onSubmit: (data: { property_id: string; job_type_id: string }) => void;
+    onSubmit: (data: CreateJobDto) => void;
 }
 
-const steps = ['Select Account', 'Select Property', 'Select Job Type'];
+const steps = ['Select Account', 'Select Property', 'Job Details'];
+
+// Hardcoded job types until we implement settings management
+const JOB_TYPES = [
+    'Inspection',
+    'Maintenance',
+    'Repair',
+    'Installation',
+    'Emergency'
+];
 
 export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogProps) {
     const router = useRouter();
     const [activeStep, setActiveStep] = useState(0);
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
     const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-    const [selectedJobType, setSelectedJobType] = useState<string>('');
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [selectedJobType, setSelectedJobType] = useState('');
     const [accountSearchQuery, setAccountSearchQuery] = useState('');
     const [propertySearchQuery, setPropertySearchQuery] = useState('');
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
-    const [jobTypes, setJobTypes] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -53,19 +64,7 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
             }
         };
 
-        const fetchJobTypes = async () => {
-            try {
-                const response = await getJobTypes();
-                const types = response?.jobTypes?.map((type: any) => type.name) || [];
-                setJobTypes(types);
-            } catch (error) {
-                console.error('Error fetching job types:', error);
-                setError('Failed to fetch job types');
-            }
-        };
-
         fetchAccounts();
-        fetchJobTypes();
     }, []);
 
     useEffect(() => {
@@ -73,8 +72,9 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
             try {
                 const response = await getProperties();
                 if (selectedAccount) {
+                    // Filter properties that belong to the selected account
                     setProperties(response.properties.filter((p: Property) => 
-                        p.accounts.some(account => account.accountId === selectedAccount.id)
+                        selectedAccount.properties?.some(prop => prop.id === p.id)
                     ));
                 } else {
                     setProperties([]);
@@ -96,7 +96,7 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
     const handleCreateNewProperty = () => {
         if (!selectedAccount) return;
         onClose();
-        router.push(`/properties/new?accountId=${selectedAccount.id}`);
+        router.push(`/properties/new?accountId=${selectedAccount.account_id}`);
     };
 
     const handleNext = () => {
@@ -110,8 +110,11 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
     const handleSubmit = () => {
         if (!selectedProperty) return;
         onSubmit({
-            property_id: selectedProperty.id,
-            job_type_id: selectedJobType // Using the job type name as the ID
+            title,
+            description,
+            propertyId: selectedProperty.id,
+            jobTypeId: selectedJobType,
+            status: 'pending'
         });
         handleClose();
     };
@@ -120,6 +123,8 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
         setActiveStep(0);
         setSelectedAccount(null);
         setSelectedProperty(null);
+        setTitle('');
+        setDescription('');
         setSelectedJobType('');
         setAccountSearchQuery('');
         setPropertySearchQuery('');
@@ -181,20 +186,35 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
                 );
             case 2:
                 return (
-                    <TextField
-                        select
-                        fullWidth
-                        label="Job Type"
-                        value={selectedJobType}
-                        onChange={(e) => setSelectedJobType(e.target.value)}
-                        sx={{ mt: 2 }}
-                    >
-                        {jobTypes.map((type) => (
-                            <MenuItem key={type} value={type}>
-                                {type}
-                            </MenuItem>
-                        ))}
-                    </TextField>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+                        <TextField
+                            fullWidth
+                            label="Job Title"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                        />
+                        <TextField
+                            select
+                            fullWidth
+                            label="Job Type"
+                            value={selectedJobType}
+                            onChange={(e) => setSelectedJobType(e.target.value)}
+                        >
+                            {JOB_TYPES.map((type) => (
+                                <MenuItem key={type} value={type}>
+                                    {type}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                        <TextField
+                            fullWidth
+                            label="Description"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            multiline
+                            rows={4}
+                        />
+                    </Box>
                 );
             default:
                 return null;
@@ -208,7 +228,7 @@ export default function AddJobDialog({ open, onClose, onSubmit }: AddJobDialogPr
             case 1:
                 return !!selectedProperty;
             case 2:
-                return !!selectedJobType;
+                return !!title && !!selectedJobType;
             default:
                 return false;
         }
