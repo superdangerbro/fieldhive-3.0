@@ -2,17 +2,19 @@ import React from 'react';
 import { Box } from '@mui/material';
 import { AddressFormStep } from '../steps/AddressFormStep';
 import { AccountStep } from '../steps/AccountStep';
+import { LocationStep } from '../steps/LocationStep';
+import { BoundaryStep } from '../steps/BoundaryStep';
 import { PropertyFormData, Account, Contact } from '../types';
 
 interface StepContentProps {
   step: number;
   propertyData: PropertyFormData;
-  setPropertyData: (data: PropertyFormData) => void;
+  setPropertyData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
   formErrors: Record<string, string>;
   setFormErrors: (errors: Record<string, string>) => void;
   handleFieldChange: (path: string, value: string) => void;
-  selectedAccount: Account | null;
-  setSelectedAccount: (account: Account | null) => void;
+  selectedAccounts: Account[];
+  setSelectedAccounts: (accounts: Account[]) => void;
   accounts: Account[];
   showAddAccount: boolean;
   setShowAddAccount: (show: boolean) => void;
@@ -28,8 +30,8 @@ export const StepContent: React.FC<StepContentProps> = ({
   formErrors,
   setFormErrors,
   handleFieldChange,
-  selectedAccount,
-  setSelectedAccount,
+  selectedAccounts,
+  setSelectedAccounts,
   accounts,
   showAddAccount,
   setShowAddAccount,
@@ -42,6 +44,7 @@ export const StepContent: React.FC<StepContentProps> = ({
       return (
         <AddressFormStep
           propertyData={propertyData}
+          setPropertyData={setPropertyData}
           formErrors={formErrors}
           handleFieldChange={handleFieldChange}
         />
@@ -49,14 +52,29 @@ export const StepContent: React.FC<StepContentProps> = ({
     case 1:
       return (
         <AccountStep
-          selectedAccount={selectedAccount}
-          setSelectedAccount={setSelectedAccount}
+          selectedAccounts={selectedAccounts}
+          setSelectedAccounts={setSelectedAccounts}
           accounts={accounts}
           showAddAccount={showAddAccount}
           setShowAddAccount={setShowAddAccount}
           fetchAccounts={fetchAccounts}
           contacts={contacts}
           setContacts={setContacts}
+        />
+      );
+    case 2:
+      return (
+        <LocationStep
+          propertyData={propertyData}
+          setPropertyData={setPropertyData}
+          formErrors={formErrors}
+        />
+      );
+    case 3:
+      return (
+        <BoundaryStep
+          propertyData={propertyData}
+          setPropertyData={setPropertyData}
           formErrors={formErrors}
         />
       );

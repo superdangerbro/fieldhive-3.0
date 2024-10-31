@@ -5,6 +5,7 @@ interface QueryParams {
     limit?: string;
     offset?: string;
     search?: string;
+    minimal?: string;
 }
 
 export async function listAccounts(req: Request<Record<string, never>, unknown, unknown, QueryParams>, res: Response) {
@@ -12,9 +13,50 @@ export async function listAccounts(req: Request<Record<string, never>, unknown, 
         const limit = parseInt(req.query.limit || '10');
         const offset = parseInt(req.query.offset || '0');
         const search = req.query.search;
+        const minimal = req.query.minimal === 'true';
 
-        console.info(`Fetching accounts with limit ${limit} offset ${offset} search ${search}`);
+        console.info(`Fetching accounts with limit ${limit} offset ${offset} search ${search} minimal ${minimal}`);
 
+        // Use a simpler query for minimal requests (just id and name)
+        if (minimal) {
+            const query = `
+                SELECT 
+                    account_id,
+                    name
+                FROM accounts
+                WHERE status != 'archived'
+                ${search ? 'AND name ILIKE $3' : ''}
+                ORDER BY name ASC
+                LIMIT $1 OFFSET $2
+            `;
+
+            const countQuery = `
+                SELECT COUNT(*) AS total 
+                FROM accounts
+                WHERE status != 'archived'
+                ${search ? 'AND name ILIKE $1' : ''}
+            `;
+
+            const params = search 
+                ? [limit, offset, `%${search}%`]
+                : [limit, offset];
+
+            const countParams = search ? [`%${search}%`] : [];
+
+            const [result, countResult] = await Promise.all([
+                AppDataSource.query(query, params),
+                AppDataSource.query(countQuery, countParams)
+            ]);
+
+            return res.json({
+                accounts: result,
+                total: parseInt(countResult[0].total),
+                limit,
+                offset
+            });
+        }
+
+        // Full account details query for the accounts page
         const query = `
             WITH account_data AS (
                 SELECT
@@ -42,7 +84,7 @@ export async function listAccounts(req: Request<Record<string, never>, unknown, 
                             DISTINCT jsonb_build_object(
                                 'property_id', p.property_id,
                                 'name', p.name,
-                                'type', p.type,
+                                'type', p.property_type,
                                 'status', p.status,
                                 'service_address', (
                                     SELECT jsonb_build_object(

@@ -9,6 +9,8 @@ const ACCOUNT_SETTINGS_KEY = 'account_settings';
 const EQUIPMENT_TYPES_KEY = 'equipment_types';
 const EQUIPMENT_STATUSES_KEY = 'equipment_statuses';
 const EQUIPMENT_KEY = 'equipment';
+const PROPERTY_TYPES_KEY = 'property_types';
+const PROPERTY_STATUSES_KEY = 'property_statuses';
 
 interface AccountStatus {
     value: string;
@@ -75,6 +77,28 @@ router.get('/:key', async (req, res) => {
             let newSetting;
 
             switch (key) {
+                case PROPERTY_TYPES_KEY: {
+                    defaultValue = ['residential', 'commercial', 'industrial', 'agricultural', 'other'];
+                    newSetting = settingsRepository.create({
+                        key: PROPERTY_TYPES_KEY,
+                        value: defaultValue
+                    });
+                    await settingsRepository.save(newSetting);
+                    logger.info(`Created default property types:`, defaultValue);
+                    return res.json(defaultValue);
+                }
+
+                case PROPERTY_STATUSES_KEY: {
+                    defaultValue = ['Active', 'Inactive', 'Archived', 'Pending'];
+                    newSetting = settingsRepository.create({
+                        key: PROPERTY_STATUSES_KEY,
+                        value: defaultValue
+                    });
+                    await settingsRepository.save(newSetting);
+                    logger.info(`Created default property statuses:`, defaultValue);
+                    return res.json(defaultValue);
+                }
+
                 case JOB_TYPES_SETTING_KEY: {
                     defaultValue = ['Inspection', 'Maintenance', 'Repair', 'Installation', 'Emergency'];
                     newSetting = settingsRepository.create({
@@ -279,38 +303,6 @@ router.put('/:key', async (req, res) => {
         res.status(500).json({
             error: 'Internal server error',
             message: 'Failed to update setting',
-            details: error instanceof Error ? error.message : String(error)
-        });
-    }
-});
-
-// Legacy endpoint for job types (keeping for backward compatibility)
-router.get('/job-types', async (req, res) => {
-    try {
-        const settingsRepository = AppDataSource.getRepository(Setting);
-        const jobTypesSetting = await settingsRepository.findOne({
-            where: { key: JOB_TYPES_SETTING_KEY }
-        });
-
-        if (!jobTypesSetting) {
-            const defaultJobTypes = ['Inspection', 'Maintenance', 'Repair', 'Installation', 'Emergency'];
-            const newSetting = settingsRepository.create({
-                key: JOB_TYPES_SETTING_KEY,
-                value: defaultJobTypes
-            });
-            await settingsRepository.save(newSetting);
-            logger.info(`Created default job types:`, defaultJobTypes);
-            return res.json({ jobTypes: defaultJobTypes.map(type => ({ id: type, name: type })) });
-        }
-
-        const jobTypes = jobTypesSetting.value;
-        logger.info(`Returning job types:`, jobTypes);
-        res.json({ jobTypes: jobTypes.map((type: string) => ({ id: type, name: type })) });
-    } catch (error) {
-        logger.error('Error fetching job types:', error);
-        res.status(500).json({
-            error: 'Internal server error',
-            message: 'Failed to fetch job types',
             details: error instanceof Error ? error.message : String(error)
         });
     }

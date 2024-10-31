@@ -1,35 +1,67 @@
-import { Address } from './address';
 import { BaseModel } from './index';
+import { Address, CreateAddressDto } from './address';
 
-export type PropertyType = 'Residential' | 'Commercial' | 'Industrial' | 'Agricultural';
-export type PropertyStatus = 'Active' | 'Inactive' | 'Archived';
+export type PropertyType = 'residential' | 'commercial' | 'industrial' | 'agricultural' | 'other';
+
+export type PropertyStatus = 'active' | 'inactive' | 'archived' | 'pending';
 
 export interface Property extends BaseModel {
-    name: string;
-    type: PropertyType;
-    status: PropertyStatus;
-    billing_address?: Address;
-    service_address?: Address;
-    created_at: string;
-    updated_at: string;
     property_id: string;
-    accounts?: { account_id: string; name: string; }[];
+    updated_at: string;
+    created_at: string;
+    name: string;
+    property_type: PropertyType;
+    location: {
+        type: string;
+        coordinates: [number, number];
+    };
+    boundary?: {
+        type: string;
+        coordinates: [number, number][];
+    };
+    billing_address_id?: string;
+    billing_address?: Address;
+    service_address_id?: string;
+    service_address?: Address;
+    status: PropertyStatus;
+    account_id: string;
+    accounts?: Array<{
+        account_id: string;
+        name: string;
+    }>;
 }
 
 export interface CreatePropertyDto {
     name: string;
-    type: PropertyType;
-    billing_address?: Omit<Address, 'address_id'>;
-    service_address?: Omit<Address, 'address_id'>;
-    accounts?: string[];
+    property_type: PropertyType;
+    location: {
+        type: string;
+        coordinates: [number, number];
+    };
+    boundary?: {
+        type: string;
+        coordinates: [number, number][];
+    };
+    billing_address?: CreateAddressDto;
+    service_address?: CreateAddressDto;
+    status?: PropertyStatus;
+    account_id: string;
 }
 
 export interface UpdatePropertyDto {
     name?: string;
-    type?: PropertyType;
+    property_type?: PropertyType;
+    location?: {
+        type: string;
+        coordinates: [number, number];
+    };
+    boundary?: {
+        type: string;
+        coordinates: [number, number][];
+    };
+    billing_address?: CreateAddressDto;
+    service_address?: CreateAddressDto;
     status?: PropertyStatus;
-    billing_address?: Omit<Address, 'address_id'>;
-    service_address?: Omit<Address, 'address_id'>;
     accounts?: string[];
 }
 

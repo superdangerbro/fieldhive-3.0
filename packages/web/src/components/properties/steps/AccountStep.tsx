@@ -1,4 +1,4 @@
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   Box,
   Button,
@@ -9,25 +9,26 @@ import {
   Collapse,
   Alert,
   Divider,
+  Chip,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { Account, Contact } from '../types';
 
 interface AccountStepProps {
-  selectedAccount: Account | null;
-  setSelectedAccount: (account: Account | null) => void;
+  selectedAccounts: Account[];
+  setSelectedAccounts: (accounts: Account[]) => void;
   accounts: Account[];
   showAddAccount: boolean;
   setShowAddAccount: (show: boolean) => void;
-  fetchAccounts: () => void;
+  fetchAccounts: () => Promise<void>;
   contacts: Contact[];
   setContacts: (contacts: Contact[]) => void;
 }
 
 export const AccountStep: React.FC<AccountStepProps> = ({
-  selectedAccount,
-  setSelectedAccount,
+  selectedAccounts,
+  setSelectedAccounts,
   accounts,
   showAddAccount,
   setShowAddAccount,
@@ -70,19 +71,29 @@ export const AccountStep: React.FC<AccountStepProps> = ({
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
       <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-        Select Account
+        Select Accounts
       </Typography>
       <Autocomplete
-        value={selectedAccount}
+        multiple
+        value={selectedAccounts}
         onChange={(_, newValue) => {
-          setSelectedAccount(newValue);
-          setShowAddAccount(!newValue);
+          setSelectedAccounts(newValue);
+          setShowAddAccount(newValue.length === 0);
         }}
         options={accounts}
         getOptionLabel={(option) => option.name}
         isOptionEqualToValue={(option, value) => option.id === value.id}
         loading={accounts.length === 0}
         loadingText="Loading accounts..."
+        renderTags={(value, getTagProps) =>
+          value.map((option, index) => (
+            <Chip
+              label={option.name}
+              {...getTagProps({ index })}
+              key={option.id}
+            />
+          ))
+        }
         noOptionsText={
           <Button 
             onClick={() => setShowAddAccount(true)}
@@ -98,6 +109,7 @@ export const AccountStep: React.FC<AccountStepProps> = ({
             label="Search Accounts"
             size="small"
             fullWidth
+            placeholder={selectedAccounts.length === 0 ? "Select accounts" : ""}
           />
         )}
       />
@@ -113,11 +125,11 @@ export const AccountStep: React.FC<AccountStepProps> = ({
           </Typography>
           <TextField
             label="Account Name"
-            value={selectedAccount?.name || ''}
-            onChange={(e) => setSelectedAccount({ 
+            value={selectedAccounts.length === 1 ? selectedAccounts[0].name : ''}
+            onChange={(e) => setSelectedAccounts([{ 
               id: 'new', 
               name: e.target.value 
-            })}
+            }])}
             fullWidth
             size="small"
             required

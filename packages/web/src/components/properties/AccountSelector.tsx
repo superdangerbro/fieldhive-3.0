@@ -5,12 +5,11 @@ import {
     Autocomplete, 
     TextField, 
     Chip,
-    Box,
     CircularProgress
 } from '@mui/material';
 import { getAccounts } from '../../services/api';
 
-interface MinimalAccount {
+export interface MinimalAccount {
     account_id: string;
     name: string;
 }
@@ -25,29 +24,67 @@ export default function AccountSelector({ selectedAccounts, onChange, disabled }
     const [inputValue, setInputValue] = useState('');
     const [options, setOptions] = useState<MinimalAccount[]>([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
+    // Load initial accounts
+    useEffect(() => {
+        let active = true;
+
+        const loadAccounts = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const response = await getAccounts({ 
+                    limit: 100,
+                    minimal: true
+                });
+                if (active) {
+                    setOptions(response.accounts);
+                }
+            } catch (error) {
+                console.error('Failed to fetch accounts:', error);
+                setError('Failed to load accounts');
+            } finally {
+                if (active) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        loadAccounts();
+
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    // Handle search
     useEffect(() => {
         let active = true;
 
         if (inputValue === '') {
-            setOptions(selectedAccounts);
             return;
         }
 
         const searchAccounts = async () => {
             setLoading(true);
+            setError(null);
             try {
-                const response = await getAccounts({ search: inputValue });
+                const response = await getAccounts({ 
+                    search: inputValue,
+                    limit: 100,
+                    minimal: true
+                });
                 if (active) {
-                    setOptions(response.accounts.map(account => ({
-                        account_id: account.account_id,
-                        name: account.name
-                    })));
+                    setOptions(response.accounts);
                 }
             } catch (error) {
-                console.error('Failed to fetch accounts:', error);
+                console.error('Failed to search accounts:', error);
+                setError('Failed to search accounts');
             } finally {
-                setLoading(false);
+                if (active) {
+                    setLoading(false);
+                }
             }
         };
 
@@ -75,6 +112,8 @@ export default function AccountSelector({ selectedAccounts, onChange, disabled }
                 <TextField
                     {...params}
                     label="Parent Accounts"
+                    error={!!error}
+                    helperText={error}
                     InputProps={{
                         ...params.InputProps,
                         endAdornment: (
@@ -95,8 +134,13 @@ export default function AccountSelector({ selectedAccounts, onChange, disabled }
                     />
                 ))
             }
+            filterOptions={(options, { inputValue }) => {
+                // Custom filter to match on name
+                const filtered = options.filter(option =>
+                    option.name.toLowerCase().includes(inputValue.toLowerCase())
+                );
+                return filtered;
+            }}
         />
     );
 }
-
-export type { MinimalAccount };

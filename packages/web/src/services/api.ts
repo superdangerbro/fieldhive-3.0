@@ -1,84 +1,83 @@
-import { Property, CreatePropertyDto, UpdatePropertyDto, PropertiesResponse, Account, CreateAccountDto, UpdateAccountDto, AccountsResponse, Job, JobsResponse, UpdateJobDto, CreateJobDto } from '@fieldhive/shared';
+import { Property, CreatePropertyDto, UpdatePropertyDto, PropertiesResponse, Account, CreateAccountDto, UpdateAccountDto, AccountsResponse, Job, JobsResponse, UpdateJobDto, CreateJobDto, Address, CreateAddressDto, UpdateAddressDto } from '@fieldhive/shared';
 
 export const API_ENDPOINTS = {
     PROPERTIES: '/properties',
     ACCOUNTS: '/accounts',
     JOBS: '/jobs',
     SETTINGS: '/settings',
-    EQUIPMENT: '/equipment'
+    EQUIPMENT: '/equipment',
+    ADDRESSES: '/addresses'
 };
 
 class Api {
     private baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
-    // Account methods
-    async getAccounts(params?: { search?: string; limit?: number; offset?: number }): Promise<AccountsResponse> {
-        const searchParams = new URLSearchParams();
-        if (params?.search) searchParams.append('search', params.search);
-        if (params?.limit) searchParams.append('limit', params.limit.toString());
-        if (params?.offset) searchParams.append('offset', params.offset.toString());
-
-        const response = await fetch(`${this.baseUrl}/accounts?${searchParams}`);
+    // Address methods
+    async getAddress(id: string): Promise<Address> {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.ADDRESSES}/${id}`);
         if (!response.ok) {
-            throw new Error('Failed to fetch accounts');
+            throw new Error('Failed to fetch address');
         }
         return response.json();
     }
 
-    async createAccount(account: CreateAccountDto): Promise<Account> {
-        const response = await fetch(`${this.baseUrl}/accounts`, {
+    async createAddress(address: CreateAddressDto): Promise<Address> {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.ADDRESSES}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(account),
+            body: JSON.stringify(address),
         });
         if (!response.ok) {
-            throw new Error('Failed to create account');
+            throw new Error('Failed to create address');
         }
         return response.json();
     }
 
-    async updateAccount(id: string, account: UpdateAccountDto): Promise<Account> {
-        const response = await fetch(`${this.baseUrl}/accounts/${id}`, {
+    async updateAddress(id: string, address: UpdateAddressDto): Promise<Address> {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.ADDRESSES}/${id}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(account),
+            body: JSON.stringify(address),
         });
         if (!response.ok) {
-            throw new Error('Failed to update account');
+            throw new Error('Failed to update address');
         }
         return response.json();
     }
 
-    async deleteAccount(id: string): Promise<{ success: boolean; error?: string; canArchive?: boolean }> {
-        const response = await fetch(`${this.baseUrl}/accounts/${id}`, {
-            method: 'DELETE',
-        });
-        
-        const data = await response.json();
-        
+    // Settings methods
+    async getSetting(key: string): Promise<any> {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.SETTINGS}/${key}`);
         if (!response.ok) {
-            throw {
-                message: data.message || 'Failed to delete account',
-                canArchive: data.canArchive
-            };
+            if (response.status === 404) {
+                // Return default values for known settings
+                switch (key) {
+                    case 'property_statuses':
+                        return ['Active', 'Inactive', 'Archived', 'Pending'];
+                    default:
+                        throw new Error(`Failed to fetch setting: ${key}`);
+                }
+            }
+            throw new Error(`Failed to fetch setting: ${key}`);
         }
-        
-        return data;
+        return response.json();
     }
 
-    async archiveAccount(id: string): Promise<{ success: boolean }> {
-        const response = await fetch(`${this.baseUrl}/accounts/${id}/archive`, {
-            method: 'POST',
+    async updateSetting(key: string, value: any): Promise<any> {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.SETTINGS}/${key}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ value }),
         });
-        
         if (!response.ok) {
-            throw new Error('Failed to archive account');
+            throw new Error(`Failed to update setting: ${key}`);
         }
-        
         return response.json();
     }
 
@@ -90,7 +89,7 @@ class Api {
         if (params?.offset) searchParams.append('offset', params.offset.toString());
         if (params?.accountId) searchParams.append('accountId', params.accountId);
 
-        const response = await fetch(`${this.baseUrl}/properties?${searchParams}`);
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.PROPERTIES}?${searchParams}`);
         if (!response.ok) {
             throw new Error('Failed to fetch properties');
         }
@@ -98,7 +97,7 @@ class Api {
     }
 
     async createProperty(property: CreatePropertyDto): Promise<Property> {
-        const response = await fetch(`${this.baseUrl}/properties`, {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.PROPERTIES}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -112,7 +111,7 @@ class Api {
     }
 
     async updateProperty(id: string, property: UpdatePropertyDto): Promise<Property> {
-        const response = await fetch(`${this.baseUrl}/properties/${id}`, {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.PROPERTIES}/${id}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -126,7 +125,7 @@ class Api {
     }
 
     async deleteProperty(id: string): Promise<{ success: boolean; error?: string; canArchive?: boolean }> {
-        const response = await fetch(`${this.baseUrl}/properties/${id}`, {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.PROPERTIES}/${id}`, {
             method: 'DELETE',
         });
         
@@ -143,12 +142,83 @@ class Api {
     }
 
     async archiveProperty(id: string): Promise<{ success: boolean }> {
-        const response = await fetch(`${this.baseUrl}/properties/${id}/archive`, {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.PROPERTIES}/${id}/archive`, {
             method: 'POST',
         });
         
         if (!response.ok) {
             throw new Error('Failed to archive property');
+        }
+        
+        return response.json();
+    }
+
+    // Account methods
+    async getAccounts(params?: { search?: string; limit?: number; offset?: number }): Promise<AccountsResponse> {
+        const searchParams = new URLSearchParams();
+        if (params?.search) searchParams.append('search', params.search);
+        if (params?.limit) searchParams.append('limit', params.limit.toString());
+        if (params?.offset) searchParams.append('offset', params.offset.toString());
+
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.ACCOUNTS}?${searchParams}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch accounts');
+        }
+        return response.json();
+    }
+
+    async createAccount(account: CreateAccountDto): Promise<Account> {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.ACCOUNTS}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(account),
+        });
+        if (!response.ok) {
+            throw new Error('Failed to create account');
+        }
+        return response.json();
+    }
+
+    async updateAccount(id: string, account: UpdateAccountDto): Promise<Account> {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.ACCOUNTS}/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(account),
+        });
+        if (!response.ok) {
+            throw new Error('Failed to update account');
+        }
+        return response.json();
+    }
+
+    async deleteAccount(id: string): Promise<{ success: boolean; error?: string; canArchive?: boolean }> {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.ACCOUNTS}/${id}`, {
+            method: 'DELETE',
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw {
+                message: data.message || 'Failed to delete account',
+                canArchive: data.canArchive
+            };
+        }
+        
+        return data;
+    }
+
+    async archiveAccount(id: string): Promise<{ success: boolean }> {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.ACCOUNTS}/${id}/archive`, {
+            method: 'POST',
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to archive account');
         }
         
         return response.json();
@@ -160,7 +230,7 @@ class Api {
             page: page.toString(),
             pageSize: pageSize.toString()
         });
-        const response = await fetch(`${this.baseUrl}/jobs?${searchParams}`);
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.JOBS}?${searchParams}`);
         if (!response.ok) {
             throw new Error('Failed to fetch jobs');
         }
@@ -168,7 +238,7 @@ class Api {
     }
 
     async getJobTypes(): Promise<{ jobTypes: { id: string; name: string }[] }> {
-        const response = await fetch(`${this.baseUrl}/settings/job_types`);
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.SETTINGS}/job_types`);
         if (!response.ok) {
             throw new Error('Failed to fetch job types');
         }
@@ -176,7 +246,7 @@ class Api {
     }
 
     async createJob(data: CreateJobDto): Promise<Job> {
-        const response = await fetch(`${this.baseUrl}/jobs`, {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.JOBS}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -194,7 +264,7 @@ class Api {
     }
 
     async updateJob(id: string, data: UpdateJobDto): Promise<Job> {
-        const response = await fetch(`${this.baseUrl}/jobs/${id}`, {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.JOBS}/${id}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -208,34 +278,11 @@ class Api {
     }
 
     async deleteJob(id: string): Promise<{ success: boolean }> {
-        const response = await fetch(`${this.baseUrl}/jobs/${id}`, {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.JOBS}/${id}`, {
             method: 'DELETE',
         });
         if (!response.ok) {
             throw new Error('Failed to delete job');
-        }
-        return response.json();
-    }
-
-    // Settings methods
-    async getSetting(key: string): Promise<any> {
-        const response = await fetch(`${this.baseUrl}/settings/${key}`);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch setting: ${key}`);
-        }
-        return response.json();
-    }
-
-    async updateSetting(key: string, value: any): Promise<any> {
-        const response = await fetch(`${this.baseUrl}/settings/${key}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ value }),
-        });
-        if (!response.ok) {
-            throw new Error(`Failed to update setting: ${key}`);
         }
         return response.json();
     }
@@ -261,6 +308,9 @@ class Api {
 export const api = new Api();
 
 // Export bound methods for direct use
+export const getAddress = api.getAddress.bind(api);
+export const createAddress = api.createAddress.bind(api);
+export const updateAddress = api.updateAddress.bind(api);
 export const getAccounts = api.getAccounts.bind(api);
 export const createAccount = api.createAccount.bind(api);
 export const updateAccount = api.updateAccount.bind(api);

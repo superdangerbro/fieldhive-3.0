@@ -90,6 +90,14 @@ const AddressForm: React.FC<{
   </Box>
 );
 
+const propertyTypes: PropertyType[] = [
+  'residential',
+  'commercial',
+  'industrial',
+  'agricultural',
+  'other'
+];
+
 export const AddressFormStep: React.FC<AddressFormStepProps> = ({
   propertyData,
   setPropertyData,
@@ -128,7 +136,7 @@ export const AddressFormStep: React.FC<AddressFormStepProps> = ({
           label="Property Type"
           onChange={e => setPropertyData(prev => ({ ...prev, type: e.target.value as PropertyType }))}
         >
-          {Object.values(PropertyType).map((type) => (
+          {propertyTypes.map((type) => (
             <MenuItem key={type} value={type}>
               {type.charAt(0).toUpperCase() + type.slice(1).toLowerCase().replace('_', ' ')}
             </MenuItem>

@@ -5,11 +5,17 @@ import { Box, List, ListItem, ListItemText, IconButton, Tooltip } from '@mui/mat
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import AddIcon from '@mui/icons-material/Add';
-import { useFieldMap3DStore } from '../../../stores/fieldMap3dStore';
+import { useFieldMapStore } from '../../../stores/fieldMapStore';
 
 interface FloorControlsProps {
   isFloorPlansOpen: boolean;
   onAddFloorPlan: () => void;
+}
+
+interface FloorPlan {
+  id: string;
+  name: string;
+  visible: boolean;
 }
 
 export const FloorControls: React.FC<FloorControlsProps> = ({
@@ -21,7 +27,7 @@ export const FloorControls: React.FC<FloorControlsProps> = ({
     activeFloorPlan,
     setActiveFloorPlan,
     toggleFloorPlanVisibility,
-  } = useFieldMap3DStore();
+  } = useFieldMapStore();
 
   if (!isFloorPlansOpen) {
     return null;
@@ -41,7 +47,7 @@ export const FloorControls: React.FC<FloorControlsProps> = ({
       }}
     >
       <List>
-        {floorPlans.map((floorPlan) => (
+        {floorPlans.map((floorPlan: FloorPlan) => (
           <ListItem
             key={floorPlan.id}
             secondaryAction={

@@ -16,7 +16,7 @@ import {
     Typography,
     FormControlLabel,
     Checkbox,
-    Collapse
+    Divider
 } from '@mui/material';
 import { updateProperty } from '../../services/api';
 import type { Property, UpdatePropertyDto } from '@fieldhive/shared';
@@ -95,8 +95,20 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
                     name: a.name
                 })) || []
             });
+
+            // Check if billing address is same as service address
+            if (property.billing_address && property.service_address) {
+                const isSameAddress = 
+                    property.billing_address.address1 === property.service_address.address1 &&
+                    property.billing_address.address2 === property.service_address.address2 &&
+                    property.billing_address.city === property.service_address.city &&
+                    property.billing_address.province === property.service_address.province &&
+                    property.billing_address.postal_code === property.service_address.postal_code;
+                setSameAsService(isSameAddress);
+            }
         } else {
             setFormData(initialFormData);
+            setSameAsService(false);
         }
     }, [property]);
 
@@ -157,8 +169,8 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
         try {
             const propertyData: UpdatePropertyDto = {
                 name: formData.name,
-                billing_address: sameAsService ? formData.service_address : formData.billing_address,
                 service_address: formData.service_address,
+                billing_address: sameAsService ? formData.service_address : formData.billing_address,
                 accounts: formData.accounts.map(a => a.account_id)
             };
 
@@ -205,6 +217,7 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
                                         disabled={loading}
                                     />
                                 </Grid>
+                                <Divider sx={{ my: 2 }} />
 
                                 <Grid item xs={12}>
                                     <AccountSelector
@@ -213,6 +226,7 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
                                         disabled={loading}
                                     />
                                 </Grid>
+                                <Divider sx={{ my: 2 }} />
 
                                 <Grid item xs={12}>
                                     <Typography variant="h6">Service Address</Typography>
@@ -272,25 +286,17 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
                                         disabled={loading}
                                     />
                                 </Grid>
+                                <Divider sx={{ my: 2 }} />
 
                                 <Grid item xs={12}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <Typography variant="h6">Billing Address</Typography>
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={sameAsService}
-                                                    onChange={handleSameAsServiceChange}
-                                                    disabled={loading}
-                                                />
-                                            }
-                                            label="Same as service address"
-                                        />
-                                    </Box>
+                                    <Typography variant="h6">Billing Address</Typography>
+                                    <FormControlLabel
+                                        control={<Checkbox checked={sameAsService} onChange={handleSameAsServiceChange} disabled={loading} />}
+                                        label="Same as service address"
+                                    />
                                 </Grid>
-
-                                <Collapse in={!sameAsService} sx={{ width: '100%' }}>
-                                    <Grid container spacing={3} sx={{ mt: 0 }}>
+                                { !sameAsService &&
+                                    <>
                                         <Grid item xs={12}>
                                             <TextField
                                                 name="billing_address.address1"
@@ -345,8 +351,8 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
                                                 disabled={loading || sameAsService}
                                             />
                                         </Grid>
-                                    </Grid>
-                                </Collapse>
+                                    </>
+                                }
                             </Grid>
                         </Box>
                     </DialogContent>

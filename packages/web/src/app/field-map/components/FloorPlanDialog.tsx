@@ -10,19 +10,19 @@ import {
   Button,
   Box,
 } from '@mui/material';
-import { useFieldMap3DStore } from '../../../stores/fieldMap3dStore';
+import { useFieldMapStore } from '../../../stores/fieldMapStore';
 
 interface FloorPlanDialogProps {
   open: boolean;
   onClose: () => void;
-  propertyId: string; // Add this prop to receive the property ID
+  propertyId: string;
 }
 
 export const FloorPlanDialog: React.FC<FloorPlanDialogProps> = ({ open, onClose, propertyId }) => {
   const [name, setName] = useState('');
   const [floor, setFloor] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const { addFloorPlan } = useFieldMap3DStore();
+  const { addFloorPlan } = useFieldMapStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,11 +32,13 @@ export const FloorPlanDialog: React.FC<FloorPlanDialogProps> = ({ open, onClose,
       // For this example, we'll create a fake URL
       const fakeImageUrl = URL.createObjectURL(file);
       
-      await addFloorPlan({
+      addFloorPlan({
+        id: Date.now().toString(), // Generate a temporary ID
         name,
         imageUrl: fakeImageUrl,
-        propertyId,
+        visible: true,
         floor: parseInt(floor, 10),
+        propertyId,
       });
       
       onClose();

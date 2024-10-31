@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { Box, TextField, List, ListItem, ListItemText, IconButton, Tooltip } from '@mui/material';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Box, TextField, List, ListItem, ListItemText, IconButton, Tooltip, CircularProgress } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import LayersIcon from '@mui/icons-material/Layers';
-import { useFieldMap3DStore } from '../../../stores/fieldMap3dStore';
+import MapIcon from '@mui/icons-material/Map';
+import { useFieldMapStore } from '../../../stores/fieldMapStore';
 
 interface PropertySearchProps {
   onManageFloorPlans: () => void;
@@ -18,21 +19,54 @@ export const PropertySearch: React.FC<PropertySearchProps> = ({
   onFloorPlansOpenChange,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const { searchResults, setSelectedProperty, searchProperties } = useFieldMap3DStore();
+  const [isSearching, setIsSearching] = useState(false);
+  const { properties, setSelectedProperty, fetchPropertiesInBounds, viewState } = useFieldMapStore();
 
-  const handleSearch = useCallback(() => {
-    searchProperties(searchTerm);
-  }, [searchTerm, searchProperties]);
-
-  const handleResultClick = useCallback((result: any) => {
-    setSelectedProperty({
-      id: result.id,
-      name: result.name,
-      location: {
-        latitude: result.location.coordinates[1],
-        longitude: result.location.coordinates[0]
+  const handleSearch = useCallback(async (useMapBounds: boolean = false) => {
+    setIsSearching(true);
+    try {
+      let bounds: [number, number, number, number];
+      if (useMapBounds) {
+        // Use the current map bounds
+        const { longitude, latitude, zoom } = viewState;
+        const latDelta = 180 / Math.pow(2, zoom);
+        const lonDelta = 360 / Math.pow(2, zoom);
+        bounds = [
+          longitude - lonDelta / 2,
+          latitude - latDelta / 2,
+          longitude + lonDelta / 2,
+          latitude + latDelta / 2
+        ];
+      } else {
+        // Use a fixed area around the center for text-based search
+        const { longitude, latitude } = viewState;
+        const zoom = 0.1;
+        bounds = [
+          longitude - zoom,
+          latitude - zoom,
+          longitude + zoom,
+          latitude + zoom
+        ];
       }
-    });
+      await fetchPropertiesInBounds(bounds, searchTerm);
+    } catch (error) {
+      console.error('Error searching properties:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [fetchPropertiesInBounds, viewState, searchTerm]);
+
+  useEffect(() => {
+    if (searchTerm.length > 2) {
+      const debounce = setTimeout(() => {
+        handleSearch();
+      }, 300);
+      return () => clearTimeout(debounce);
+    }
+  }, [searchTerm, handleSearch]);
+
+  const handleResultClick = useCallback((property: any) => {
+    setSelectedProperty(property);
   }, [setSelectedProperty]);
 
   return (
@@ -58,9 +92,14 @@ export const PropertySearch: React.FC<PropertySearchProps> = ({
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
         />
-        <IconButton onClick={handleSearch} size="small" sx={{ ml: 1 }}>
-          <SearchIcon />
+        <IconButton onClick={() => handleSearch()} size="small" sx={{ ml: 1 }}>
+          {isSearching ? <CircularProgress size={24} /> : <SearchIcon />}
         </IconButton>
+        <Tooltip title="Search in Map View">
+          <IconButton onClick={() => handleSearch(true)} size="small" sx={{ ml: 1 }}>
+            <MapIcon />
+          </IconButton>
+        </Tooltip>
         <Tooltip title="Manage Floor Plans">
           <IconButton
             onClick={() => {
@@ -74,17 +113,17 @@ export const PropertySearch: React.FC<PropertySearchProps> = ({
           </IconButton>
         </Tooltip>
       </Box>
-      {searchResults.length > 0 && (
+      {properties.length > 0 && (
         <List sx={{ maxHeight: 200, overflowY: 'auto' }}>
-          {searchResults.map((result) => (
+          {properties.map((property) => (
             <ListItem
-              key={result.id}
+              key={property.id}
               button
-              onClick={() => handleResultClick(result)}
+              onClick={() => handleResultClick(property)}
             >
               <ListItemText
-                primary={result.name}
-                secondary={result.address}
+                primary={property.name}
+                secondary={`Lat: ${property.location.latitude.toFixed(4)}, Lon: ${property.location.longitude.toFixed(4)}`}
               />
             </ListItem>
           ))}

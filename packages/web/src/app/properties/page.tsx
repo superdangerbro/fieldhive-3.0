@@ -6,7 +6,6 @@ import PropertyDetails from '../../components/properties/PropertyDetails';
 import PropertiesTable from '../../components/properties/PropertiesTable';
 import AddPropertyDialog from '../../components/properties/AddPropertyDialog';
 import EditPropertyDialog from '../../components/properties/EditPropertyDialog';
-import PropertySearch from '../../components/properties/PropertySearch';
 import { usePersistedProperty } from '../../hooks/usePersistedProperty';
 import type { Property } from '@fieldhive/shared';
 
@@ -16,7 +15,6 @@ export default function PropertiesPage() {
   const [editProperty, setEditProperty] = useState<Property | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [properties, setProperties] = useState<Property[]>([]);
-  const [filterText, setFilterText] = useState('');
 
   const handleAddSuccess = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -30,14 +28,10 @@ export default function PropertiesPage() {
 
   const handlePropertySelect = (property: Property | null) => {
     // If the property is deleted, remove it from persistence
-    if (!property || !properties.find(p => p.id === property.id)) {
+    if (!property || !properties.find(p => p.property_id === property.property_id)) {
       setSelectedProperty(null);
     } else {
       setSelectedProperty(property);
-    }
-    // Update filter text when property is selected from autocomplete
-    if (property) {
-      setFilterText(property.name);
     }
   };
 
@@ -48,7 +42,7 @@ export default function PropertiesPage() {
   const handlePropertiesLoad = (loadedProperties: Property[]) => {
     setProperties(loadedProperties);
     // If the selected property no longer exists in the loaded properties, clear it
-    if (selectedProperty && !loadedProperties.find(p => p.id === selectedProperty.id)) {
+    if (selectedProperty && !loadedProperties.find(p => p.property_id === selectedProperty.property_id)) {
       setSelectedProperty(null);
     }
   };
@@ -59,26 +53,21 @@ export default function PropertiesPage() {
 
   return (
     <Box p={3}>
-      <PropertyDetails
-        property={selectedProperty}
-        onEdit={handleEdit}
-        onUpdate={handleUpdate}
-        onPropertySelect={handlePropertySelect}
-      />
-      
-      <PropertySearch
-        properties={properties}
-        selectedProperty={selectedProperty}
-        onPropertySelect={handlePropertySelect}
-        onAddClick={() => setIsAddDialogOpen(true)}
-      />
+      {selectedProperty && (
+        <PropertyDetails
+          property={selectedProperty}
+          onEdit={handleEdit}
+          onUpdate={handleUpdate}
+          onPropertySelect={handlePropertySelect}
+        />
+      )}
 
       <PropertiesTable 
         refreshTrigger={refreshTrigger}
         onPropertySelect={handlePropertySelect}
         selectedProperty={selectedProperty}
         onPropertiesLoad={handlePropertiesLoad}
-        filterText={filterText}
+        onAddClick={() => setIsAddDialogOpen(true)}
       />
       
       <AddPropertyDialog

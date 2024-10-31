@@ -1,12 +1,12 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Point, Polygon } from 'geojson';
-import { PropertyType, PropertyStatus } from '@fieldhive/shared';
 import { Account } from './Account';
+import { Address } from './Address';
 
 @Entity('properties')
 export class Property {
     @PrimaryGeneratedColumn('uuid', { name: 'property_id' })
-    id: string;
+    property_id: string;
 
     @Column()
     name: string;
@@ -27,26 +27,43 @@ export class Property {
     boundary?: Polygon;
 
     @Column({
-        type: 'text'
+        name: 'property_type',
+        type: 'text',
+        collation: 'aa_DJ',
+        default: 'residential'
     })
-    type: PropertyType;
+    property_type: string;
 
     @Column({
         type: 'text',
         default: 'active'
     })
-    status: PropertyStatus;
+    status: string;
 
     @Column({ name: 'account_id' })
-    accountId: string;
+    account_id: string;
 
     @ManyToOne(() => Account, account => account.properties)
     @JoinColumn({ name: 'account_id' })
     account: Account;
 
+    @Column({ name: 'billing_address_id', nullable: true })
+    billing_address_id: string;
+
+    @ManyToOne(() => Address)
+    @JoinColumn({ name: 'billing_address_id' })
+    billing_address: Address;
+
+    @Column({ name: 'service_address_id', nullable: true })
+    service_address_id: string;
+
+    @ManyToOne(() => Address)
+    @JoinColumn({ name: 'service_address_id' })
+    service_address: Address;
+
     @CreateDateColumn({ name: 'created_at' })
-    createdAt: Date;
+    created_at: Date;
 
     @UpdateDateColumn({ name: 'updated_at' })
-    updatedAt: Date;
+    updated_at: Date;
 }

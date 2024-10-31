@@ -4,13 +4,12 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Map, { MapRef, GeolocateControl, Marker } from 'react-map-gl';
 import { Box, Fab, IconButton, Tooltip, useTheme, Switch, FormControlLabel } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import ViewInArIcon from '@mui/icons-material/ViewInAr';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import mapboxgl from 'mapbox-gl';
 
 import { MapControls } from './MapControls';
 import { useEquipmentStore } from '../../../stores/equipmentStore';
-import { useFieldMap3DStore } from '../../../stores/fieldMap3dStore';
+import { useFieldMapStore } from '../../../stores/fieldMapStore';
 import { Crosshairs } from './Crosshairs';
 import { AddEquipmentDialog } from './AddEquipmentDialog';
 import { EquipmentMarkerDialog } from './EquipmentMarkerDialog';
@@ -36,21 +35,16 @@ const FieldMap: React.FC = () => {
   const [showFieldEquipment, setShowFieldEquipment] = useState(false);
   
   const { 
-    floorPlans,
-    activeFloorPlan,
-    is3DMode,
-    isPlacingFloorPlan,
     viewState,
     setViewState,
-    toggle3DMode,
-    cancelPlacingFloorPlan,
-    confirmFloorPlanPlacement,
     selectedProperty,
     flyToProperty,
-    searchResults,
+    properties,
     setSelectedProperty,
-    fetchPropertiesInBounds
-  } = useFieldMap3DStore();
+    fetchPropertiesInBounds,
+    floorPlans,
+    activeFloorPlan
+  } = useFieldMapStore();
 
   const {
     isPlacingEquipment,
@@ -69,34 +63,8 @@ const FieldMap: React.FC = () => {
   } = useEquipmentStore();
 
   useEffect(() => {
-    const map = mapRef.current?.getMap();
-    if (!map) return;
-    
-    const targetPitch = is3DMode ? 45 : 0;
-    const targetBearing = is3DMode ? 0 : viewState.bearing;
-    
-    const animate = () => {
-      const currentPitch = map.getPitch();
-      const currentBearing = map.getBearing();
-      
-      const pitchDiff = Math.abs(currentPitch - targetPitch);
-      const bearingDiff = Math.abs(currentBearing - targetBearing);
-      
-      if (pitchDiff > 0.1) {
-        const newPitch = currentPitch + (targetPitch - currentPitch) * 0.1;
-        map.setPitch(newPitch);
-        requestAnimationFrame(animate);
-      }
-      
-      if (is3DMode && bearingDiff > 0.1) {
-        const newBearing = currentBearing + (targetBearing - currentBearing) * 0.1;
-        map.setBearing(newBearing);
-        requestAnimationFrame(animate);
-      }
-    };
-    
-    animate();
-  }, [is3DMode, viewState.bearing]);
+    console.log('Properties updated:', properties);
+  }, [properties]);
 
   useEffect(() => {
     if (selectedProperty) {
@@ -105,6 +73,24 @@ const FieldMap: React.FC = () => {
       setTimeout(() => setShowPropertyMarker(false), 1000);
     }
   }, [selectedProperty, flyToProperty]);
+
+  useEffect(() => {
+    // Fetch initial properties on component mount
+    const map = mapRef.current?.getMap();
+    if (map) {
+      const bounds = map.getBounds();
+      if (bounds) {
+        const boundsArray: [number, number, number, number] = [
+          bounds.getWest(),
+          bounds.getSouth(),
+          bounds.getEast(),
+          bounds.getNorth()
+        ];
+        console.log('Initial bounds:', boundsArray);
+        fetchPropertiesInBounds(boundsArray);
+      }
+    }
+  }, [fetchPropertiesInBounds]);
 
   const handleMoveEnd = useCallback(() => {
     const map = mapRef.current;
@@ -120,24 +106,18 @@ const FieldMap: React.FC = () => {
       bounds.getNorth()
     ];
     
+    console.log('Map moved, new bounds:', boundsArray);
     setCurrentBounds(boundsArray);
-    fetchPropertiesInBounds(boundsArray);
+    fetchPropertiesInBounds(boundsArray).then(() => {
+      console.log('Properties after fetch:', useFieldMapStore.getState().properties);
+    });
     if (showFieldEquipment) {
       fetchEquipmentInBounds(boundsArray);
     }
   }, [fetchPropertiesInBounds, fetchEquipmentInBounds, setCurrentBounds, showFieldEquipment]);
 
-  const handleFloorPlanConfirm = useCallback((bounds: {
-    west: number;
-    east: number;
-    north: number;
-    south: number;
-    coordinates: [number, number][];
-  }) => {
-    confirmFloorPlanPlacement(bounds, '', 300, 300);
-  }, [confirmFloorPlanPlacement]);
-
   const handleSearchResultClick = useCallback((result: any) => {
+    console.log('Search result clicked:', result);
     setSelectedProperty({
       id: result.id,
       name: result.name,
@@ -203,14 +183,14 @@ const FieldMap: React.FC = () => {
         />
 
         {/* Property Markers */}
-        {searchResults.map((result) => (
+        {properties.map((property) => (
           <Marker
-            key={result.id}
-            longitude={result.location.coordinates[0]}
-            latitude={result.location.coordinates[1]}
-            onClick={() => handleSearchResultClick(result)}
+            key={property.id}
+            longitude={property.location.longitude}
+            latitude={property.location.latitude}
+            onClick={() => handleSearchResultClick(property)}
           >
-            <Tooltip title={`${result.name} - ${result.address}`}>
+            <Tooltip title={`${property.name}`}>
               <Box
                 sx={{
                   width: 20,
@@ -250,24 +230,19 @@ const FieldMap: React.FC = () => {
           </Marker>
         )}
 
-        {floorPlans.map(floorPlan => (
-          floorPlan.visible && floorPlan.bounds && floorPlan.bounds.coordinates && (
-            <ImageOverlay
-              key={floorPlan.id}
-              id={floorPlan.id}
-              imageUrl={floorPlan.imageUrl}
-              coordinates={floorPlan.bounds.coordinates}
-              opacity={floorPlan.id === activeFloorPlan ? 0.8 : 0.4}
-              map={mapRef.current?.getMap()}
-            />
-          )
-        ))}
-
-        {isPlacingFloorPlan && mapRef.current?.getMap() && (
-          <FloorPlanPlacement
+        {/* ImageOverlay for floor plans */}
+        {activeFloorPlan && mapRef.current && (
+          <ImageOverlay
+            id={activeFloorPlan}
+            imageUrl={floorPlans.find(fp => fp.id === activeFloorPlan)?.imageUrl || ''}
+            coordinates={[
+              [selectedProperty?.location.longitude || 0, selectedProperty?.location.latitude || 0],
+              [selectedProperty?.location.longitude || 0, (selectedProperty?.location.latitude || 0) + 0.001],
+              [(selectedProperty?.location.longitude || 0) + 0.001, (selectedProperty?.location.latitude || 0) + 0.001],
+              [(selectedProperty?.location.longitude || 0) + 0.001, selectedProperty?.location.latitude || 0]
+            ]}
+            opacity={0.75}
             map={mapRef.current.getMap()}
-            onCancel={cancelPlacingFloorPlan}
-            onConfirm={handleFloorPlanConfirm}
           />
         )}
       </Map>
@@ -278,7 +253,7 @@ const FieldMap: React.FC = () => {
         onFloorPlansOpenChange={setIsFloorPlansOpen}
       />
 
-      {showFloorPlanDialog && !isPlacingFloorPlan && selectedProperty && (
+      {showFloorPlanDialog && selectedProperty && (
         <FloorPlanDialog
           open={showFloorPlanDialog}
           onClose={() => setShowFloorPlanDialog(false)}
@@ -324,24 +299,6 @@ const FieldMap: React.FC = () => {
         <LocationOnIcon />
       </IconButton>
 
-      <IconButton
-        onClick={toggle3DMode}
-        sx={{
-          position: 'absolute',
-          top: 24,
-          right: 90,
-          backgroundColor: theme.palette.background.paper,
-          color: is3DMode ? theme.palette.primary.main : theme.palette.text.primary,
-          '&:hover': { 
-            backgroundColor: theme.palette.action.hover 
-          },
-          boxShadow: theme.shadows[2],
-          zIndex: 1000,
-        }}
-      >
-        <ViewInArIcon />
-      </IconButton>
-
       <FormControlLabel
         control={
           <Switch
@@ -363,7 +320,7 @@ const FieldMap: React.FC = () => {
         }}
       />
 
-      {!isPlacingEquipment && !isPlacingFloorPlan && selectedProperty && (
+      {!isPlacingEquipment && selectedProperty && (
         <Fab
           color="primary"
           onClick={startPlacingEquipment}

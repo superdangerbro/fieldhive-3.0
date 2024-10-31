@@ -5,6 +5,7 @@ import { Box, Tabs, Tab } from '@mui/material';
 import EquipmentTab from './EquipmentTab';
 import JobsTab from './JobsTab';
 import AccountsTab from './AccountsTab';
+import PropertiesTab from './PropertiesTab';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -44,6 +45,7 @@ export default function SettingsPage() {
           <Tab label="Equipment" />
           <Tab label="Jobs" />
           <Tab label="Accounts" />
+          <Tab label="Properties" />
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>
@@ -54,6 +56,9 @@ export default function SettingsPage() {
       </TabPanel>
       <TabPanel value={value} index={2}>
         <AccountsTab />
+      </TabPanel>
+      <TabPanel value={value} index={3}>
+        <PropertiesTab />
       </TabPanel>
     </Box>
   );

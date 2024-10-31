@@ -1,11 +1,11 @@
 import { useState, useCallback, useRef } from 'react';
 import { PropertyFormData, Account, Contact } from '../types';
-import { PropertyType } from '@fieldhive/shared';
+import type { PropertyType } from '@fieldhive/shared';
 
 export const usePropertyForm = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [selectedAccounts, setSelectedAccounts] = useState<Account[]>([]);
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -32,7 +32,7 @@ export const usePropertyForm = () => {
     },
     boundary: null,
     location: null,
-    type: PropertyType.RESIDENTIAL,
+    type: 'residential',
   });
 
   const validateAddressForm = useCallback(() => {
@@ -72,6 +72,54 @@ export const usePropertyForm = () => {
     return Object.keys(errors).length === 0;
   }, [propertyData]);
 
+  const validateAccountStep = useCallback(() => {
+    const errors: Record<string, string> = {};
+
+    if (selectedAccounts.length === 0) {
+      errors.accounts = 'Please select at least one account';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  }, [selectedAccounts]);
+
+  const validateLocationStep = useCallback(() => {
+    const errors: Record<string, string> = {};
+
+    if (!propertyData.location) {
+      errors.location = 'Please select a property location';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  }, [propertyData]);
+
+  const validateBoundaryStep = useCallback(() => {
+    const errors: Record<string, string> = {};
+
+    if (!propertyData.boundary) {
+      errors.boundary = 'Please draw the property boundary';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  }, [propertyData]);
+
+  const validateStep = useCallback((step: number) => {
+    switch (step) {
+      case 0: // Address step
+        return validateAddressForm();
+      case 1: // Account step
+        return validateAccountStep();
+      case 2: // Location step
+        return validateLocationStep();
+      case 3: // Boundary step
+        return validateBoundaryStep();
+      default:
+        return true;
+    }
+  }, [validateAddressForm, validateAccountStep, validateLocationStep, validateBoundaryStep]);
+
   const handleFieldChange = useCallback((path: string, value: string) => {
     const parts = path.split('.');
     setPropertyData(prev => {
@@ -86,10 +134,20 @@ export const usePropertyForm = () => {
     setFormErrors(prev => ({ ...prev, [path]: '' }));
   }, []);
 
+  const handleNext = useCallback(() => {
+    if (validateStep(activeStep)) {
+      setActiveStep(prev => prev + 1);
+    }
+  }, [activeStep, validateStep]);
+
+  const handleBack = useCallback(() => {
+    setActiveStep(prev => prev - 1);
+  }, []);
+
   const reset = useCallback(() => {
     setActiveStep(0);
     setAccounts([]);
-    setSelectedAccount(null);
+    setSelectedAccounts([]);
     setShowAddAccount(false);
     setFormErrors({});
     setContacts([]);
@@ -115,7 +173,7 @@ export const usePropertyForm = () => {
       },
       boundary: null,
       location: null,
-      type: PropertyType.RESIDENTIAL,
+      type: 'residential',
     });
   }, []);
 
@@ -124,8 +182,8 @@ export const usePropertyForm = () => {
     setActiveStep,
     accounts,
     setAccounts,
-    selectedAccount,
-    setSelectedAccount,
+    selectedAccounts,
+    setSelectedAccounts,
     showAddAccount,
     setShowAddAccount,
     formErrors,
@@ -135,7 +193,12 @@ export const usePropertyForm = () => {
     propertyData,
     setPropertyData,
     validateAddressForm,
+    validateLocationStep,
+    validateBoundaryStep,
+    validateStep,
     handleFieldChange,
+    handleNext,
+    handleBack,
     reset,
   };
 };

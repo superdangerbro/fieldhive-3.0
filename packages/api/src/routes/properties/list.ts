@@ -42,10 +42,17 @@ export const listProperties = async (req: Request, res: Response) => {
         }
 
         if (search) {
-            query.andWhere(
-                'p.name ILIKE :search OR ba.address1 ILIKE :search OR sa.address1 ILIKE :search',
-                { search: `%${search}%` }
-            );
+            // Check if search is a UUID (property_id)
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search as string);
+            
+            if (isUUID) {
+                query.andWhere('p.property_id = :propertyId', { propertyId: search });
+            } else {
+                query.andWhere(
+                    'p.name ILIKE :search OR ba.address1 ILIKE :search OR sa.address1 ILIKE :search',
+                    { search: `%${search}%` }
+                );
+            }
         }
 
         const [properties, total] = await Promise.all([
