@@ -1,4 +1,4 @@
-import { Property, CreatePropertyDto, UpdatePropertyDto, PropertiesResponse, Account, CreateAccountDto, UpdateAccountDto, AccountsResponse, Job, JobsResponse, UpdateJobDto, CreateJobDto, Address, CreateAddressDto, UpdateAddressDto } from '@fieldhive/shared';
+import { Property, CreatePropertyDto, UpdatePropertyDto, PropertiesResponse, Account, CreateAccountDto, UpdateAccountDto, AccountsResponse, Job, JobsResponse, UpdateJobDto, CreateJobDto, Address, CreateAddressDto, UpdateAddressDto, PropertyType, PropertyStatus } from '@fieldhive/shared';
 
 export const API_ENDPOINTS = {
     PROPERTIES: '/properties',
@@ -11,6 +11,39 @@ export const API_ENDPOINTS = {
 
 class Api {
     private baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+
+    // Property metadata methods
+    async updatePropertyMetadata(id: string, metadata: { property_type?: PropertyType; status?: PropertyStatus }): Promise<Property> {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.PROPERTIES}/${id}/metadata`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(metadata),
+        });
+        if (!response.ok) {
+            throw new Error('Failed to update property metadata');
+        }
+        return response.json();
+    }
+
+    // Property location methods
+    async getPropertyLocation(id: string): Promise<any> {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.PROPERTIES}/${id}/location`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch property location');
+        }
+        return response.json();
+    }
+
+    // Property addresses methods
+    async getPropertyAddresses(id: string): Promise<{ billing_address: Address | null, service_address: Address | null }> {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.PROPERTIES}/${id}/addresses`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch property addresses');
+        }
+        return response.json();
+    }
 
     // Address methods
     async getAddress(id: string): Promise<Address> {
@@ -330,6 +363,9 @@ export const updateProperty = api.updateProperty.bind(api);
 export const deleteProperty = api.deleteProperty.bind(api);
 export const archiveProperty = api.archiveProperty.bind(api);
 export const getPropertyAccounts = api.getPropertyAccounts.bind(api);
+export const getPropertyLocation = api.getPropertyLocation.bind(api);
+export const getPropertyAddresses = api.getPropertyAddresses.bind(api);
+export const updatePropertyMetadata = api.updatePropertyMetadata.bind(api);
 export const getJobs = api.getJobs.bind(api);
 export const getJobTypes = api.getJobTypes.bind(api);
 export const createJob = api.createJob.bind(api);

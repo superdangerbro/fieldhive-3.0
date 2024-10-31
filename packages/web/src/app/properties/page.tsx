@@ -41,9 +41,14 @@ export default function PropertiesPage() {
 
   const handlePropertiesLoad = (loadedProperties: Property[]) => {
     setProperties(loadedProperties);
-    // If the selected property no longer exists in the loaded properties, clear it
-    if (selectedProperty && !loadedProperties.find(p => p.property_id === selectedProperty.property_id)) {
-      setSelectedProperty(null);
+    // If the selected property exists in loaded properties, update it
+    if (selectedProperty) {
+      const updatedProperty = loadedProperties.find(p => p.property_id === selectedProperty.property_id);
+      if (updatedProperty) {
+        setSelectedProperty(updatedProperty);
+      } else {
+        setSelectedProperty(null);
+      }
     }
   };
 

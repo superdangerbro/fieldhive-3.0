@@ -13,11 +13,23 @@ interface MapDialogProps {
   initialLocation: [number, number];
   mode: 'marker' | 'polygon';
   onLocationSelect?: (coordinates: [number, number]) => void;
-  onBoundarySelect?: (polygon: any) => void;
+  onBoundarySelect?: (polygon: {
+    type: 'Polygon';
+    coordinates: Array<Array<[number, number]>>;
+  }) => void;
   title?: string;
+  initialBoundary?: {
+    type: string;
+    coordinates: Array<Array<[number, number]>>;
+  };
 }
 
 const APP_THEME_COLOR = '#6366f1';
+
+// Helper function to compare coordinates
+function areCoordinatesEqual(coord1: [number, number], coord2: [number, number]): boolean {
+  return coord1[0] === coord2[0] && coord1[1] === coord2[1];
+}
 
 export default function MapDialog({ 
   open, 
@@ -26,16 +38,35 @@ export default function MapDialog({
   mode,
   onLocationSelect,
   onBoundarySelect,
-  title = 'Edit Location'
+  title = 'Edit Location',
+  initialBoundary
 }: MapDialogProps) {
   const [selectedLocation, setSelectedLocation] = useState<[number, number]>(initialLocation);
   const [cssLoaded, setCssLoaded] = useState(false);
-  const [polygonPoints, setPolygonPoints] = useState<number[][]>([]);
-  const [history, setHistory] = useState<number[][][]>([]);
+  const [polygonPoints, setPolygonPoints] = useState<Array<[number, number]>>([]);
+  const [history, setHistory] = useState<Array<Array<[number, number]>>>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [drawingInstructions, setDrawingInstructions] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const dragTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Initialize polygon points from initialBoundary if provided
+  useEffect(() => {
+    if (mode === 'polygon' && initialBoundary?.coordinates?.[0]) {
+      console.log('Initializing polygon with boundary:', initialBoundary);
+      // Remove the last point if it's the same as the first (closing point)
+      const points = initialBoundary.coordinates[0];
+      const uniquePoints = areCoordinatesEqual(
+        points[0], 
+        points[points.length - 1]
+      ) ? points.slice(0, -1) : points;
+      
+      setPolygonPoints(uniquePoints);
+      setHistory([uniquePoints]);
+      setHistoryIndex(0);
+      setDrawingInstructions(false);
+    }
+  }, [mode, initialBoundary]);
 
   useEffect(() => {
     if (!open) return;
@@ -62,7 +93,7 @@ export default function MapDialog({
     };
   }, [open]);
 
-  const addToHistory = (points: number[][]) => {
+  const addToHistory = (points: Array<[number, number]>) => {
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(points);
     setHistory(newHistory);
@@ -104,8 +135,10 @@ export default function MapDialog({
       console.log('Map clicked (marker):', { lat, lng });
       setSelectedLocation([lat, lng]);
     } else if (mode === 'polygon') {
+      const newPoint: [number, number] = [lng, lat];
+      
       if (polygonPoints.length < 2) {
-        const newPoints = [...polygonPoints, [lng, lat]];
+        const newPoints = [...polygonPoints, newPoint];
         setPolygonPoints(newPoints);
         addToHistory(newPoints);
         setDrawingInstructions(false);
@@ -115,9 +148,9 @@ export default function MapDialog({
 
         for (let i = 0; i < polygonPoints.length - 1; i++) {
           const distance = distanceToLineSegment(
-            [lng, lat],
-            polygonPoints[i] as [number, number],
-            polygonPoints[i + 1] as [number, number]
+            newPoint,
+            polygonPoints[i],
+            polygonPoints[i + 1]
           );
           if (distance < minDistance) {
             minDistance = distance;
@@ -128,13 +161,13 @@ export default function MapDialog({
         if (minDistance < 0.0001) {
           const newPoints = [
             ...polygonPoints.slice(0, insertIndex),
-            [lng, lat],
+            newPoint,
             ...polygonPoints.slice(insertIndex)
           ];
           setPolygonPoints(newPoints);
           addToHistory(newPoints);
         } else {
-          const newPoints = [...polygonPoints, [lng, lat]];
+          const newPoints = [...polygonPoints, newPoint];
           setPolygonPoints(newPoints);
           addToHistory(newPoints);
         }
@@ -190,7 +223,12 @@ export default function MapDialog({
       console.log('Saving location:', selectedLocation);
       onLocationSelect(selectedLocation);
     } else if (mode === 'polygon' && onBoundarySelect && polygonPoints.length >= 3) {
-      const closedPolygon = [...polygonPoints, polygonPoints[0]];
+      // Create a properly typed closed polygon
+      const closedPolygon: Array<[number, number]> = [...polygonPoints];
+      if (!areCoordinatesEqual(closedPolygon[0], closedPolygon[closedPolygon.length - 1])) {
+        closedPolygon.push([...closedPolygon[0]]);
+      }
+      
       console.log('Saving polygon:', closedPolygon);
       onBoundarySelect({
         type: 'Polygon',

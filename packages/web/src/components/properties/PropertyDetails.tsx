@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, Divider, SelectChangeEvent } from '@mui/material';
 import type { Property, PropertyType, PropertyStatus, Address } from '@fieldhive/shared';
-import { deleteProperty, updateProperty, getSetting, getAddress } from '../../services/api';
+import { deleteProperty, updatePropertyMetadata, getSetting, getPropertyAddresses } from '../../services/api';
 import dynamic from 'next/dynamic';
 
 import PropertyHeader from './PropertyHeader';
@@ -11,8 +11,6 @@ import PropertyMetadata from './PropertyMetadata';
 import PropertyAddresses from './PropertyAddresses';
 import PropertyLocation from './PropertyLocation';
 import PropertyTabs from './PropertyTabs';
-
-const MapDialog = dynamic(() => import('../common/MapDialog'), { ssr: false });
 
 interface PropertyDetailsProps {
   property: Property | null;
@@ -23,7 +21,6 @@ interface PropertyDetailsProps {
 
 const DEFAULT_STATUSES: PropertyStatus[] = ['active', 'inactive', 'archived', 'pending'];
 const DEFAULT_PROPERTY_TYPES: PropertyType[] = ['residential', 'commercial', 'industrial', 'agricultural', 'other'];
-const DEFAULT_LOCATION: [number, number] = [-123.1207, 49.2827]; // Vancouver [lng, lat]
 
 export default function PropertyDetails({ property, onEdit, onUpdate, onPropertySelect }: PropertyDetailsProps) {
   const [tabValue, setTabValue] = useState(0);
@@ -35,7 +32,6 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>(DEFAULT_PROPERTY_TYPES);
   const [serviceAddress, setServiceAddress] = useState<Address | null>(null);
   const [billingAddress, setBillingAddress] = useState<Address | null>(null);
-  const [mapDialogOpen, setMapDialogOpen] = useState(false);
 
   useEffect(() => {
     getSetting('property_statuses')
@@ -58,21 +54,12 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
   useEffect(() => {
     if (property) {
       // Fetch addresses
-      if (property.service_address_id) {
-        getAddress(property.service_address_id)
-          .then(setServiceAddress)
-          .catch(console.error);
-      } else {
-        setServiceAddress(null);
-      }
-
-      if (property.billing_address_id) {
-        getAddress(property.billing_address_id)
-          .then(setBillingAddress)
-          .catch(console.error);
-      } else {
-        setBillingAddress(null);
-      }
+      getPropertyAddresses(property.property_id)
+        .then(({ service_address, billing_address }) => {
+          setServiceAddress(service_address);
+          setBillingAddress(billing_address);
+        })
+        .catch(console.error);
     }
   }, [property]);
 
@@ -96,7 +83,7 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
     if (!property) return;
     setStatusLoading(true);
     try {
-      const updatedProperty = await updateProperty(property.property_id, {
+      const updatedProperty = await updatePropertyMetadata(property.property_id, {
         status: event.target.value as PropertyStatus
       });
       onPropertySelect(updatedProperty);
@@ -112,7 +99,7 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
     if (!property) return;
     setTypeLoading(true);
     try {
-      const updatedProperty = await updateProperty(property.property_id, {
+      const updatedProperty = await updatePropertyMetadata(property.property_id, {
         property_type: event.target.value as PropertyType
       });
       onPropertySelect(updatedProperty);
@@ -122,29 +109,6 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
     } finally {
       setTypeLoading(false);
     }
-  };
-
-  const handleLocationUpdate = async (coordinates: [number, number]) => {
-    if (!property) return;
-    try {
-      const geoJsonCoordinates: [number, number] = [coordinates[1], coordinates[0]];
-      const updatedProperty = await updateProperty(property.property_id, {
-        location: {
-          type: 'Point',
-          coordinates: geoJsonCoordinates
-        }
-      });
-      onPropertySelect(updatedProperty);
-      if (onUpdate) onUpdate();
-      setMapDialogOpen(false);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const getInitialMapLocation = (): [number, number] => {
-    if (!property?.location?.coordinates) return DEFAULT_LOCATION;
-    return [property.location.coordinates[1], property.location.coordinates[0]];
   };
 
   if (!property) return null;
@@ -183,7 +147,7 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
 
           <PropertyLocation
             property={property}
-            onMapClick={() => setMapDialogOpen(true)}
+            onUpdate={onUpdate}
           />
 
           <Divider sx={{ my: 2 }} />
@@ -216,17 +180,6 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
           <Button onClick={handleConfirmDelete} color="error">Delete</Button>
         </DialogActions>
       </Dialog>
-
-      {property && (
-        <MapDialog
-          open={mapDialogOpen}
-          onClose={() => setMapDialogOpen(false)}
-          initialLocation={getInitialMapLocation()}
-          onLocationSelect={handleLocationUpdate}
-          mode="marker"
-          title="Edit Location"
-        />
-      )}
     </>
   );
 }

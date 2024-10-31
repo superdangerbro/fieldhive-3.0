@@ -6,8 +6,7 @@ import { UpdatePropertyDto } from '@fieldhive/shared';
 export const updateProperty = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { 
-        name, 
-        status,
+        name,
         billing_address,
         service_address,
         accounts
@@ -16,6 +15,7 @@ export const updateProperty = async (req: Request, res: Response) => {
     try {
         await AppDataSource.transaction(async (transactionalEntityManager) => {
             // Update or create service address if provided
+            let service_address_id = null;
             if (service_address) {
                 const [existingServiceAddress] = await transactionalEntityManager.query(
                     `SELECT service_address_id FROM properties WHERE property_id = $1`,
@@ -37,6 +37,7 @@ export const updateProperty = async (req: Request, res: Response) => {
                             existingServiceAddress.service_address_id
                         ]
                     );
+                    service_address_id = existingServiceAddress.service_address_id;
                 } else {
                     const [newAddress] = await transactionalEntityManager.query(
                         `INSERT INTO addresses (address1, address2, city, province, postal_code, country)
@@ -51,15 +52,12 @@ export const updateProperty = async (req: Request, res: Response) => {
                             service_address.country || 'Canada'
                         ]
                     );
-
-                    await transactionalEntityManager.query(
-                        `UPDATE properties SET service_address_id = $1 WHERE property_id = $2`,
-                        [newAddress.address_id, id]
-                    );
+                    service_address_id = newAddress.address_id;
                 }
             }
 
             // Update or create billing address if provided
+            let billing_address_id = null;
             if (billing_address) {
                 const [existingBillingAddress] = await transactionalEntityManager.query(
                     `SELECT billing_address_id FROM properties WHERE property_id = $1`,
@@ -81,6 +79,7 @@ export const updateProperty = async (req: Request, res: Response) => {
                             existingBillingAddress.billing_address_id
                         ]
                     );
+                    billing_address_id = existingBillingAddress.billing_address_id;
                 } else {
                     const [newAddress] = await transactionalEntityManager.query(
                         `INSERT INTO addresses (address1, address2, city, province, postal_code, country)
@@ -95,23 +94,49 @@ export const updateProperty = async (req: Request, res: Response) => {
                             billing_address.country || 'Canada'
                         ]
                     );
-
-                    await transactionalEntityManager.query(
-                        `UPDATE properties SET billing_address_id = $1 WHERE property_id = $2`,
-                        [newAddress.address_id, id]
-                    );
+                    billing_address_id = newAddress.address_id;
                 }
             }
 
-            // Update property
-            await transactionalEntityManager.query(
-                `UPDATE properties 
-                SET name = COALESCE($1, name), 
-                    status = COALESCE($2, status),
-                    updated_at = NOW()
-                WHERE property_id = $3`,
-                [name, status, id]
-            );
+            // Build the update query for property fields
+            const updates = [];
+            const params = [];
+            let paramCount = 1;
+
+            if (name !== undefined) {
+                updates.push(`name = $${paramCount}`);
+                params.push(name);
+                paramCount++;
+            }
+
+            if (service_address_id !== null) {
+                updates.push(`service_address_id = $${paramCount}`);
+                params.push(service_address_id);
+                paramCount++;
+            }
+
+            if (billing_address_id !== null) {
+                updates.push(`billing_address_id = $${paramCount}`);
+                params.push(billing_address_id);
+                paramCount++;
+            }
+
+            updates.push(`updated_at = NOW()`);
+
+            // Update property if there are fields to update
+            if (updates.length > 0) {
+                const updateQuery = `
+                    UPDATE properties 
+                    SET ${updates.join(', ')}
+                    WHERE property_id = $${paramCount}
+                `;
+                logger.info('Executing update query:', {
+                    query: updateQuery,
+                    params: [...params, id]
+                });
+                
+                await transactionalEntityManager.query(updateQuery, [...params, id]);
+            }
 
             // Update accounts if provided
             if (accounts) {
@@ -129,7 +154,7 @@ export const updateProperty = async (req: Request, res: Response) => {
 
                     await transactionalEntityManager.query(
                         `INSERT INTO properties_accounts (property_id, account_id) VALUES ${values}`,
-                        [id, ...accounts]
+                        [id, ...accounts.map(a => a.account_id)]
                     );
                 }
             }
@@ -138,24 +163,20 @@ export const updateProperty = async (req: Request, res: Response) => {
             const [updatedProperty] = await transactionalEntityManager.query(
                 `SELECT 
                     p.*,
-                    json_build_object(
-                        'address_id', ba.address_id,
-                        'address1', ba.address1,
-                        'address2', ba.address2,
-                        'city', ba.city,
-                        'province', ba.province,
-                        'postal_code', ba.postal_code,
-                        'country', ba.country
-                    ) AS billing_address,
-                    json_build_object(
-                        'address_id', sa.address_id,
-                        'address1', sa.address1,
-                        'address2', sa.address2,
-                        'city', sa.city,
-                        'province', sa.province,
-                        'postal_code', sa.postal_code,
-                        'country', sa.country
-                    ) AS service_address,
+                    ba.address_id as billing_address_id,
+                    ba.address1 as billing_address1,
+                    ba.address2 as billing_address2,
+                    ba.city as billing_city,
+                    ba.province as billing_province,
+                    ba.postal_code as billing_postal_code,
+                    ba.country as billing_country,
+                    sa.address_id as service_address_id,
+                    sa.address1 as service_address1,
+                    sa.address2 as service_address2,
+                    sa.city as service_city,
+                    sa.province as service_province,
+                    sa.postal_code as service_postal_code,
+                    sa.country as service_country,
                     COALESCE(
                         (
                             SELECT json_agg(
@@ -177,13 +198,63 @@ export const updateProperty = async (req: Request, res: Response) => {
                 [id]
             );
 
-            res.json(updatedProperty);
+            // Format the response to match the Property type
+            const response = {
+                ...updatedProperty,
+                billing_address: updatedProperty.billing_address_id ? {
+                    address_id: updatedProperty.billing_address_id,
+                    address1: updatedProperty.billing_address1,
+                    address2: updatedProperty.billing_address2,
+                    city: updatedProperty.billing_city,
+                    province: updatedProperty.billing_province,
+                    postal_code: updatedProperty.billing_postal_code,
+                    country: updatedProperty.billing_country
+                } : null,
+                service_address: updatedProperty.service_address_id ? {
+                    address_id: updatedProperty.service_address_id,
+                    address1: updatedProperty.service_address1,
+                    address2: updatedProperty.service_address2,
+                    city: updatedProperty.service_city,
+                    province: updatedProperty.service_province,
+                    postal_code: updatedProperty.service_postal_code,
+                    country: updatedProperty.service_country
+                } : null
+            };
+
+            // Clean up the response by removing the flattened address fields
+            delete response.billing_address_id;
+            delete response.billing_address1;
+            delete response.billing_address2;
+            delete response.billing_city;
+            delete response.billing_province;
+            delete response.billing_postal_code;
+            delete response.billing_country;
+            delete response.service_address_id;
+            delete response.service_address1;
+            delete response.service_address2;
+            delete response.service_city;
+            delete response.service_province;
+            delete response.service_postal_code;
+            delete response.service_country;
+
+            res.json(response);
         });
     } catch (error) {
-        logger.error('Error updating property:', error);
+        logger.error('Error updating property:', {
+            propertyId: id,
+            error: error instanceof Error ? {
+                message: error.message,
+                stack: error.stack,
+                name: error.name
+            } : error,
+            requestBody: req.body
+        });
+
+        // Send a more detailed error message to the client
         res.status(500).json({
             error: 'Internal server error',
-            message: 'Failed to update property'
+            message: error instanceof Error ? error.message : 'Failed to update property',
+            details: error instanceof Error ? error.stack : String(error)
         });
     }
 };

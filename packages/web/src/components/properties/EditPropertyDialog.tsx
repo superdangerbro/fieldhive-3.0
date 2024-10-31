@@ -171,7 +171,9 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
                 name: formData.name,
                 service_address: formData.service_address,
                 billing_address: sameAsService ? formData.service_address : formData.billing_address,
-                accounts: formData.accounts.map(a => a.account_id)
+                accounts: formData.accounts.map(a => ({
+                    account_id: a.account_id
+                }))
             };
 
             await updateProperty(property.property_id, propertyData);

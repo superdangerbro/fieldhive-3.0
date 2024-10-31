@@ -3,11 +3,7 @@ import { createAccount } from './accounts/create';
 import { updateAccount } from './accounts/update';
 import { listAccounts } from './accounts/list';
 import { deleteAccount, archiveAccount } from './accounts/delete';
-import { listProperties } from './properties/list';
-import { createProperty } from './properties/create';
-import { updateProperty } from './properties/update';
-import { deleteProperty, archiveProperty } from './properties/delete';
-import { getPropertyAccounts } from './properties/accounts';
+import propertiesRouter from './properties';
 import jobsRouter from './jobs';
 import settingsRouter from './settings';
 import addressesRouter from './addresses';
@@ -23,13 +19,8 @@ router.put('/accounts/:id', updateAccount);
 router.delete('/accounts/:id', deleteAccount);
 router.post('/accounts/:id/archive', archiveAccount);
 
-// Property routes
-router.get('/properties', listProperties);
-router.post('/properties', createProperty);
-router.put('/properties/:id', updateProperty);
-router.delete('/properties/:id', deleteProperty);
-router.post('/properties/:id/archive', archiveProperty);
-router.get('/properties/:id/accounts', getPropertyAccounts);
+// Properties routes
+router.use('/properties', propertiesRouter);
 
 // Jobs routes
 router.use('/jobs', jobsRouter);
