@@ -2,109 +2,158 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../../config/database';
 import { logger } from '../../utils/logger';
 import { CreatePropertyDto } from '@fieldhive/shared';
+import { Property } from '../../entities/Property';
+import { Address } from '../../entities/Address';
+import { Account } from '../../entities/Account';
+
+interface PostgresError extends Error {
+    code?: string;
+    detail?: string;
+    query?: string;
+}
 
 export const createProperty = async (req: Request, res: Response) => {
     try {
         const { 
-            name, 
+            name,
+            property_type,
+            location,
+            boundary,
             billing_address,
-            service_address
+            service_address,
+            account_id
         } = req.body as CreatePropertyDto;
 
-        if (!name) {
+        logger.info('Creating property with data:', JSON.stringify({
+            name,
+            property_type,
+            location,
+            boundary,
+            service_address,
+            billing_address,
+            account_id
+        }, null, 2));
+
+        // Validate required fields
+        if (!service_address) {
             return res.status(400).json({
                 error: 'Bad request',
-                message: 'Name is required'
+                message: 'Service address is required'
             });
         }
 
-        await AppDataSource.transaction(async (transactionalEntityManager) => {
-            let billing_address_id = null;
-            let service_address_id = null;
+        if (!account_id || !location) {
+            return res.status(400).json({
+                error: 'Bad request',
+                message: 'Account ID and location are required'
+            });
+        }
 
-            // Create billing address if provided
-            if (billing_address) {
-                const [newBillingAddress] = await transactionalEntityManager.query(
-                    `INSERT INTO addresses (
-                        address1, address2, city, province, postal_code, country
-                    ) VALUES ($1, $2, $3, $4, $5, $6)
-                    RETURNING address_id`,
-                    [
-                        billing_address.address1,
-                        billing_address.address2 || null,
-                        billing_address.city,
-                        billing_address.province,
-                        billing_address.postal_code,
-                        billing_address.country || 'Canada'
-                    ]
-                );
-                billing_address_id = newBillingAddress.address_id;
-            }
+        // Validate GeoJSON format
+        if (!location.type || !location.coordinates || !Array.isArray(location.coordinates) || location.coordinates.length !== 2) {
+            return res.status(400).json({
+                error: 'Bad request',
+                message: 'Invalid location format. Expected GeoJSON Point with [longitude, latitude] coordinates.'
+            });
+        }
 
-            // Create service address if provided
-            if (service_address) {
-                const [newServiceAddress] = await transactionalEntityManager.query(
-                    `INSERT INTO addresses (
-                        address1, address2, city, province, postal_code, country
-                    ) VALUES ($1, $2, $3, $4, $5, $6)
-                    RETURNING address_id`,
-                    [
-                        service_address.address1,
-                        service_address.address2 || null,
-                        service_address.city,
-                        service_address.province,
-                        service_address.postal_code,
-                        service_address.country || 'Canada'
-                    ]
-                );
-                service_address_id = newServiceAddress.address_id;
-            }
+        try {
+            const result = await AppDataSource.transaction(async (transactionalEntityManager) => {
+                // Set timezone for this transaction
+                await transactionalEntityManager.query(`SET TIME ZONE 'America/Vancouver'`);
 
-            // Create property
-            const [property] = await transactionalEntityManager.query(
-                `INSERT INTO properties (
-                    name, billing_address_id, service_address_id
-                ) VALUES ($1, $2, $3)
-                RETURNING property_id`,
-                [name, billing_address_id, service_address_id]
-            );
+                // Create service address
+                logger.info('Creating service address...');
+                const newServiceAddress = new Address();
+                newServiceAddress.address1 = service_address.address1;
+                newServiceAddress.address2 = service_address.address2 || undefined;
+                newServiceAddress.city = service_address.city;
+                newServiceAddress.province = service_address.province;
+                newServiceAddress.postal_code = service_address.postal_code;
+                newServiceAddress.country = service_address.country || 'Canada';
+                const savedServiceAddress = await transactionalEntityManager.save(newServiceAddress);
+                logger.info('Service address created:', savedServiceAddress.address_id);
 
-            // Get full property details with addresses
-            const [fullProperty] = await transactionalEntityManager.query(
-                `SELECT 
-                    p.*,
-                    json_build_object(
-                        'address_id', ba.address_id,
-                        'address1', ba.address1,
-                        'address2', ba.address2,
-                        'city', ba.city,
-                        'province', ba.province,
-                        'postal_code', ba.postal_code,
-                        'country', ba.country
-                    ) AS billing_address,
-                    json_build_object(
-                        'address_id', sa.address_id,
-                        'address1', sa.address1,
-                        'address2', sa.address2,
-                        'city', sa.city,
-                        'province', sa.province,
-                        'postal_code', sa.postal_code,
-                        'country', sa.country
-                    ) AS service_address
-                FROM properties p
-                LEFT JOIN addresses ba ON ba.address_id = p.billing_address_id
-                LEFT JOIN addresses sa ON sa.address_id = p.service_address_id
-                WHERE p.property_id = $1`,
-                [property.property_id]
-            );
+                // Create billing address if provided, otherwise use service address
+                let savedBillingAddress;
+                if (billing_address) {
+                    logger.info('Creating billing address...');
+                    const newBillingAddress = new Address();
+                    newBillingAddress.address1 = billing_address.address1;
+                    newBillingAddress.address2 = billing_address.address2 || undefined;
+                    newBillingAddress.city = billing_address.city;
+                    newBillingAddress.province = billing_address.province;
+                    newBillingAddress.postal_code = billing_address.postal_code;
+                    newBillingAddress.country = billing_address.country || 'Canada';
+                    savedBillingAddress = await transactionalEntityManager.save(newBillingAddress);
+                    logger.info('Billing address created:', savedBillingAddress.address_id);
+                } else {
+                    savedBillingAddress = savedServiceAddress;
+                    logger.info('Using service address as billing address');
+                }
 
-            res.status(201).json(fullProperty);
-        });
+                // Find the account
+                const account = await transactionalEntityManager.findOne(Account, {
+                    where: { id: account_id }
+                });
+
+                if (!account) {
+                    throw new Error(`Account not found with ID: ${account_id}`);
+                }
+
+                // Create property
+                logger.info('Creating property...');
+                const property = new Property();
+                property.name = name || service_address.address1;
+                property.property_type = property_type || 'residential';
+                property.location = location;
+                property.boundary = boundary;
+                property.billing_address = savedBillingAddress;
+                property.service_address = savedServiceAddress;
+                property.status = 'active';
+                property.accounts = [account];
+
+                const savedProperty = await transactionalEntityManager.save(property);
+                logger.info('Property created:', savedProperty.property_id);
+
+                // Fetch full property details
+                logger.info('Fetching full property details...');
+                const fullProperty = await transactionalEntityManager
+                    .createQueryBuilder(Property, 'p')
+                    .leftJoinAndSelect('p.billing_address', 'ba')
+                    .leftJoinAndSelect('p.service_address', 'sa')
+                    .leftJoinAndSelect('p.accounts', 'a')
+                    .where('p.property_id = :id', { id: savedProperty.property_id })
+                    .getOne();
+
+                return fullProperty;
+            });
+
+            res.status(201).json(result);
+        } catch (error) {
+            const txError = error as PostgresError;
+            logger.error('Transaction error:', txError);
+            logger.error('Transaction error details:', {
+                message: txError.message,
+                stack: txError.stack,
+                code: txError.code,
+                detail: txError.detail,
+                query: txError.query
+            });
+            throw txError;
+        }
     } catch (error) {
         logger.error('Error creating property:', error);
+        const err = error as PostgresError;
         res.status(500).json({
             error: 'Internal server error',
-            message: 'Failed to create property'
+            message: err.message,
+            details: {
+                stack: err.stack,
+                code: err.code,
+                detail: err.detail,
+                query: err.query
+            }
         });
     }
 };

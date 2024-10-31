@@ -8,6 +8,7 @@ import { PropertyFormData, Account, Contact } from '../types';
 
 interface StepContentProps {
   step: number;
+  setActiveStep: (step: number) => void;
   propertyData: PropertyFormData;
   setPropertyData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
   formErrors: Record<string, string>;
@@ -25,6 +26,7 @@ interface StepContentProps {
 
 export const StepContent: React.FC<StepContentProps> = ({
   step,
+  setActiveStep,
   propertyData,
   setPropertyData,
   formErrors,
@@ -39,6 +41,10 @@ export const StepContent: React.FC<StepContentProps> = ({
   contacts,
   setContacts,
 }) => {
+  const handleEditLocation = () => {
+    setActiveStep(2); // Jump to Location step
+  };
+
   switch (step) {
     case 0:
       return (
@@ -47,6 +53,7 @@ export const StepContent: React.FC<StepContentProps> = ({
           setPropertyData={setPropertyData}
           formErrors={formErrors}
           handleFieldChange={handleFieldChange}
+          onEditLocation={handleEditLocation}
         />
       );
     case 1:

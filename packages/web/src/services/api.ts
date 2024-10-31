@@ -153,6 +153,14 @@ class Api {
         return response.json();
     }
 
+    async getPropertyAccounts(propertyId: string): Promise<Account[]> {
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.PROPERTIES}/${propertyId}/accounts`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch property accounts');
+        }
+        return response.json();
+    }
+
     // Account methods
     async getAccounts(params?: { search?: string; limit?: number; offset?: number }): Promise<AccountsResponse> {
         const searchParams = new URLSearchParams();
@@ -321,6 +329,7 @@ export const createProperty = api.createProperty.bind(api);
 export const updateProperty = api.updateProperty.bind(api);
 export const deleteProperty = api.deleteProperty.bind(api);
 export const archiveProperty = api.archiveProperty.bind(api);
+export const getPropertyAccounts = api.getPropertyAccounts.bind(api);
 export const getJobs = api.getJobs.bind(api);
 export const getJobTypes = api.getJobTypes.bind(api);
 export const createJob = api.createJob.bind(api);

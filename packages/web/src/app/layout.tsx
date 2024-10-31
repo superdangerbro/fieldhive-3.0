@@ -1,5 +1,4 @@
 import './globals.css';
-import 'mapbox-gl/dist/mapbox-gl.css';
 import { Providers } from './providers';
 
 export const metadata = {

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { listProperties } from './list';
-import createProperty from './create';
-import updateProperty from './update';
+import { createProperty } from './create';
+import { updateProperty } from './update';
 import db from '../../config/database';
 
 const router = Router();
@@ -28,7 +28,7 @@ router.delete('/:id', async (req, res) => {
 
         // Delete property
         const deleteResult = await db.query(
-            'DELETE FROM properties WHERE id = $1',
+            'DELETE FROM properties WHERE property_id = $1',
             [id]
         );
 

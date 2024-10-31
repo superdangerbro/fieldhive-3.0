@@ -1,23 +1,24 @@
-import React, { useEffect } from 'react';
+'use client';
+
+import React from 'react';
 import {
   Box,
-  Button,
-  TextField,
   Typography,
-  Autocomplete,
-  IconButton,
-  Collapse,
   Alert,
   Divider,
-  Chip,
+  TextField,
+  Button,
+  IconButton,
+  Collapse,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { Account, Contact } from '../types';
+import AccountSelector, { MinimalAccount } from '../AccountSelector';
 
 interface AccountStepProps {
-  selectedAccounts: Account[];
-  setSelectedAccounts: (accounts: Account[]) => void;
+  selectedAccounts: MinimalAccount[];
+  setSelectedAccounts: (accounts: MinimalAccount[]) => void;
   accounts: Account[];
   showAddAccount: boolean;
   setShowAddAccount: (show: boolean) => void;
@@ -29,17 +30,19 @@ interface AccountStepProps {
 export const AccountStep: React.FC<AccountStepProps> = ({
   selectedAccounts,
   setSelectedAccounts,
-  accounts,
   showAddAccount,
   setShowAddAccount,
-  fetchAccounts,
   contacts,
   setContacts,
 }) => {
-  // Fetch accounts when component mounts
-  useEffect(() => {
-    fetchAccounts();
-  }, [fetchAccounts]);
+  const handleContactChange = (index: number, field: keyof Contact, value: string) => {
+    const newContacts = [...contacts];
+    newContacts[index] = {
+      ...newContacts[index],
+      [field]: value,
+    };
+    setContacts(newContacts);
+  };
 
   const handleAddContact = () => {
     setContacts([
@@ -59,59 +62,18 @@ export const AccountStep: React.FC<AccountStepProps> = ({
     setContacts(contacts.filter((_, i) => i !== index));
   };
 
-  const handleContactChange = (index: number, field: keyof Contact, value: string) => {
-    const newContacts = [...contacts];
-    newContacts[index] = {
-      ...newContacts[index],
-      [field]: value,
-    };
-    setContacts(newContacts);
-  };
-
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
       <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
         Select Accounts
       </Typography>
-      <Autocomplete
-        multiple
-        value={selectedAccounts}
-        onChange={(_, newValue) => {
-          setSelectedAccounts(newValue);
-          setShowAddAccount(newValue.length === 0);
+      
+      <AccountSelector
+        selectedAccounts={selectedAccounts}
+        onChange={(accounts) => {
+          setSelectedAccounts(accounts);
+          setShowAddAccount(accounts.length === 0);
         }}
-        options={accounts}
-        getOptionLabel={(option) => option.name}
-        isOptionEqualToValue={(option, value) => option.id === value.id}
-        loading={accounts.length === 0}
-        loadingText="Loading accounts..."
-        renderTags={(value, getTagProps) =>
-          value.map((option, index) => (
-            <Chip
-              label={option.name}
-              {...getTagProps({ index })}
-              key={option.id}
-            />
-          ))
-        }
-        noOptionsText={
-          <Button 
-            onClick={() => setShowAddAccount(true)}
-            startIcon={<AddIcon />}
-            fullWidth
-          >
-            Create New Account
-          </Button>
-        }
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            label="Search Accounts"
-            size="small"
-            fullWidth
-            placeholder={selectedAccounts.length === 0 ? "Select accounts" : ""}
-          />
-        )}
       />
 
       <Collapse in={showAddAccount}>
@@ -127,8 +89,8 @@ export const AccountStep: React.FC<AccountStepProps> = ({
             label="Account Name"
             value={selectedAccounts.length === 1 ? selectedAccounts[0].name : ''}
             onChange={(e) => setSelectedAccounts([{ 
-              id: 'new', 
-              name: e.target.value 
+              account_id: 'new', 
+              name: e.target.value
             }])}
             fullWidth
             size="small"

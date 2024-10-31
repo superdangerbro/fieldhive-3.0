@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, ManyToMany } from 'typeorm';
 import { Property } from './Property';
 import { Address } from './Address';
 
@@ -20,7 +20,7 @@ export class Account {
     @JoinColumn({ name: 'billing_address_id' })
     billingAddress: Address | null;
 
-    @OneToMany(() => Property, property => property.account)
+    @ManyToMany(() => Property, property => property.accounts)
     properties: Property[];
 
     @CreateDateColumn({ name: 'created_at' })

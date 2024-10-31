@@ -31,6 +31,22 @@ export const listProperties = async (req: Request, res: Response) => {
                     'country', sa.country
                 ) as service_address
             `)
+            .addSelect(`
+                COALESCE(
+                    (
+                        SELECT json_agg(
+                            json_build_object(
+                                'account_id', a.account_id,
+                                'name', a.name
+                            )
+                        )
+                        FROM properties_accounts pa2
+                        JOIN accounts a ON a.account_id = pa2.account_id
+                        WHERE pa2.property_id = p.property_id
+                    ),
+                    '[]'::json
+                ) as accounts
+            `)
             .from('properties', 'p')
             .leftJoin('addresses', 'ba', 'ba.address_id = p.billing_address_id')
             .leftJoin('addresses', 'sa', 'sa.address_id = p.service_address_id');

@@ -1,7 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, ManyToMany, JoinTable } from 'typeorm';
 import { Point, Polygon } from 'geojson';
-import { Account } from './Account';
 import { Address } from './Address';
+import { Account } from './Account';
 
 @Entity('properties')
 export class Property {
@@ -29,7 +29,6 @@ export class Property {
     @Column({
         name: 'property_type',
         type: 'text',
-        collation: 'aa_DJ',
         default: 'residential'
     })
     property_type: string;
@@ -39,13 +38,6 @@ export class Property {
         default: 'active'
     })
     status: string;
-
-    @Column({ name: 'account_id' })
-    account_id: string;
-
-    @ManyToOne(() => Account, account => account.properties)
-    @JoinColumn({ name: 'account_id' })
-    account: Account;
 
     @Column({ name: 'billing_address_id', nullable: true })
     billing_address_id: string;
@@ -60,6 +52,20 @@ export class Property {
     @ManyToOne(() => Address)
     @JoinColumn({ name: 'service_address_id' })
     service_address: Address;
+
+    @ManyToMany(() => Account)
+    @JoinTable({
+        name: 'properties_accounts',
+        joinColumn: {
+            name: 'property_id',
+            referencedColumnName: 'property_id'
+        },
+        inverseJoinColumn: {
+            name: 'account_id',
+            referencedColumnName: 'id'
+        }
+    })
+    accounts: Account[];
 
     @CreateDateColumn({ name: 'created_at' })
     created_at: Date;

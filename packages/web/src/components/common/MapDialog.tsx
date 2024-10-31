@@ -1,149 +1,230 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, ToggleButton, ToggleButtonGroup } from '@mui/material';
-import mapboxgl from 'mapbox-gl';
-import MapboxDraw from '@mapbox/mapbox-gl-draw';
-import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
-import 'mapbox-gl/dist/mapbox-gl.css';
-import { Point, Polygon } from 'geojson';
+import React, { useState, useEffect, useRef } from 'react';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography, IconButton } from '@mui/material';
+import Map, { Marker, NavigationControl, Source, Layer } from 'react-map-gl';
+import DeleteIcon from '@mui/icons-material/Delete';
+import UndoIcon from '@mui/icons-material/Undo';
+import RedoIcon from '@mui/icons-material/Redo';
 
 interface MapDialogProps {
   open: boolean;
   onClose: () => void;
-  initialLocation?: [number, number];
+  initialLocation: [number, number];
   mode: 'marker' | 'polygon';
   onLocationSelect?: (coordinates: [number, number]) => void;
-  onBoundarySelect?: (polygon: Polygon) => void;
+  onBoundarySelect?: (polygon: any) => void;
   title?: string;
 }
+
+const APP_THEME_COLOR = '#6366f1';
 
 export default function MapDialog({ 
   open, 
   onClose, 
-  initialLocation, 
+  initialLocation,
   mode,
   onLocationSelect,
   onBoundarySelect,
   title = 'Edit Location'
 }: MapDialogProps) {
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const marker = useRef<mapboxgl.Marker | null>(null);
-  const draw = useRef<MapboxDraw | null>(null);
-  const [selectedLocation, setSelectedLocation] = useState<[number, number] | undefined>(initialLocation);
-  const [mapInitialized, setMapInitialized] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<[number, number]>(initialLocation);
+  const [cssLoaded, setCssLoaded] = useState(false);
+  const [polygonPoints, setPolygonPoints] = useState<number[][]>([]);
+  const [history, setHistory] = useState<number[][][]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [drawingInstructions, setDrawingInstructions] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (!open || !mapContainer.current || mapInitialized) return;
+    if (!open) return;
 
-    try {
-      const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-      if (!token) {
-        console.error('Mapbox token is not configured');
-        return;
+    // Add Mapbox CSS when dialog opens
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css';
+    document.head.appendChild(link);
+
+    // Wait for CSS to load
+    link.onload = () => {
+      console.log('Mapbox CSS loaded');
+      setCssLoaded(true);
+    };
+
+    return () => {
+      // Remove CSS when dialog closes
+      document.head.removeChild(link);
+      setCssLoaded(false);
+      if (dragTimeout.current) {
+        clearTimeout(dragTimeout.current);
       }
+    };
+  }, [open]);
 
-      mapboxgl.accessToken = token;
+  const addToHistory = (points: number[][]) => {
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(points);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
 
-      const newMap = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/satellite-streets-v12',
-        center: initialLocation || [-123.1207, 49.2827],
-        zoom: initialLocation ? 15 : 11,
-        preserveDrawingBuffer: true
-      });
+  const distanceToLineSegment = (
+    point: [number, number],
+    lineStart: [number, number],
+    lineEnd: [number, number]
+  ): number => {
+    const dx = lineEnd[0] - lineStart[0];
+    const dy = lineEnd[1] - lineStart[1];
+    const len2 = dx * dx + dy * dy;
+    
+    if (len2 === 0) return Math.sqrt(
+      Math.pow(point[0] - lineStart[0], 2) + 
+      Math.pow(point[1] - lineStart[1], 2)
+    );
 
-      newMap.on('load', () => {
-        console.log('Map loaded successfully');
-        setMapInitialized(true);
-      });
+    let t = ((point[0] - lineStart[0]) * dx + (point[1] - lineStart[1]) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
 
-      newMap.on('error', (e) => {
-        console.error('Map error:', e);
-      });
+    const projX = lineStart[0] + t * dx;
+    const projY = lineStart[1] + t * dy;
 
-      map.current = newMap;
+    return Math.sqrt(
+      Math.pow(point[0] - projX, 2) + 
+      Math.pow(point[1] - projY, 2)
+    );
+  };
 
-      if (mode === 'marker') {
-        const newMarker = new mapboxgl.Marker({
-          draggable: true,
-          color: '#FF0000'
-        })
-          .setLngLat(initialLocation || [-123.1207, 49.2827])
-          .addTo(newMap);
+  const handleClick = (event: any) => {
+    if (isDragging) return;
+    
+    const { lng, lat } = event.lngLat;
+    
+    if (mode === 'marker') {
+      console.log('Map clicked (marker):', { lat, lng });
+      setSelectedLocation([lat, lng]);
+    } else if (mode === 'polygon') {
+      if (polygonPoints.length < 2) {
+        const newPoints = [...polygonPoints, [lng, lat]];
+        setPolygonPoints(newPoints);
+        addToHistory(newPoints);
+        setDrawingInstructions(false);
+      } else {
+        let minDistance = Infinity;
+        let insertIndex = -1;
 
-        newMarker.on('dragend', () => {
-          const lngLat = newMarker.getLngLat();
-          setSelectedLocation([lngLat.lng, lngLat.lat]);
-        });
-
-        newMap.on('click', (e) => {
-          const { lng, lat } = e.lngLat;
-          newMarker.setLngLat([lng, lat]);
-          setSelectedLocation([lng, lat]);
-        });
-
-        marker.current = newMarker;
-      } else if (mode === 'polygon') {
-        const drawInstance = new MapboxDraw({
-          displayControlsDefault: false,
-          controls: {
-            polygon: true,
-            trash: true
-          },
-          defaultMode: 'draw_polygon'
-        });
-
-        newMap.addControl(drawInstance);
-        draw.current = drawInstance;
-
-        newMap.on('draw.create', () => {
-          const data = drawInstance.getAll();
-          if (data.features.length > 0 && onBoundarySelect) {
-            const polygon = data.features[0].geometry as Polygon;
-            onBoundarySelect(polygon);
+        for (let i = 0; i < polygonPoints.length - 1; i++) {
+          const distance = distanceToLineSegment(
+            [lng, lat],
+            polygonPoints[i] as [number, number],
+            polygonPoints[i + 1] as [number, number]
+          );
+          if (distance < minDistance) {
+            minDistance = distance;
+            insertIndex = i + 1;
           }
-        });
+        }
 
-        newMap.on('draw.update', () => {
-          const data = drawInstance.getAll();
-          if (data.features.length > 0 && onBoundarySelect) {
-            const polygon = data.features[0].geometry as Polygon;
-            onBoundarySelect(polygon);
-          }
-        });
-
-        newMap.on('draw.delete', () => {
-          if (onBoundarySelect) {
-            onBoundarySelect(null as any);
-          }
-        });
+        if (minDistance < 0.0001) {
+          const newPoints = [
+            ...polygonPoints.slice(0, insertIndex),
+            [lng, lat],
+            ...polygonPoints.slice(insertIndex)
+          ];
+          setPolygonPoints(newPoints);
+          addToHistory(newPoints);
+        } else {
+          const newPoints = [...polygonPoints, [lng, lat]];
+          setPolygonPoints(newPoints);
+          addToHistory(newPoints);
+        }
+        setDrawingInstructions(false);
       }
-
-      newMap.addControl(new mapboxgl.NavigationControl());
-
-      return () => {
-        if (marker.current) {
-          marker.current.remove();
-        }
-        if (draw.current) {
-          newMap.removeControl(draw.current);
-        }
-        newMap.remove();
-        map.current = null;
-        setMapInitialized(false);
-      };
-    } catch (error) {
-      console.error('Error initializing map:', error);
     }
-  }, [open, initialLocation, mapInitialized, mode, onBoundarySelect]);
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      setHistoryIndex(historyIndex - 1);
+      setPolygonPoints(history[historyIndex - 1]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      setHistoryIndex(historyIndex + 1);
+      setPolygonPoints(history[historyIndex + 1]);
+    }
+  };
+
+  const handleDeletePoint = (index: number) => {
+    if (!isDragging) {
+      const newPoints = polygonPoints.filter((_, i) => i !== index);
+      setPolygonPoints(newPoints);
+      addToHistory(newPoints);
+    }
+  };
+
+  const handleDragStart = () => {
+    setIsDragging(true);
+    if (dragTimeout.current) {
+      clearTimeout(dragTimeout.current);
+    }
+  };
+
+  const handleDragEnd = (index: number, event: any) => {
+    const { lng, lat } = event.lngLat;
+    const newPoints = [...polygonPoints];
+    newPoints[index] = [lng, lat];
+    setPolygonPoints(newPoints);
+    addToHistory(newPoints);
+    
+    // Set a timeout before allowing clicks again
+    dragTimeout.current = setTimeout(() => {
+      setIsDragging(false);
+    }, 200);
+  };
 
   const handleSave = () => {
-    if (mode === 'marker' && selectedLocation && onLocationSelect) {
+    if (mode === 'marker' && onLocationSelect) {
+      console.log('Saving location:', selectedLocation);
       onLocationSelect(selectedLocation);
+    } else if (mode === 'polygon' && onBoundarySelect && polygonPoints.length >= 3) {
+      const closedPolygon = [...polygonPoints, polygonPoints[0]];
+      console.log('Saving polygon:', closedPolygon);
+      onBoundarySelect({
+        type: 'Polygon',
+        coordinates: [closedPolygon]
+      });
     }
     onClose();
+  };
+
+  const handleReset = () => {
+    setPolygonPoints([]);
+    setHistory([]);
+    setHistoryIndex(-1);
+    setDrawingInstructions(true);
+  };
+
+  const polygonData = polygonPoints.length >= 3 ? {
+    type: 'Feature',
+    geometry: {
+      type: 'Polygon',
+      coordinates: [
+        [...polygonPoints, polygonPoints[0]]
+      ]
+    },
+    properties: {}
+  } : null;
+
+  const lineData = {
+    type: 'Feature',
+    geometry: {
+      type: 'LineString',
+      coordinates: polygonPoints
+    },
+    properties: {}
   };
 
   return (
@@ -152,30 +233,144 @@ export default function MapDialog({
       onClose={onClose}
       maxWidth="md"
       fullWidth
-      PaperProps={{
-        sx: {
-          maxHeight: '90vh',
-          height: 'auto'
-        }
-      }}
     >
-      <DialogTitle>{title}</DialogTitle>
-      <DialogContent>
-        <Box
-          ref={mapContainer}
-          sx={{
-            height: '500px',
-            width: '100%',
-            position: 'relative',
-            '& .mapboxgl-canvas': {
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100% !important',
-              height: '100% !important'
+      <DialogTitle>
+        {title}
+        {mode === 'polygon' && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {drawingInstructions ? 
+              'Click on the map to start drawing the property boundary. Add at least 3 points to create a polygon.' :
+              'Click to add points. Click on lines to add control points. Drag points to adjust.'
             }
-          }}
-        />
+          </Typography>
+        )}
+      </DialogTitle>
+      <DialogContent>
+        {mode === 'polygon' && (
+          <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
+            <IconButton 
+              onClick={handleUndo} 
+              disabled={historyIndex <= 0}
+              size="small"
+            >
+              <UndoIcon />
+            </IconButton>
+            <IconButton 
+              onClick={handleRedo} 
+              disabled={historyIndex >= history.length - 1}
+              size="small"
+            >
+              <RedoIcon />
+            </IconButton>
+            <Button 
+              onClick={handleReset}
+              size="small"
+              startIcon={<DeleteIcon />}
+              sx={{ ml: 'auto' }}
+            >
+              Clear All
+            </Button>
+          </Box>
+        )}
+        
+        <Box sx={{ height: 500, position: 'relative' }}>
+          {cssLoaded && (
+            <Map
+              initialViewState={{
+                longitude: initialLocation[1],
+                latitude: initialLocation[0],
+                zoom: 17
+              }}
+              style={{ width: '100%', height: '100%' }}
+              mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+              mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+              onClick={handleClick}
+              attributionControl={false}
+            >
+              {mode === 'marker' && (
+                <Marker
+                  longitude={selectedLocation[1]}
+                  latitude={selectedLocation[0]}
+                  draggable
+                  onDragEnd={(event) => {
+                    const { lat, lng } = event.lngLat;
+                    console.log('Marker dragged to:', { lat, lng });
+                    setSelectedLocation([lat, lng]);
+                  }}
+                  color={APP_THEME_COLOR}
+                />
+              )}
+
+              {mode === 'polygon' && (
+                <>
+                  {/* Draw lines */}
+                  <Source type="geojson" data={lineData}>
+                    <Layer
+                      id="line-layer"
+                      type="line"
+                      paint={{
+                        'line-color': APP_THEME_COLOR,
+                        'line-width': 2
+                      }}
+                    />
+                  </Source>
+                  
+                  {/* Draw filled polygon if we have enough points */}
+                  {polygonData && (
+                    <Source type="geojson" data={polygonData}>
+                      <Layer
+                        id="polygon-layer"
+                        type="fill"
+                        paint={{
+                          'fill-color': APP_THEME_COLOR,
+                          'fill-opacity': 0.3
+                        }}
+                      />
+                    </Source>
+                  )}
+
+                  {/* Draw draggable points */}
+                  {polygonPoints.map((point, index) => (
+                    <Marker
+                      key={index}
+                      longitude={point[0]}
+                      latitude={point[1]}
+                      draggable
+                      onDragStart={handleDragStart}
+                      onDragEnd={(event) => handleDragEnd(index, event)}
+                    >
+                      <Box
+                        sx={{
+                          width: '24px',
+                          height: '24px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'move'
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: '14px',
+                            height: '14px',
+                            backgroundColor: APP_THEME_COLOR,
+                            borderRadius: '50%'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeletePoint(index);
+                          }}
+                        />
+                      </Box>
+                    </Marker>
+                  ))}
+                </>
+              )}
+              
+              <NavigationControl />
+            </Map>
+          )}
+        </Box>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
@@ -183,7 +378,13 @@ export default function MapDialog({
           onClick={handleSave} 
           color="primary" 
           variant="contained"
-          disabled={mode === 'marker' ? !selectedLocation : false}
+          disabled={mode === 'polygon' && polygonPoints.length < 3}
+          sx={{
+            backgroundImage: 'linear-gradient(to right, #6366f1, #4f46e5)',
+            '&:not(:disabled)': {
+              backgroundImage: 'linear-gradient(to right, #6366f1, #4f46e5)',
+            }
+          }}
         >
           Confirm
         </Button>

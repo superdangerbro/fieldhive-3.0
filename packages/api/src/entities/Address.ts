@@ -2,14 +2,14 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 
 @Entity('addresses')
 export class Address {
-    @PrimaryGeneratedColumn('uuid')
+    @PrimaryGeneratedColumn('uuid', { name: 'address_id' })
     address_id: string;
 
     @Column()
     address1: string;
 
     @Column({ nullable: true })
-    address2: string;
+    address2?: string;
 
     @Column()
     city: string;
@@ -17,18 +17,15 @@ export class Address {
     @Column()
     province: string;
 
-    @Column()
+    @Column({ name: 'postal_code' })
     postal_code: string;
 
     @Column()
     country: string;
 
-    @Column({ nullable: true })
-    label: string;
-
-    @CreateDateColumn()
+    @CreateDateColumn({ name: 'created_at' })
     created_at: Date;
 
-    @UpdateDateColumn()
+    @UpdateDateColumn({ name: 'updated_at' })
     updated_at: Date;
 }

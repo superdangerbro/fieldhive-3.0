@@ -17,17 +17,17 @@ export interface Property extends BaseModel {
     };
     boundary?: {
         type: string;
-        coordinates: [number, number][];
+        coordinates: [number, number][][];  // Changed to support GeoJSON Polygon format
     };
     billing_address_id?: string;
     billing_address?: Address;
     service_address_id?: string;
     service_address?: Address;
     status: PropertyStatus;
-    account_id: string;
     accounts?: Array<{
         account_id: string;
         name: string;
+        role?: string;
     }>;
 }
 
@@ -40,12 +40,12 @@ export interface CreatePropertyDto {
     };
     boundary?: {
         type: string;
-        coordinates: [number, number][];
+        coordinates: [number, number][][];  // Changed to support GeoJSON Polygon format
     };
     billing_address?: CreateAddressDto;
     service_address?: CreateAddressDto;
     status?: PropertyStatus;
-    account_id: string;
+    account_id: string; // Still needed for initial property creation
 }
 
 export interface UpdatePropertyDto {
@@ -57,12 +57,15 @@ export interface UpdatePropertyDto {
     };
     boundary?: {
         type: string;
-        coordinates: [number, number][];
+        coordinates: [number, number][][];  // Changed to support GeoJSON Polygon format
     };
     billing_address?: CreateAddressDto;
     service_address?: CreateAddressDto;
     status?: PropertyStatus;
-    accounts?: string[];
+    accounts?: Array<{
+        account_id: string;
+        role?: string;
+    }>;
 }
 
 export interface PropertiesResponse {

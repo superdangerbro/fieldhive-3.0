@@ -11,7 +11,7 @@ export interface AddressFields {
 }
 
 export interface Account {
-  id: string;
+  account_id: string;
   name: string;
 }
 

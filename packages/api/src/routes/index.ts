@@ -7,6 +7,7 @@ import { listProperties } from './properties/list';
 import { createProperty } from './properties/create';
 import { updateProperty } from './properties/update';
 import { deleteProperty, archiveProperty } from './properties/delete';
+import { getPropertyAccounts } from './properties/accounts';
 import jobsRouter from './jobs';
 import settingsRouter from './settings';
 import addressesRouter from './addresses';
@@ -28,6 +29,7 @@ router.post('/properties', createProperty);
 router.put('/properties/:id', updateProperty);
 router.delete('/properties/:id', deleteProperty);
 router.post('/properties/:id/archive', archiveProperty);
+router.get('/properties/:id/accounts', getPropertyAccounts);
 
 // Jobs routes
 router.use('/jobs', jobsRouter);

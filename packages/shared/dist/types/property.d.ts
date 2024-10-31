@@ -14,17 +14,17 @@ export interface Property extends BaseModel {
     };
     boundary?: {
         type: string;
-        coordinates: [number, number][];
+        coordinates: [number, number][][];
     };
     billing_address_id?: string;
     billing_address?: Address;
     service_address_id?: string;
     service_address?: Address;
     status: PropertyStatus;
-    account_id: string;
     accounts?: Array<{
         account_id: string;
         name: string;
+        role?: string;
     }>;
 }
 export interface CreatePropertyDto {
@@ -36,7 +36,7 @@ export interface CreatePropertyDto {
     };
     boundary?: {
         type: string;
-        coordinates: [number, number][];
+        coordinates: [number, number][][];
     };
     billing_address?: CreateAddressDto;
     service_address?: CreateAddressDto;
@@ -52,12 +52,15 @@ export interface UpdatePropertyDto {
     };
     boundary?: {
         type: string;
-        coordinates: [number, number][];
+        coordinates: [number, number][][];
     };
     billing_address?: CreateAddressDto;
     service_address?: CreateAddressDto;
     status?: PropertyStatus;
-    accounts?: string[];
+    accounts?: Array<{
+        account_id: string;
+        role?: string;
+    }>;
 }
 export interface PropertiesResponse {
     properties: Property[];
