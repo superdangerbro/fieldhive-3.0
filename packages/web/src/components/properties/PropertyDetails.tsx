@@ -23,6 +23,7 @@ const DEFAULT_STATUSES: PropertyStatus[] = ['active', 'inactive', 'archived', 'p
 const DEFAULT_PROPERTY_TYPES: PropertyType[] = ['residential', 'commercial', 'industrial', 'agricultural', 'other'];
 
 export default function PropertyDetails({ property, onEdit, onUpdate, onPropertySelect }: PropertyDetailsProps) {
+  const [localProperty, setLocalProperty] = useState<Property | null>(property);
   const [tabValue, setTabValue] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -32,6 +33,10 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>(DEFAULT_PROPERTY_TYPES);
   const [serviceAddress, setServiceAddress] = useState<Address | null>(null);
   const [billingAddress, setBillingAddress] = useState<Address | null>(null);
+
+  useEffect(() => {
+    setLocalProperty(property);
+  }, [property]);
 
   useEffect(() => {
     getSetting('property_statuses')
@@ -52,25 +57,25 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
   }, []);
 
   useEffect(() => {
-    if (property) {
+    if (localProperty) {
       // Fetch addresses
-      getPropertyAddresses(property.property_id)
+      getPropertyAddresses(localProperty.property_id)
         .then(({ service_address, billing_address }) => {
           setServiceAddress(service_address);
           setBillingAddress(billing_address);
         })
         .catch(console.error);
     }
-  }, [property]);
+  }, [localProperty]);
 
   const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
   };
 
   const handleConfirmDelete = async () => {
-    if (!property) return;
+    if (!localProperty) return;
     try {
-      await deleteProperty(property.property_id);
+      await deleteProperty(localProperty.property_id);
       setDeleteDialogOpen(false);
       onPropertySelect(null);
       if (onUpdate) onUpdate();
@@ -80,54 +85,68 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
   };
 
   const handleStatusChange = async (event: SelectChangeEvent<string>) => {
-    if (!property) return;
+    if (!localProperty) return;
     setStatusLoading(true);
+    
+    // Update local state immediately
+    const newStatus = event.target.value as PropertyStatus;
+    const updatedProperty = { ...localProperty, status: newStatus };
+    setLocalProperty(updatedProperty);
+
     try {
-      const updatedProperty = await updatePropertyMetadata(property.property_id, {
-        status: event.target.value as PropertyStatus
+      await updatePropertyMetadata(localProperty.property_id, {
+        status: newStatus
       });
-      onPropertySelect(updatedProperty);
       if (onUpdate) onUpdate();
     } catch (error) {
       console.error(error);
+      // Revert local state on error
+      setLocalProperty(localProperty);
     } finally {
       setStatusLoading(false);
     }
   };
 
   const handleTypeChange = async (event: SelectChangeEvent<string>) => {
-    if (!property) return;
+    if (!localProperty) return;
     setTypeLoading(true);
+
+    // Update local state immediately
+    const newType = event.target.value as PropertyType;
+    const updatedProperty = { ...localProperty, property_type: newType };
+    setLocalProperty(updatedProperty);
+
     try {
-      const updatedProperty = await updatePropertyMetadata(property.property_id, {
-        property_type: event.target.value as PropertyType
+      await updatePropertyMetadata(localProperty.property_id, {
+        property_type: newType
       });
-      onPropertySelect(updatedProperty);
       if (onUpdate) onUpdate();
     } catch (error) {
       console.error(error);
+      // Revert local state on error
+      setLocalProperty(localProperty);
     } finally {
       setTypeLoading(false);
     }
   };
 
-  if (!property) return null;
+  if (!localProperty) return null;
 
   return (
     <>
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <PropertyHeader 
-            property={property}
+            property={localProperty}
             onEdit={onEdit}
             onDelete={handleDeleteClick}
-            linkedAccounts={property.accounts || []}
+            linkedAccounts={localProperty.accounts || []}
           />
 
           <Divider sx={{ my: 2 }} />
 
           <PropertyMetadata
-            property={property}
+            property={localProperty}
             propertyTypes={propertyTypes}
             statusOptions={statusOptions}
             typeLoading={typeLoading}
@@ -146,7 +165,7 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
           <Divider sx={{ my: 2 }} />
 
           <PropertyLocation
-            property={property}
+            property={localProperty}
             onUpdate={onUpdate}
           />
 
