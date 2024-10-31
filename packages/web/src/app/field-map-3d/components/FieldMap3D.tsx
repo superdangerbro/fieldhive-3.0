@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Map, { MapRef, GeolocateControl, Marker } from 'react-map-gl';
-import { Box, Fab, IconButton, Tooltip, useTheme, Typography } from '@mui/material';
+import { Box, Fab, IconButton, Tooltip, useTheme } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ViewInArIcon from '@mui/icons-material/ViewInAr';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -21,10 +21,6 @@ import { FloorPlanDialog } from './FloorPlanDialog';
 import { PropertySearch } from './PropertySearch';
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-
-if (!MAPBOX_TOKEN) {
-  console.error('Mapbox token is missing. Please set NEXT_PUBLIC_MAPBOX_TOKEN in your environment variables.');
-}
 
 if (MAPBOX_TOKEN) {
   mapboxgl.accessToken = MAPBOX_TOKEN;
@@ -148,36 +144,11 @@ const FieldMap3D = () => {
     setShowPropertyMarker(true);
   }, [setSelectedProperty]);
 
-  if (!MAPBOX_TOKEN) {
-    return (
-      <Box 
-        sx={{ 
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          bgcolor: theme.palette.background.default,
-        }}
-      >
-        <Typography variant="h6" color="error">
-          Mapbox token is missing. Please set NEXT_PUBLIC_MAPBOX_TOKEN in your environment variables.
-        </Typography>
-      </Box>
-    );
-  }
-
   return (
     <Box 
       sx={{ 
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        height: '100%',
+        width: '100%',
         bgcolor: theme.palette.background.default,
         '& .mapboxgl-ctrl-logo': {
           display: 'none'

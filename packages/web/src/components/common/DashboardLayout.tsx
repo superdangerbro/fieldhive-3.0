@@ -1,5 +1,4 @@
 'use client';
-
 import React, { useState } from 'react';
 import { Box, Drawer, List, ListItem, ListItemIcon, ListItemText, AppBar, Toolbar, Typography, IconButton, Collapse } from '@mui/material';
 import MapIcon from '@mui/icons-material/Map';
@@ -90,7 +89,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <AppBar 
         position="fixed" 
         sx={{ 
@@ -145,16 +144,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         component="main" 
         sx={{
           flexGrow: 1,
-          height: '100vh',
+          height: '100%',
           overflow: 'auto',
           transition: (theme) => theme.transitions.create('margin', {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
           }),
           marginLeft: 0,
+          pt: (theme) => `${theme.mixins.toolbar.minHeight}px`,
         }}
       >
-        <Toolbar />
         {children}
       </Box>
     </Box>

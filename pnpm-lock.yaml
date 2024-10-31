@@ -79,7 +79,7 @@ importers:
         specifier: ^7946.0.14
         version: 7946.0.14
       react:
-        specifier: ^18.3.1
+        specifier: ^18.2.0
         version: 18.3.1
     devDependencies:
       '@types/node':

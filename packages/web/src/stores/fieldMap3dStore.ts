@@ -1,26 +1,26 @@
 import { create } from 'zustand';
+import { ViewState } from 'react-map-gl';
+import { Property, FloorPlan } from '../types';
 
-interface ViewState {
-  longitude: number;
-  latitude: number;
-  zoom: number;
-  pitch: number;
-  bearing: number;
-}
-
-interface Bounds {
-  north: number;
-  south: number;
-  east: number;
-  west: number;
-  coordinates?: [number, number][];
-}
-
-interface FloorPlan {
-  id: string;
-  name: string;
-  visible: boolean;
-  imageUrl: string;
+interface FieldMap3DStore {
+  viewState: ViewState;
+  setViewState: (viewState: ViewState) => void;
+  is3DMode: boolean;
+  toggle3DMode: () => void;
+  selectedProperty: Property | null;
+  setSelectedProperty: (property: Property | null) => void;
+  floorPlans: FloorPlan[];
+  activeFloorPlan: string | null;
+  setActiveFloorPlan: (floorPlanId: string | null) => void;
+  isPlacingFloorPlan: boolean;
+  setIsPlacingFloorPlan: (isPlacing: boolean) => void;
+  addFloorPlan: (floorPlan: Omit<FloorPlan, 'id' | 'bounds' | 'visible'>) => Promise<void>;
+  toggleFloorPlanVisibility: (floorPlanId: string) => void;
+  confirmFloorPlanPlacement: (bounds: any, imageUrl: string, width: number, height: number) => void;
+  cancelPlacingFloorPlan: () => void;
+  flyToProperty: (property: Property) => void;
+  searchResults: Property[];
+  setSearchResults: (results: Property[]) => void;
   propertyId: string;
   floor: number;
   bounds: Bounds | null;
