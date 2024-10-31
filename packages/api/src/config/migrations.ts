@@ -5,6 +5,10 @@ import { logger } from '../utils/logger';
 import { Property } from '../entities/Property';
 import { Address } from '../entities/Address';
 import { Job } from '../entities/Job';
+import { Account } from '../entities/Account';
+import { PropertiesAccounts } from '../entities/PropertiesAccounts';
+import { Setting } from '../entities/Setting';
+import { UsersAccounts } from '../entities/UsersAccounts';
 
 // Load environment variables
 const envPath = resolve(__dirname, '../../.env');
@@ -29,7 +33,7 @@ export const MigrationDataSource = new DataSource({
   // Disable synchronization for migrations
   synchronize: false,
   logging: true,
-  entities: [Property, Address, Job],
+  entities: [Property, Address, Job, Account, PropertiesAccounts, Setting, UsersAccounts],
   migrations: [resolve(__dirname, '../migrations/*{.ts,.js}')],
   ssl: {
     rejectUnauthorized: false

@@ -12,9 +12,9 @@ router.get('/', async (req, res) => {
             where: { key: JOB_TYPES_SETTING_KEY }
         });
 
-        // Convert settings-based job types to format expected by AddJobDialog
+        // Convert settings-based job types to format expected by components
         const jobTypes = (jobTypesSetting?.value || []).map((name: string) => ({
-            id: name, // Use name as ID since these are simple strings
+            id: name.toLowerCase().replace(/\s+/g, '_'), // Create stable ID from name
             name: name
         }));
 
@@ -39,10 +39,36 @@ router.post('/', async (req, res) => {
             jobTypesSetting.key = JOB_TYPES_SETTING_KEY;
         }
 
-        jobTypesSetting.value = value;
+        // Ensure value is an array of strings
+        if (!Array.isArray(value)) {
+            return res.status(400).json({
+                error: 'Bad request',
+                message: 'Value must be an array of strings'
+            });
+        }
+
+        // Clean up and validate job types
+        const cleanedTypes = value
+            .map(v => String(v).trim())
+            .filter(v => v.length > 0);
+
+        if (cleanedTypes.length === 0) {
+            return res.status(400).json({
+                error: 'Bad request',
+                message: 'At least one valid job type is required'
+            });
+        }
+
+        jobTypesSetting.value = cleanedTypes;
         await settingsRepository.save(jobTypesSetting);
 
-        res.json({ success: true, value: jobTypesSetting.value });
+        // Return in the same format as GET
+        const formattedTypes = cleanedTypes.map(name => ({
+            id: name.toLowerCase().replace(/\s+/g, '_'),
+            name: name
+        }));
+
+        res.json({ jobTypes: formattedTypes });
     } catch (error) {
         console.error('Error updating job types:', error);
         res.status(500).json({ error: 'Failed to update job types' });

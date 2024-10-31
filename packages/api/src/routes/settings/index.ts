@@ -5,6 +5,7 @@ import { logger } from '../../utils/logger';
 
 const router = Router();
 const JOB_TYPES_SETTING_KEY = 'job_types';
+const JOB_STATUSES_KEY = 'job_statuses';
 const ACCOUNT_SETTINGS_KEY = 'account_settings';
 const EQUIPMENT_TYPES_KEY = 'equipment_types';
 const EQUIPMENT_STATUSES_KEY = 'equipment_statuses';
@@ -108,6 +109,17 @@ router.get('/:key', async (req, res) => {
                     await settingsRepository.save(newSetting);
                     logger.info(`Created default job types:`, defaultValue);
                     return res.json({ jobTypes: defaultValue.map(type => ({ id: type, name: type })) });
+                }
+
+                case JOB_STATUSES_KEY: {
+                    defaultValue = ['pending', 'in_progress', 'completed', 'cancelled'];
+                    newSetting = settingsRepository.create({
+                        key: JOB_STATUSES_KEY,
+                        value: defaultValue
+                    });
+                    await settingsRepository.save(newSetting);
+                    logger.info(`Created default job statuses:`, defaultValue);
+                    return res.json(defaultValue);
                 }
 
                 case ACCOUNT_SETTINGS_KEY: {

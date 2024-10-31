@@ -53,7 +53,7 @@ export class Property {
     @JoinColumn({ name: 'service_address_id' })
     service_address: Address;
 
-    @ManyToMany(() => Account)
+    @ManyToMany(() => Account, account => account.properties)
     @JoinTable({
         name: 'properties_accounts',
         joinColumn: {
