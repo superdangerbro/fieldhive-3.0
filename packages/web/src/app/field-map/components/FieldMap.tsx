@@ -17,7 +17,8 @@ import { FloorControls } from './FloorControls';
 import { FloorPlanPlacement } from './FloorPlanPlacement';
 import { ImageOverlay } from './ImageOverlay';
 import { FloorPlanDialog } from './FloorPlanDialog';
-import { PropertySearch } from './PropertySearch';
+import { PropertyMarker } from './PropertyMarker';
+import type { MapProperty } from '../types';
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -69,7 +70,6 @@ const FieldMap: React.FC = () => {
   useEffect(() => {
     if (selectedProperty) {
       flyToProperty(selectedProperty);
-      // Hide marker after flying to property
       setTimeout(() => setShowPropertyMarker(false), 1000);
     }
   }, [selectedProperty, flyToProperty]);
@@ -116,14 +116,13 @@ const FieldMap: React.FC = () => {
     }
   }, [fetchPropertiesInBounds, fetchEquipmentInBounds, setCurrentBounds, showFieldEquipment]);
 
-  const handleSearchResultClick = useCallback((result: any) => {
-    console.log('Search result clicked:', result);
+  const handlePropertyClick = useCallback((property: MapProperty) => {
     setSelectedProperty({
-      id: result.id,
-      name: result.name,
+      id: property.property_id,
+      name: property.name,
       location: {
-        latitude: result.location.coordinates[1],
-        longitude: result.location.coordinates[0]
+        latitude: property.location.coordinates[1],
+        longitude: property.location.coordinates[0]
       }
     });
     setShowPropertyMarker(true);
@@ -184,29 +183,11 @@ const FieldMap: React.FC = () => {
 
         {/* Property Markers */}
         {properties.map((property) => (
-          <Marker
-            key={property.id}
-            longitude={property.location.longitude}
-            latitude={property.location.latitude}
-            onClick={() => handleSearchResultClick(property)}
-          >
-            <Tooltip title={`${property.name}`}>
-              <Box
-                sx={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: '50%',
-                  bgcolor: 'info.main',
-                  border: '2px solid white',
-                  cursor: 'pointer',
-                  transition: 'transform 0.2s',
-                  '&:hover': {
-                    transform: 'scale(1.2)'
-                  }
-                }}
-              />
-            </Tooltip>
-          </Marker>
+          <PropertyMarker
+            key={property.property_id}
+            property={property as MapProperty}
+            onClick={handlePropertyClick}
+          />
         ))}
 
         {/* Selected Property Marker */}
@@ -247,11 +228,44 @@ const FieldMap: React.FC = () => {
         )}
       </Map>
 
-      <PropertySearch 
-        onManageFloorPlans={() => setShowFloorPlanDialog(true)}
-        isFloorPlansOpen={isFloorPlansOpen}
-        onFloorPlansOpenChange={setIsFloorPlansOpen}
+      <FormControlLabel
+        control={
+          <Switch
+            checked={showFieldEquipment}
+            onChange={handleToggleFieldEquipment}
+            name="showFieldEquipment"
+          />
+        }
+        label="Show Field Equipment"
+        sx={{
+          position: 'absolute',
+          top: 24,
+          left: 16,
+          backgroundColor: theme.palette.background.paper,
+          padding: '4px 8px',
+          borderRadius: 1,
+          boxShadow: theme.shadows[2],
+          zIndex: 1000,
+        }}
       />
+
+      <IconButton
+        onClick={() => setIsTracking(!isTracking)}
+        sx={{
+          position: 'absolute',
+          top: 24,
+          right: 160,
+          backgroundColor: theme.palette.background.paper,
+          color: isTracking ? theme.palette.primary.main : theme.palette.text.primary,
+          '&:hover': { 
+            backgroundColor: theme.palette.action.hover 
+          },
+          boxShadow: theme.shadows[2],
+          zIndex: 1000,
+        }}
+      >
+        <LocationOnIcon />
+      </IconButton>
 
       {showFloorPlanDialog && selectedProperty && (
         <FloorPlanDialog
@@ -279,45 +293,6 @@ const FieldMap: React.FC = () => {
         onZoomIn={() => mapRef.current?.getMap()?.zoomIn()}
         onZoomOut={() => mapRef.current?.getMap()?.zoomOut()}
         isTracking={isTracking}
-      />
-
-      <IconButton
-        onClick={() => setIsTracking(!isTracking)}
-        sx={{
-          position: 'absolute',
-          top: 24,
-          right: 160,
-          backgroundColor: theme.palette.background.paper,
-          color: isTracking ? theme.palette.primary.main : theme.palette.text.primary,
-          '&:hover': { 
-            backgroundColor: theme.palette.action.hover 
-          },
-          boxShadow: theme.shadows[2],
-          zIndex: 1000,
-        }}
-      >
-        <LocationOnIcon />
-      </IconButton>
-
-      <FormControlLabel
-        control={
-          <Switch
-            checked={showFieldEquipment}
-            onChange={handleToggleFieldEquipment}
-            name="showFieldEquipment"
-          />
-        }
-        label="Show Field Equipment"
-        sx={{
-          position: 'absolute',
-          top: 24,
-          left: 330,
-          backgroundColor: theme.palette.background.paper,
-          padding: '4px 8px',
-          borderRadius: 1,
-          boxShadow: theme.shadows[2],
-          zIndex: 1000,
-        }}
       />
 
       {!isPlacingEquipment && selectedProperty && (

@@ -1,9 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Box, CircularProgress } from '@mui/material';
-import 'mapbox-gl/dist/mapbox-gl.css';
 
 // Dynamically import the map component to avoid SSR issues
 const FieldMap = dynamic(
@@ -27,6 +26,42 @@ const FieldMap = dynamic(
 );
 
 export default function FieldMapPage() {
+  const [cssLoaded, setCssLoaded] = useState(false);
+
+  // Dynamically load Mapbox CSS
+  React.useEffect(() => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css';
+    document.head.appendChild(link);
+
+    link.onload = () => {
+      console.log('Mapbox CSS loaded');
+      setCssLoaded(true);
+    };
+
+    return () => {
+      document.head.removeChild(link);
+      setCssLoaded(false);
+    };
+  }, []);
+
+  if (!cssLoaded) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100%',
+          width: '100%',
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <Box
       sx={{

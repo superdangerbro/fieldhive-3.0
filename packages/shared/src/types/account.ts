@@ -10,6 +10,7 @@ export interface Account extends BaseModel {
     type: AccountType;
     status: AccountStatus;
     billing_address?: Address;
+    addresses?: Address[];  // All addresses associated with the account
     account_id: string;
     created_at: string;
     updated_at: string;

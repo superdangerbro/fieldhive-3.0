@@ -14,7 +14,8 @@ import {
     FormControlLabel,
     Stack,
     Typography,
-    Chip
+    Chip,
+    Alert
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
@@ -77,7 +78,7 @@ const defaultColumns: GridColDef[] = [
         width: 150,
         renderCell: (params) => (
             <Chip
-                label={params.value.replace('_', ' ').toUpperCase()}
+                label={params.value?.replace('_', ' ').toUpperCase() || 'N/A'}
                 size="small"
                 color={getStatusColor(params.value as JobStatus)}
                 sx={{ color: 'white' }}
@@ -88,7 +89,7 @@ const defaultColumns: GridColDef[] = [
         field: 'created_at',
         headerName: 'Created',
         width: 120,
-        valueGetter: (params) => new Date(params.value).toLocaleDateString()
+        valueGetter: (params) => params.value ? new Date(params.value).toLocaleDateString() : 'N/A'
     }
 ];
 
@@ -102,6 +103,7 @@ export default function JobsTable({ refreshTrigger, onJobSelect, selectedJob, on
     const [filterText, setFilterText] = useState('');
     const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns.map(col => col.field));
     const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
 
     const handleColumnMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
         setColumnMenuAnchor(event.currentTarget);
@@ -131,17 +133,45 @@ export default function JobsTable({ refreshTrigger, onJobSelect, selectedJob, on
     const fetchJobs = async () => {
         try {
             setLoading(true);
+            setError(null);
+            // Convert page/pageSize to limit/offset
+            const limit = pageSize;
+            const offset = page * pageSize;
             const response = await getJobs(page + 1, pageSize);
-            setJobs(response.jobs || []);
-            setTotalRows(response.total);
-            onJobsLoad(response.jobs || []);
+            
+            if (!response || !Array.isArray(response.jobs)) {
+                throw new Error('Invalid response format from server');
+            }
+
+            setJobs(response.jobs);
+            setTotalRows(response.total || 0);
+            onJobsLoad(response.jobs);
+            
+            if (isInitialLoad) {
+                setIsInitialLoad(false);
+            }
         } catch (error) {
             console.error('Failed to fetch jobs:', error);
-            setError('Failed to fetch jobs. Please try again later.');
+            setError(error instanceof Error ? error.message : 'Failed to fetch jobs. Please try again later.');
+            setJobs([]);
+            setTotalRows(0);
         } finally {
             setLoading(false);
         }
     };
+
+    // Filter jobs based on search text
+    const filteredJobs = jobs.filter(job => {
+        if (!filterText) return true;
+        const searchText = filterText.toLowerCase();
+        return (
+            job.title?.toLowerCase().includes(searchText) ||
+            job.property?.name?.toLowerCase().includes(searchText) ||
+            job.account?.name?.toLowerCase().includes(searchText) ||
+            job.job_type?.name?.toLowerCase().includes(searchText) ||
+            job.status?.toLowerCase().includes(searchText)
+        );
+    });
 
     useEffect(() => {
         fetchJobs();
@@ -212,8 +242,14 @@ export default function JobsTable({ refreshTrigger, onJobSelect, selectedJob, on
                 </CardContent>
             </Card>
 
+            {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    {error}
+                </Alert>
+            )}
+
             <DataGrid
-                rows={jobs}
+                rows={filterText ? filteredJobs : jobs}
                 columns={columns}
                 getRowId={(row) => row.job_id}
                 loading={loading}
@@ -232,6 +268,15 @@ export default function JobsTable({ refreshTrigger, onJobSelect, selectedJob, on
                     '& .MuiDataGrid-row': {
                         cursor: 'pointer'
                     }
+                }}
+                components={{
+                    NoRowsOverlay: () => (
+                        <Stack height="100%" alignItems="center" justifyContent="center">
+                            <Typography color="text.secondary">
+                                {loading ? 'Loading...' : isInitialLoad ? 'Loading jobs...' : 'No jobs found'}
+                            </Typography>
+                        </Stack>
+                    )
                 }}
             />
         </Box>

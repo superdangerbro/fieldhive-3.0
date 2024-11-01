@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@fieldhive/shared', 'react-map-gl'],
+  transpilePackages: ['@fieldhive/shared', 'react-map-gl', 'mapbox-gl'],
   webpack: (config) => {
     config.module.rules.push({
       test: /\.ts$/,

@@ -12,6 +12,16 @@ export const API_ENDPOINTS = {
 class Api {
     private baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
+    // Property spatial methods
+    async getPropertiesInBounds(bounds: [number, number, number, number]): Promise<PropertiesResponse> {
+        const [west, south, east, north] = bounds;
+        const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.PROPERTIES}/spatial/bounds?bounds=${west},${south},${east},${north}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch properties in bounds');
+        }
+        return response.json();
+    }
+
     // Property metadata methods
     async updatePropertyMetadata(id: string, metadata: { property_type?: PropertyType; status?: PropertyStatus }): Promise<Property> {
         const response = await fetch(`${this.baseUrl}${API_ENDPOINTS.PROPERTIES}/${id}/metadata`, {
@@ -358,6 +368,7 @@ export const updateAccount = api.updateAccount.bind(api);
 export const deleteAccount = api.deleteAccount.bind(api);
 export const archiveAccount = api.archiveAccount.bind(api);
 export const getProperties = api.getProperties.bind(api);
+export const getPropertiesInBounds = api.getPropertiesInBounds.bind(api);
 export const createProperty = api.createProperty.bind(api);
 export const updateProperty = api.updateProperty.bind(api);
 export const deleteProperty = api.deleteProperty.bind(api);

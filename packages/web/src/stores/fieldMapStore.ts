@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import { ViewState } from 'react-map-gl';
-import { getProperties } from '../services/api';
+import { getPropertiesInBounds } from '../services/api';
+import type { Property } from '@fieldhive/shared';
+import type { MapProperty } from '../app/field-map/types';
 
-interface Property {
+interface SelectedProperty {
   id: string;
   name: string;
   location: {
@@ -20,19 +22,34 @@ interface FloorPlan {
   propertyId: string;
 }
 
+interface PlacementState {
+  imageUrl: string;
+  propertyId: string | null;
+}
+
 interface FieldMapStore {
   viewState: ViewState;
   setViewState: (viewState: ViewState) => void;
-  selectedProperty: Property | null;
-  setSelectedProperty: (property: Property | null) => void;
-  properties: Property[];
-  fetchPropertiesInBounds: (bounds: [number, number, number, number], searchTerm?: string) => Promise<void>;
-  flyToProperty: (property: Property) => void;
+  selectedProperty: SelectedProperty | null;
+  setSelectedProperty: (property: SelectedProperty | null) => void;
+  properties: MapProperty[];
+  fetchPropertiesInBounds: (bounds: [number, number, number, number]) => Promise<void>;
+  flyToProperty: (property: SelectedProperty) => void;
   floorPlans: FloorPlan[];
   activeFloorPlan: string | null;
   setActiveFloorPlan: (id: string) => void;
   toggleFloorPlanVisibility: (id: string) => void;
   addFloorPlan: (floorPlan: FloorPlan) => void;
+  placementState: PlacementState | null;
+  startPlacingFloorPlan: (imageUrl: string, propertyId: string) => void;
+  cancelPlacingFloorPlan: () => void;
+  confirmFloorPlanPlacement: (bounds: {
+    west: number;
+    east: number;
+    north: number;
+    south: number;
+    coordinates: [number, number][];
+  }) => void;
 }
 
 const INITIAL_VIEW_STATE: ViewState = {
@@ -50,34 +67,13 @@ export const useFieldMapStore = create<FieldMapStore>((set, get) => ({
   selectedProperty: null,
   setSelectedProperty: (property) => set({ selectedProperty: property }),
   properties: [],
-  fetchPropertiesInBounds: async (bounds, searchTerm) => {
+  fetchPropertiesInBounds: async (bounds) => {
     try {
-      const [west, south, east, north] = bounds;
-      let searchQuery = `${west},${south},${east},${north}`;
-      if (searchTerm) {
-        searchQuery += `,${searchTerm}`;
-      }
-      const response = await getProperties({ search: searchQuery });
-      console.log('API Response:', JSON.stringify(response, null, 2)); // Detailed logging
+      const response = await getPropertiesInBounds(bounds);
+      console.log('API Response:', JSON.stringify(response, null, 2));
 
       if (response && Array.isArray(response.properties)) {
-        const properties = response.properties.map((prop: any) => {
-          if (!prop || !prop.location || !Array.isArray(prop.location.coordinates)) {
-            console.error('Invalid property data:', prop);
-            return null;
-          }
-          return {
-            id: prop.id,
-            name: prop.name,
-            location: {
-              latitude: prop.location.coordinates[1],
-              longitude: prop.location.coordinates[0]
-            }
-          };
-        }).filter((prop): prop is Property => prop !== null);
-
-        console.log('Mapped Properties:', properties);
-        set({ properties });
+        set({ properties: response.properties as MapProperty[] });
       } else {
         console.error('Invalid response structure:', response);
         set({ properties: [] });
@@ -101,11 +97,23 @@ export const useFieldMapStore = create<FieldMapStore>((set, get) => ({
   activeFloorPlan: null,
   setActiveFloorPlan: (id) => set({ activeFloorPlan: id }),
   toggleFloorPlanVisibility: (id) => set((state) => ({
-    floorPlans: state.floorPlans.map(fp =>
+    floorPlans: state.floorPlans.map((fp: FloorPlan) => 
       fp.id === id ? { ...fp, visible: !fp.visible } : fp
     )
   })),
   addFloorPlan: (floorPlan) => set((state) => ({
     floorPlans: [...state.floorPlans, floorPlan]
-  }))
+  })),
+  placementState: null,
+  startPlacingFloorPlan: (imageUrl: string, propertyId: string) => set({
+    placementState: { imageUrl, propertyId }
+  }),
+  cancelPlacingFloorPlan: () => set({ placementState: null }),
+  confirmFloorPlanPlacement: (bounds) => {
+    const { placementState } = get();
+    if (!placementState) return;
+    
+    console.log('Saving floor plan with bounds:', bounds);
+    set({ placementState: null });
+  }
 }));

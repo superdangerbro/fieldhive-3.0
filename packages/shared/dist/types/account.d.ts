@@ -8,6 +8,7 @@ export interface Account extends BaseModel {
     type: AccountType;
     status: AccountStatus;
     billing_address?: Address;
+    addresses?: Address[];
     account_id: string;
     created_at: string;
     updated_at: string;

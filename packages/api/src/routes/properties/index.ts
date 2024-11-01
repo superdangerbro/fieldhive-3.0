@@ -6,9 +6,14 @@ import { deleteProperty, archiveProperty } from './delete';
 import { getPropertyLocation } from './location';
 import { getPropertyAddresses } from './addresses';
 import { updatePropertyMetadata } from './metadata';
+import { getPropertiesInBounds } from './spatial';
 
 const router = Router();
 
+// Static routes first
+router.get('/spatial/bounds', getPropertiesInBounds);
+
+// Then parameterized routes
 router.get('/', listProperties);
 router.post('/', createProperty);
 router.put('/:id', updateProperty);
