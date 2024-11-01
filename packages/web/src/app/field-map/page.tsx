@@ -6,7 +6,7 @@ import { Box, CircularProgress } from '@mui/material';
 
 // Dynamically import the map component to avoid SSR issues
 const FieldMap = dynamic(
-  () => import('./components/FieldMap'),
+  () => import('./components/core').then(mod => ({ default: mod.FieldMap })),
   {
     loading: () => (
       <Box
