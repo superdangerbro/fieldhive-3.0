@@ -3,8 +3,6 @@
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { theme } from '../theme';
-import DashboardLayout from '../components/common/DashboardLayout';
-import { AccountProvider } from '../stores/accountStore';
 
 export function Providers({
   children,
@@ -14,9 +12,7 @@ export function Providers({
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AccountProvider>
-        <DashboardLayout>{children}</DashboardLayout>
-      </AccountProvider>
+      {children}
     </ThemeProvider>
   );
 }

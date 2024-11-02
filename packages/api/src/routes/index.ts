@@ -1,8 +1,5 @@
 import { Router } from 'express';
-import { createAccount } from './accounts/create';
-import { updateAccount } from './accounts/update';
-import { listAccounts } from './accounts/list';
-import { deleteAccount, archiveAccount } from './accounts/delete';
+import accountsRouter, { createAccount, updateAccount, listAccounts, deleteAccount } from './accounts';
 import propertiesRouter from './properties';
 import jobsRouter from './jobs';
 import settingsRouter from './settings';
@@ -17,7 +14,6 @@ router.get('/accounts', listAccounts);
 router.post('/accounts', createAccount);
 router.put('/accounts/:id', updateAccount);
 router.delete('/accounts/:id', deleteAccount);
-router.post('/accounts/:id/archive', archiveAccount);
 
 // Properties routes
 router.use('/properties', propertiesRouter);

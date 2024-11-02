@@ -9,6 +9,18 @@ import {
     CREATE_ADDRESS_QUERY 
 } from '../queries';
 
+const UPDATE_ADDRESS_QUERY = `
+UPDATE addresses SET 
+    address1 = $1,
+    address2 = $2,
+    city = $3,
+    province = $4,
+    postal_code = $5,
+    country = $6,
+    updated_at = NOW()
+WHERE address_id = $7
+RETURNING address_id`;
+
 /**
  * Update an existing account
  * Handles:
@@ -51,21 +63,39 @@ export const updateAccount = async (req: Request, res: Response) => {
         await AppDataSource.query('BEGIN');
 
         try {
-            // Create new billing address if provided
+            // Handle billing address
             let billingAddressId = null;
             if (billing_address) {
-                const [newAddress] = await AppDataSource.query(
-                    CREATE_ADDRESS_QUERY,
-                    [
-                        billing_address.address1,
-                        billing_address.address2,
-                        billing_address.city,
-                        billing_address.province,
-                        billing_address.postal_code,
-                        billing_address.country
-                    ]
-                );
-                billingAddressId = newAddress.address_id;
+                if (billing_address.address_id) {
+                    // Update existing address
+                    const [updatedAddress] = await AppDataSource.query(
+                        UPDATE_ADDRESS_QUERY,
+                        [
+                            billing_address.address1,
+                            billing_address.address2,
+                            billing_address.city,
+                            billing_address.province,
+                            billing_address.postal_code,
+                            billing_address.country,
+                            billing_address.address_id
+                        ]
+                    );
+                    billingAddressId = updatedAddress.address_id;
+                } else {
+                    // Create new address
+                    const [newAddress] = await AppDataSource.query(
+                        CREATE_ADDRESS_QUERY,
+                        [
+                            billing_address.address1,
+                            billing_address.address2,
+                            billing_address.city,
+                            billing_address.province,
+                            billing_address.postal_code,
+                            billing_address.country
+                        ]
+                    );
+                    billingAddressId = newAddress.address_id;
+                }
             }
 
             // Update account

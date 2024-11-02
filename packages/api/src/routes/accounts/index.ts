@@ -9,8 +9,15 @@ import {
     validatePropertyLink 
 } from './validation';
 
-// Re-export types for backwards compatibility
-export * from './types';
+// Re-export handlers for use in main router
+export { 
+    createAccount,
+    listAccounts,
+    updateAccount,
+    deleteAccount,
+    linkProperty,
+    unlinkProperty
+};
 
 const router = Router();
 
@@ -39,70 +46,3 @@ router.post('/:id/properties', validatePropertyLink, linkProperty);
 router.delete('/:id/properties/:propertyId', unlinkProperty);
 
 export default router;
-
-/**
- * For backwards compatibility, export individual handlers
- * This allows existing code to continue working while
- * we transition to the new modular structure
- */
-export {
-    createAccount,
-    listAccounts,
-    getAccountById,
-    updateAccount,
-    deleteAccount,
-    linkProperty,
-    unlinkProperty
-};
-
-/**
- * Export validation utilities for external use
- */
-export {
-    validateCreateAccountRequest,
-    validateUpdateAccountRequest,
-    validatePropertyLink,
-    isValidType,
-    isValidStatus
-} from './validation';
-
-/**
- * Export queries for external use
- * This allows other modules to use our SQL queries
- * while maintaining consistency
- */
-export {
-    GET_ACCOUNTS_QUERY,
-    CREATE_ACCOUNT_QUERY,
-    UPDATE_ACCOUNT_QUERY,
-    DELETE_ACCOUNT_QUERY,
-    COUNT_ACCOUNTS_QUERY,
-    GET_ACCOUNT_PROPERTIES_QUERY
-} from './queries';
-
-/**
- * Example Usage:
- * 
- * Using the router (recommended):
- * ```typescript
- * import accountsRouter from './routes/accounts';
- * app.use('/accounts', accountsRouter);
- * ```
- * 
- * Using individual handlers (backwards compatibility):
- * ```typescript
- * import { createAccount, updateAccount } from './routes/accounts';
- * router.post('/custom-accounts', validateCreateAccountRequest, createAccount);
- * ```
- * 
- * Using types:
- * ```typescript
- * import { AccountResponse, CreateAccountDto } from './routes/accounts';
- * ```
- * 
- * Using validation:
- * ```typescript
- * import { validateCreateAccountRequest } from './routes/accounts';
- * router.post('/accounts', validateCreateAccountRequest, customHandler);
- * ```
- */

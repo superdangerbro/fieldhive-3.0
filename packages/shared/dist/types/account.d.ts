@@ -7,8 +7,8 @@ export interface Account extends BaseModel {
     name: string;
     type: AccountType;
     status: AccountStatus;
-    billing_address?: Address;
-    addresses?: Address[];
+    billing_address_id?: string;
+    billingAddress?: Address;
     account_id: string;
     created_at: string;
     updated_at: string;
@@ -17,13 +17,13 @@ export interface Account extends BaseModel {
 export interface CreateAccountDto {
     name: string;
     type: AccountType;
-    billing_address?: Address;
+    billing_address_id?: string;
 }
 export interface UpdateAccountDto {
     name?: string;
     type?: AccountType;
     status?: AccountStatus;
-    billing_address?: Address;
+    billing_address_id?: string;
 }
 export interface AccountsResponse {
     accounts: Account[];
