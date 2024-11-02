@@ -1,18 +1,15 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
-@Entity('settings')
+@Entity({ name: 'settings' })
 export class Setting {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column()
+    @Column({ unique: true })
     key: string;
 
     @Column({ type: 'jsonb' })
     value: any;
-
-    @Column({ nullable: true })
-    description?: string;
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;

@@ -2,17 +2,24 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, TextField, Button, Grid } from '@mui/material';
-import type { Address } from '@fieldhive/shared';
-import { createAddress, updateAddress } from '@/services/api';
+import type { Address, CreateAddressDto } from '@fieldhive/shared';
 
 interface AddressFormProps {
-  initialAddress?: Address | null;
-  onSubmit: (address: Address) => void;
+  initialAddress?: Address | CreateAddressDto | null;
+  onSubmit: (address: CreateAddressDto) => void;
   onCancel: () => void;
+  hideButtons?: boolean;
+  disabled?: boolean;
 }
 
-export function AddressForm({ initialAddress, onSubmit, onCancel }: AddressFormProps) {
-  const [formData, setFormData] = useState({
+export function AddressForm({ 
+  initialAddress, 
+  onSubmit, 
+  onCancel, 
+  hideButtons = false,
+  disabled = false 
+}: AddressFormProps) {
+  const [formData, setFormData] = useState<CreateAddressDto>({
     address1: '',
     address2: '',
     city: '',
@@ -42,23 +49,12 @@ export function AddressForm({ initialAddress, onSubmit, onCancel }: AddressFormP
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      let address;
-      if (initialAddress?.address_id) {
-        address = await updateAddress(initialAddress.address_id, formData);
-      } else {
-        address = await createAddress(formData);
-      }
-      onSubmit(address);
-    } catch (error) {
-      console.error('Failed to save address:', error);
-    }
+  const handleSubmit = () => {
+    onSubmit(formData);
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+    <Box sx={{ mt: 2 }}>
       <Grid container spacing={2}>
         <Grid item xs={12}>
           <TextField
@@ -68,6 +64,7 @@ export function AddressForm({ initialAddress, onSubmit, onCancel }: AddressFormP
             name="address1"
             value={formData.address1}
             onChange={handleChange}
+            disabled={disabled}
           />
         </Grid>
         <Grid item xs={12}>
@@ -77,6 +74,7 @@ export function AddressForm({ initialAddress, onSubmit, onCancel }: AddressFormP
             name="address2"
             value={formData.address2}
             onChange={handleChange}
+            disabled={disabled}
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -87,6 +85,7 @@ export function AddressForm({ initialAddress, onSubmit, onCancel }: AddressFormP
             name="city"
             value={formData.city}
             onChange={handleChange}
+            disabled={disabled}
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -97,6 +96,7 @@ export function AddressForm({ initialAddress, onSubmit, onCancel }: AddressFormP
             name="province"
             value={formData.province}
             onChange={handleChange}
+            disabled={disabled}
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -107,6 +107,7 @@ export function AddressForm({ initialAddress, onSubmit, onCancel }: AddressFormP
             name="postal_code"
             value={formData.postal_code}
             onChange={handleChange}
+            disabled={disabled}
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -117,26 +118,30 @@ export function AddressForm({ initialAddress, onSubmit, onCancel }: AddressFormP
             name="country"
             value={formData.country}
             onChange={handleChange}
+            disabled={disabled}
           />
         </Grid>
       </Grid>
-      <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-        <Button onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button 
-          type="submit" 
-          variant="contained"
-          sx={{
-            backgroundImage: 'linear-gradient(to right, #6366f1, #4f46e5)',
-            '&:hover': {
-              backgroundImage: 'linear-gradient(to right, #4f46e5, #4338ca)',
-            }
-          }}
-        >
-          Save Address
-        </Button>
-      </Box>
+      {!hideButtons && (
+        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+          <Button onClick={onCancel} disabled={disabled}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit}
+            variant="contained"
+            disabled={disabled}
+            sx={{
+              backgroundImage: 'linear-gradient(to right, #6366f1, #4f46e5)',
+              '&:hover': {
+                backgroundImage: 'linear-gradient(to right, #4f46e5, #4338ca)',
+              }
+            }}
+          >
+            Save Address
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 }

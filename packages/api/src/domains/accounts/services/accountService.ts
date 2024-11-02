@@ -9,39 +9,46 @@ export class AccountService {
     private addressService = new AddressService();
 
     async findById(id: string): Promise<Account | null> {
-        try {
-            return await this.accountRepository.findOne({
-                where: { account_id: id },
-                relations: ['billingAddress', 'properties']
-            });
-        } catch (error) {
-            logger.error('Error finding account by ID:', error);
-            throw error;
-        }
+        return this.accountRepository.findOne({
+            where: { account_id: id },
+            relations: ['billingAddress', 'properties']
+        });
     }
 
-    async findByFilters(filters: AccountFilters & { limit?: number; offset?: number }): Promise<{ accounts: Account[]; total: number }> {
+    async findByFilters(filters: AccountFilters & { limit?: number; offset?: number; search?: string }): Promise<{ accounts: Account[]; total: number }> {
         try {
-            const query = this.accountRepository.createQueryBuilder('account')
+            const query = this.accountRepository
+                .createQueryBuilder('account')
                 .leftJoinAndSelect('account.billingAddress', 'billingAddress')
                 .leftJoinAndSelect('account.properties', 'properties');
 
+            // Add filters
             if (filters.type) {
                 query.andWhere('account.type = :type', { type: filters.type });
             }
-
             if (filters.status) {
                 query.andWhere('account.status = :status', { status: filters.status });
             }
-
-            if (filters.name) {
-                query.andWhere('account.name ILIKE :name', { name: `%${filters.name}%` });
+            if (filters.search) {
+                // Check if it's a UUID (account_id)
+                if (filters.search.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+                    logger.info('Searching by account_id:', filters.search);
+                    query.andWhere('account.account_id = :id', { id: filters.search });
+                } else {
+                    logger.info('Searching by name:', filters.search);
+                    query.andWhere('account.name ILIKE :name', { name: `%${filters.search}%` });
+                }
             }
 
-            // Get total count before applying pagination
+            // Log the generated SQL
+            const sqlQuery = query.getSql();
+            const sqlParams = query.getParameters();
+            logger.info('Generated SQL:', { sql: sqlQuery, params: sqlParams });
+
+            // Get total count
             const total = await query.getCount();
 
-            // Apply pagination if provided
+            // Apply pagination
             if (filters.limit !== undefined) {
                 query.take(filters.limit);
             }
@@ -49,18 +56,24 @@ export class AccountService {
                 query.skip(filters.offset);
             }
 
-            const accounts = await query.getMany();
+            // Get accounts
+            const accounts = await query
+                .orderBy('account.name', 'ASC')
+                .getMany();
 
-            // Transform the response to match frontend expectations
-            const transformedAccounts = accounts.map(account => ({
-                ...account,
-                billing_address: account.billingAddress
-            }));
+            // Log the results
+            logger.info('Query results:', {
+                total,
+                accountCount: accounts.length,
+                firstAccount: accounts[0] ? {
+                    id: accounts[0].account_id,
+                    name: accounts[0].name,
+                    billing_address_id: accounts[0].billing_address_id,
+                    billingAddress: accounts[0].billingAddress
+                } : null
+            });
 
-            return {
-                accounts: transformedAccounts,
-                total
-            };
+            return { accounts, total };
         } catch (error) {
             logger.error('Error finding accounts by filters:', error);
             throw error;
@@ -74,10 +87,11 @@ export class AccountService {
             // Create account with initial status
             const account = this.accountRepository.create({
                 ...accountData,
-                status: accountData.status || 'Active'
+                status: 'Active'
             });
 
-            return await this.accountRepository.save(account);
+            await this.accountRepository.save(account);
+            return this.findById(account.account_id) as Promise<Account>;
         } catch (error) {
             logger.error('Error creating account:', error);
             throw error;
@@ -94,8 +108,10 @@ export class AccountService {
             // Only validate fields that are being updated
             this.validateAccount(accountData, true);
             
-            this.accountRepository.merge(account, accountData);
-            return await this.accountRepository.save(account);
+            await this.accountRepository.update(id, accountData);
+            
+            // Fetch and return the updated account with relations
+            return this.findById(id);
         } catch (error) {
             logger.error('Error updating account:', error);
             throw error;
@@ -110,7 +126,8 @@ export class AccountService {
             }
 
             account.status = 'Archived';
-            return await this.accountRepository.save(account);
+            await this.accountRepository.save(account);
+            return this.findById(id);
         } catch (error) {
             logger.error('Error archiving account:', error);
             throw error;
@@ -124,14 +141,17 @@ export class AccountService {
                 return null;
             }
 
-            // Verify address exists
+            // First verify the address exists
             const address = await this.addressService.findById(addressId);
             if (!address) {
                 throw new Error('Address not found');
             }
 
-            account.billing_address_id = addressId;
-            return await this.accountRepository.save(account);
+            // Update the account
+            await this.accountRepository.update(id, { billing_address_id: addressId });
+
+            // Return the updated account with relations
+            return this.findById(id);
         } catch (error) {
             logger.error('Error updating account billing address:', error);
             throw error;
@@ -150,13 +170,6 @@ export class AccountService {
         if (!isUpdate || account.type !== undefined) {
             if (!account.type) {
                 errors.push('Account type is required');
-            }
-        }
-
-        if (account.status) {
-            const validStatuses: AccountStatus[] = ['Active', 'Inactive', 'Archived'];
-            if (!validStatuses.includes(account.status)) {
-                errors.push('Invalid account status');
             }
         }
 

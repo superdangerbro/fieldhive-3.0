@@ -2,7 +2,7 @@
  * Account-related components
  */
 
-export { AccountDetails } from './AccountDetails';
+export { AccountDetails } from './AccountDetails/index';
 export { AccountSearch } from './AccountSearch';
 export { AccountsTable } from './AccountsTable';
 

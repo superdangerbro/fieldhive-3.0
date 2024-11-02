@@ -1,83 +1,97 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Box } from '@mui/material';
 import { AccountDetails, AccountSearch, AccountsTable } from './components';
 import { AddAccountDialog } from './dialogs';
 import type { Account } from '@fieldhive/shared';
+import { getAccounts } from '@/services/api';
 
 export default function AccountsPage() {
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
-  // Load selected account from localStorage on mount
-  useEffect(() => {
-    const savedAccount = localStorage.getItem('selectedAccount');
-    if (savedAccount) {
-      setSelectedAccount(JSON.parse(savedAccount));
-    }
-  }, []);
+    const handleAccountSelect = (account: Account | null) => {
+        // If we already have the account in our accounts list, use that data
+        if (account) {
+            const existingAccount = accounts.find(a => a.account_id === account.account_id);
+            if (existingAccount) {
+                setSelectedAccount(existingAccount);
+            } else {
+                setSelectedAccount(account);
+            }
+        } else {
+            setSelectedAccount(null);
+        }
+    };
 
-  // Save selected account to localStorage
-  const handleAccountSelect = (account: Account | null) => {
-    setSelectedAccount(account);
-    if (account) {
-      localStorage.setItem('selectedAccount', JSON.stringify(account));
-    } else {
-      localStorage.removeItem('selectedAccount');
-    }
-  };
+    const handleRefresh = async () => {
+        // Increment refresh trigger to cause table to reload
+        setRefreshTrigger(prev => prev + 1);
 
-  const handleRefresh = () => {
-    setRefreshTrigger(prev => prev + 1);
-  };
+        // If we have a selected account, refresh its data
+        if (selectedAccount) {
+            try {
+                const response = await getAccounts({
+                    limit: 1,
+                    offset: 0,
+                    search: selectedAccount.account_id
+                });
 
-  const handleAccountsLoad = (loadedAccounts: Account[]) => {
-    setAccounts(loadedAccounts);
-    // Update selected account with fresh data if it exists
-    if (selectedAccount) {
-      const updatedAccount = loadedAccounts.find(a => a.account_id === selectedAccount.account_id);
-      if (updatedAccount) {
-        handleAccountSelect(updatedAccount);
-      }
-    }
-  };
+                if (response.accounts.length > 0) {
+                    const freshAccount = response.accounts[0];
+                    setSelectedAccount(freshAccount);
+                }
+            } catch (error) {
+                console.error('Failed to refresh selected account:', error);
+            }
+        }
+    };
 
-  return (
-    <Box p={3}>
-      <Box sx={{ display: 'flex', gap: 3 }}>
-        <Box sx={{ flex: 1 }}>
-          <AccountSearch
-            accounts={accounts}
-            selectedAccount={selectedAccount}
-            onAccountSelect={handleAccountSelect}
-            onAddClick={() => setIsAddDialogOpen(true)}
-          />
+    const handleAccountsLoad = (loadedAccounts: Account[]) => {
+        setAccounts(loadedAccounts);
+        
+        // If we have a selected account, update it with fresh data
+        if (selectedAccount) {
+            const updatedAccount = loadedAccounts.find(a => a.account_id === selectedAccount.account_id);
+            if (updatedAccount) {
+                setSelectedAccount(updatedAccount);
+            }
+        }
+    };
 
-          <AccountsTable
-            refreshTrigger={refreshTrigger}
-            onAccountSelect={handleAccountSelect}
-            selectedAccount={selectedAccount}
-            onAccountsLoad={handleAccountsLoad}
-          />
+    return (
+        <Box p={3}>
+            <AccountDetails
+                account={selectedAccount}
+                onUpdate={handleRefresh}
+                onAccountSelect={handleAccountSelect}
+            />
+            <Box sx={{ display: 'flex', gap: 3 }}>
+                <Box sx={{ flex: 1 }}>
+                    <AccountSearch
+                        accounts={accounts}
+                        selectedAccount={selectedAccount}
+                        onAccountSelect={handleAccountSelect}
+                        onAddClick={() => setIsAddDialogOpen(true)}
+                    />
+
+                    <AccountsTable
+                        refreshTrigger={refreshTrigger}
+                        onAccountSelect={handleAccountSelect}
+                        selectedAccount={selectedAccount}
+                        onAccountsLoad={handleAccountsLoad}
+                    />
+                </Box>
+            </Box>
+
+            <AddAccountDialog
+                open={isAddDialogOpen}
+                onClose={() => setIsAddDialogOpen(false)}
+                onAccountAdded={handleRefresh}
+            />
         </Box>
-
-        <Box sx={{ width: '35%', minWidth: 400 }}>
-          <AccountDetails
-            account={selectedAccount}
-            onUpdate={handleRefresh}
-            onAccountSelect={handleAccountSelect}
-          />
-        </Box>
-      </Box>
-
-      <AddAccountDialog
-        open={isAddDialogOpen}
-        onClose={() => setIsAddDialogOpen(false)}
-        onSuccess={handleRefresh}
-      />
-    </Box>
-  );
+    );
 }

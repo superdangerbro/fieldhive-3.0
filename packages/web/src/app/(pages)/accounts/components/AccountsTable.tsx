@@ -41,18 +41,14 @@ const defaultColumns: GridColDef[] = [
     minWidth: 200
   },
   {
-    field: 'billing_address',
+    field: 'billingAddress',
     headerName: 'Billing Address',
     flex: 1,
     minWidth: 200,
     valueGetter: (params) => {
-      const address = params.value;
-      if (!address) return 'No address';
-      const parts = [];
-      if (address.address1) parts.push(address.address1);
-      if (address.city) parts.push(address.city);
-      if (address.province) parts.push(address.province);
-      return parts.length > 0 ? parts.join(', ') : 'No address';
+      const address = params.row.billingAddress;
+      if (!address || !address.address1) return 'No address';
+      return `${address.address1}${address.address2 ? `, ${address.address2}` : ''}, ${address.city}, ${address.province}`;
     }
   },
   {
@@ -157,6 +153,14 @@ export function AccountsTable({
     fetchAccounts();
   }, [page, pageSize, refreshTrigger, filterText]);
 
+  const handleRowClick = (params: any) => {
+    // Find the full account data from our accounts state
+    const account = accounts.find(a => a.account_id === params.id);
+    if (account) {
+      onAccountSelect(account);
+    }
+  };
+
   return (
     <Box sx={{ height: 600, width: '100%' }}>
       <Card sx={{ mb: 2 }}>
@@ -236,7 +240,7 @@ export function AccountsTable({
         onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
         disableSelectionOnClick
         disableColumnMenu
-        onRowClick={(params) => onAccountSelect(params.row as Account)}
+        onRowClick={handleRowClick}
         selectionModel={selectedAccount ? [selectedAccount.account_id] : []}
         sx={{
           '& .MuiDataGrid-row': {

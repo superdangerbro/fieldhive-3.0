@@ -3,19 +3,19 @@ import { Setting } from './entities/Setting';
 export interface CreateSettingDto {
     key: string;
     value: any;
-    description?: string;
 }
 
 export interface UpdateSettingDto {
     key?: string;
     value?: any;
-    description?: string;
 }
 
-export interface SettingResponse extends Setting {
-    setting_id: string;
-    created_at: Date;
-    updated_at: Date;
+export interface SettingResponse {
+    id: string;
+    key: string;
+    value: any;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 export interface SettingFilters {

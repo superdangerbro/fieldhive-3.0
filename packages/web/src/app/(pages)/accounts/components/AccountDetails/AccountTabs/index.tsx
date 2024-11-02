@@ -1,11 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Box, Tabs, Tab } from '@mui/material';
-import type { Account } from '@fieldhive/shared';
-import { PropertiesTab } from './PropertiesTab';
-import { JobsTab } from './JobsTab';
-import { AddressesTab } from './AddressesTab';
+import { Box, Tabs, Tab, Card, CardContent, Typography, Grid } from '@mui/material';
+import type { Account, Property } from '@fieldhive/shared';
 
 interface AccountTabsProps {
   account: Account;
@@ -19,26 +16,52 @@ export function AccountTabs({ account }: AccountTabsProps) {
   };
 
   return (
-    <>
+    <Box sx={{ width: '100%', mt: 3 }}>
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={tabValue} onChange={handleTabChange}>
           <Tab label="Properties" />
           <Tab label="Jobs" />
-          <Tab label="Addresses" />
         </Tabs>
       </Box>
 
       <Box role="tabpanel" hidden={tabValue !== 0} sx={{ p: 3 }}>
-        {tabValue === 0 && <PropertiesTab account={account} />}
+        {tabValue === 0 && (
+          <Box>
+            {account.properties?.length ? (
+              <Grid container spacing={2}>
+                {account.properties.map((property: Property) => (
+                  <Grid item xs={12} key={property.property_id}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Typography variant="subtitle1">{property.name}</Typography>
+                        <Typography variant="body2" color="text.secondary" component="div">
+                          {property.service_address ? (
+                            <>
+                              {property.service_address.address1}<br />
+                              {property.service_address.city}, {property.service_address.province}<br />
+                              {property.service_address.postal_code}
+                            </>
+                          ) : (
+                            'No service address set'
+                          )}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Typography>No properties associated with this account</Typography>
+            )}
+          </Box>
+        )}
       </Box>
 
       <Box role="tabpanel" hidden={tabValue !== 1} sx={{ p: 3 }}>
-        {tabValue === 1 && <JobsTab account={account} />}
+        {tabValue === 1 && (
+          <Typography>Jobs list will go here</Typography>
+        )}
       </Box>
-
-      <Box role="tabpanel" hidden={tabValue !== 2} sx={{ p: 3 }}>
-        {tabValue === 2 && <AddressesTab account={account} />}
-      </Box>
-    </>
+    </Box>
   );
 }
