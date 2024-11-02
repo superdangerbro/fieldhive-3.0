@@ -3,46 +3,58 @@ import { AppDataSource } from '../../../config/database';
 import { Setting } from '../entities/Setting';
 import { logger } from '../../../core/utils/logger';
 
-const EQUIPMENT_STATUSES_KEY = 'equipment_statuses';
-const DEFAULT_EQUIPMENT_STATUSES = [
-    { name: 'Available', color: 'success' },
-    { name: 'In Use', color: 'warning' },
-    { name: 'Under Maintenance', color: 'error' }
+const JOB_STATUSES_KEY = 'job_statuses';
+const DEFAULT_JOB_STATUSES = [
+    { name: 'Pending', color: 'warning' },
+    { name: 'In Progress', color: 'info' },
+    { name: 'Completed', color: 'success' },
+    { name: 'Cancelled', color: 'error' }
 ];
 
 const VALID_COLORS = ['default', 'primary', 'secondary', 'error', 'info', 'success', 'warning'];
 
-// Helper function to convert legacy string to new format
+// Helper function to convert legacy status to new format
 const convertToNewFormat = (status: string) => {
     const colorMap: Record<string, string> = {
-        'available': 'success',
-        'in_use': 'warning',
-        'under_maintenance': 'error'
+        'pending': 'warning',
+        'in_progress': 'info',
+        'completed': 'success',
+        'cancelled': 'error'
     };
 
     return {
         name: status,
-        color: colorMap[status.toLowerCase().replace(/\s+/g, '_')] || 'default'
+        color: colorMap[status.toLowerCase()] || 'default'
     };
 };
 
-export async function getEquipmentStatuses(req: Request, res: Response) {
+// Helper function to convert new format to legacy format for backward compatibility
+const convertToLegacyFormat = (status: { name: string; color: string }) => {
+    return status.name.toLowerCase().replace(/\s+/g, '_');
+};
+
+export async function getJobStatuses(req: Request, res: Response) {
     try {
         // Initialize repository for each request
         const settingRepository = AppDataSource.getRepository(Setting);
         
         const setting = await settingRepository.findOne({
-            where: { key: EQUIPMENT_STATUSES_KEY }
+            where: { key: JOB_STATUSES_KEY }
         });
         
         if (!setting) {
             // Return default statuses if none are set
             const newSetting = settingRepository.create({
-                key: EQUIPMENT_STATUSES_KEY,
-                value: DEFAULT_EQUIPMENT_STATUSES
+                key: JOB_STATUSES_KEY,
+                value: DEFAULT_JOB_STATUSES
             });
             await settingRepository.save(newSetting);
-            return res.json(DEFAULT_EQUIPMENT_STATUSES);
+
+            // Return in legacy format if requested
+            if (req.query.format === 'legacy') {
+                return res.json(DEFAULT_JOB_STATUSES.map(convertToLegacyFormat));
+            }
+            return res.json(DEFAULT_JOB_STATUSES);
         }
 
         // Handle legacy format (array of strings)
@@ -52,20 +64,29 @@ export async function getEquipmentStatuses(req: Request, res: Response) {
             // Update the setting to new format
             setting.value = convertedStatuses;
             await settingRepository.save(setting);
+
+            // Return in legacy format if requested
+            if (req.query.format === 'legacy') {
+                return res.json(setting.value.map(convertToLegacyFormat));
+            }
             return res.json(convertedStatuses);
         }
 
+        // Return in legacy format if requested
+        if (req.query.format === 'legacy') {
+            return res.json(setting.value.map(convertToLegacyFormat));
+        }
         return res.json(setting.value);
     } catch (error) {
-        logger.error('Error getting equipment statuses:', error);
+        logger.error('Error getting job statuses:', error);
         return res.status(500).json({ 
-            message: 'Failed to get equipment statuses',
+            message: 'Failed to get job statuses',
             error: error instanceof Error ? error.message : 'Unknown error'
         });
     }
 }
 
-export async function updateEquipmentStatuses(req: Request, res: Response) {
+export async function updateJobStatuses(req: Request, res: Response) {
     try {
         // Initialize repository for each request
         const settingRepository = AppDataSource.getRepository(Setting);
@@ -74,7 +95,7 @@ export async function updateEquipmentStatuses(req: Request, res: Response) {
 
         if (!Array.isArray(value)) {
             return res.status(400).json({ 
-                message: 'Equipment statuses must be an array'
+                message: 'Job statuses must be an array'
             });
         }
 
@@ -97,12 +118,12 @@ export async function updateEquipmentStatuses(req: Request, res: Response) {
         }
 
         let setting = await settingRepository.findOne({
-            where: { key: EQUIPMENT_STATUSES_KEY }
+            where: { key: JOB_STATUSES_KEY }
         });
 
         if (!setting) {
             setting = settingRepository.create({
-                key: EQUIPMENT_STATUSES_KEY,
+                key: JOB_STATUSES_KEY,
                 value: statuses
             });
         } else {
@@ -110,11 +131,16 @@ export async function updateEquipmentStatuses(req: Request, res: Response) {
         }
 
         const updated = await settingRepository.save(setting);
+
+        // Return in legacy format if requested
+        if (req.query.format === 'legacy') {
+            return res.json(updated.value.map(convertToLegacyFormat));
+        }
         return res.json(updated.value);
     } catch (error) {
-        logger.error('Error updating equipment statuses:', error);
+        logger.error('Error updating job statuses:', error);
         return res.status(500).json({ 
-            message: 'Failed to update equipment statuses',
+            message: 'Failed to update job statuses',
             error: error instanceof Error ? error.message : 'Unknown error'
         });
     }

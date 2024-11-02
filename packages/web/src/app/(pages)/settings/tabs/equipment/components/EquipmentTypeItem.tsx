@@ -6,7 +6,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import { EquipmentTypeConfig, NewFieldState, FormField } from './types';
+import { EquipmentTypeConfig, NewFieldState, FormField } from '../types';
 
 interface EquipmentTypeItemProps {
     type: EquipmentTypeConfig;

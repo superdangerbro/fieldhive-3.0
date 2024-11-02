@@ -15,6 +15,11 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WebSocketEventType = void 0;
+// Export all types
+__exportStar(require("./property"), exports);
+__exportStar(require("./job"), exports);
+__exportStar(require("./address"), exports);
+__exportStar(require("./account"), exports);
 // WebSocket Event Types
 var WebSocketEventType;
 (function (WebSocketEventType) {
@@ -22,7 +27,4 @@ var WebSocketEventType;
     WebSocketEventType["LOCATION_UPDATE"] = "LOCATION_UPDATE";
     WebSocketEventType["ALERT"] = "ALERT";
 })(WebSocketEventType || (exports.WebSocketEventType = WebSocketEventType = {}));
-__exportStar(require("./property"), exports);
-__exportStar(require("./job"), exports);
-__exportStar(require("./address"), exports);
 //# sourceMappingURL=index.js.map

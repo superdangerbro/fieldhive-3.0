@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
-import { EquipmentTypeConfig, NewFieldState, FormField } from './types';
+import { EquipmentTypeConfig, NewFieldState, FormField } from './types/equipment-types';
 import { AddEquipmentTypeForm } from './AddEquipmentTypeForm';
 import { EquipmentTypeItem } from './EquipmentTypeItem';
 import { getEquipmentTypes, saveEquipmentTypes } from '@/services/api';

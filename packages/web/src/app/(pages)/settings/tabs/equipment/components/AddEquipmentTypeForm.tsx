@@ -9,26 +9,27 @@ interface AddEquipmentTypeFormProps {
     onAddType: (e?: React.FormEvent) => void;
 }
 
-export function AddEquipmentTypeForm({ 
-    newTypeName, 
-    onTypeNameChange, 
-    onAddType 
+export function AddEquipmentTypeForm({
+    newTypeName,
+    onTypeNameChange,
+    onAddType
 }: AddEquipmentTypeFormProps) {
     return (
         <Box 
             component="form" 
             onSubmit={onAddType}
             sx={{ 
+                mb: 3, 
                 display: 'flex', 
-                gap: 2, 
-                mb: 2 
+                gap: 2,
+                alignItems: 'flex-start'
             }}
         >
             <TextField
                 label="New Equipment Type"
                 value={newTypeName}
                 onChange={(e) => onTypeNameChange(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && onAddType(e)}
+                size="small"
             />
             <Button 
                 variant="contained" 

@@ -18,7 +18,7 @@ import {
     Box,
     Typography
 } from '@mui/material';
-import { EquipmentTypeConfig, FormField } from './types';
+import { EquipmentTypeConfig, FormField } from '../types';
 
 interface Props {
     open: boolean;

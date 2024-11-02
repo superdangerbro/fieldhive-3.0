@@ -1,3 +1,19 @@
+// Export all types
+export * from './property';
+export * from './job';
+export * from './address';
+export * from './account';
+
+// Export status types
+export {
+  StatusColor,
+  StatusConfig,
+  AccountStatus,
+  JobStatus,
+  EquipmentStatus,
+  StatusSettings
+} from './status';
+
 // Geospatial Types
 export interface GeoPoint {
   type: 'Point';
@@ -101,7 +117,3 @@ export interface DashboardConfig {
   refreshInterval: number; // in seconds
   autoRefresh: boolean;
 }
-
-export * from './property';
-export * from './job';
-export * from './address';

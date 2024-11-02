@@ -2,8 +2,10 @@ import { BaseModel } from './index';
 import { Property } from './property';
 import { Account } from './account';
 import { Address } from './address';
+import { StatusConfig } from './status';
 
-export type JobStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+// Support both string (legacy) and object (new) formats
+export type JobStatusType = string | StatusConfig;
 
 export interface Job {
     job_id: string;
@@ -16,7 +18,7 @@ export interface Job {
         job_type_id: string;
         name: string;
     };
-    status: JobStatus;
+    status: JobStatusType;
     created_at: string;
     updated_at: string;
     account: Account;
@@ -33,7 +35,7 @@ export interface CreateJobDto {
     description?: string;
     propertyId: string;
     jobTypeId: string;
-    status?: JobStatus;
+    status?: JobStatusType;
     use_custom_addresses?: boolean;
     service_address_id?: string | null;
     billing_address_id?: string | null;
@@ -44,7 +46,7 @@ export interface CreateJobDto {
 export interface UpdateJobDto {
     title?: string;
     description?: string;
-    status?: JobStatus;
+    status?: JobStatusType;
     job_type_id?: string;
     property_id?: string;
     use_custom_addresses?: boolean;
@@ -60,3 +62,32 @@ export interface JobsResponse {
     limit: number;
     offset: number;
 }
+
+// Helper function to get status color
+export const getStatusColor = (status: JobStatusType) => {
+    if (typeof status === 'object') {
+        return status.color;
+    }
+
+    // Legacy status mapping
+    switch (status.toLowerCase()) {
+        case 'pending':
+            return 'warning';
+        case 'in_progress':
+            return 'info';
+        case 'completed':
+            return 'success';
+        case 'cancelled':
+            return 'error';
+        default:
+            return 'default';
+    }
+};
+
+// Helper function to get status display name
+export const getStatusDisplayName = (status: JobStatusType): string => {
+    if (typeof status === 'object') {
+        return status.label.toUpperCase();
+    }
+    return status.replace(/_/g, ' ').toUpperCase();
+};

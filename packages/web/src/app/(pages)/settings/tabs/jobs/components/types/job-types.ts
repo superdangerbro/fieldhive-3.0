@@ -7,7 +7,7 @@ export interface NumberConfig {
 export interface Condition {
     field: string;
     value: any;
-    makeRequired?: boolean;  // New field to indicate if the field should be required when condition is met
+    makeRequired?: boolean;
 }
 
 export interface FormField {
@@ -19,7 +19,7 @@ export interface FormField {
     showWhen?: Condition[];
 }
 
-export interface EquipmentTypeConfig {
+export interface JobTypeConfig {
     name: string;
     fields: FormField[];
 }

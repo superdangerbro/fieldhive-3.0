@@ -7,7 +7,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RuleIcon from '@mui/icons-material/Rule';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import { FormField } from './types';
+import { FormField } from '../types';
 
 interface Props {
     fields: FormField[];

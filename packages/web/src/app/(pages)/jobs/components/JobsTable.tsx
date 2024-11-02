@@ -21,8 +21,7 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import { getJobs } from '@/services/api';
-import { Job, JobStatus } from '@fieldhive/shared';
-import { getStatusColor } from '../utils';
+import { Job, JobStatus, getStatusColor, getStatusDisplayName } from '@fieldhive/shared';
 
 interface JobsTableProps {
     refreshTrigger: number;
@@ -64,7 +63,7 @@ const defaultColumns: GridColDef[] = [
         width: 150,
         renderCell: (params) => (
             <Chip
-                label={params.value?.replace('_', ' ').toUpperCase() || 'N/A'}
+                label={getStatusDisplayName(params.value as JobStatus)}
                 size="small"
                 color={getStatusColor(params.value as JobStatus)}
                 sx={{ color: 'white' }}
@@ -120,9 +119,6 @@ export function JobsTable({ refreshTrigger, onJobSelect, selectedJob, onJobsLoad
         try {
             setLoading(true);
             setError(null);
-            // Convert page/pageSize to limit/offset
-            const limit = pageSize;
-            const offset = page * pageSize;
             const response = await getJobs(page + 1, pageSize);
             
             if (!response || !Array.isArray(response.jobs)) {
@@ -150,12 +146,13 @@ export function JobsTable({ refreshTrigger, onJobSelect, selectedJob, onJobsLoad
     const filteredJobs = jobs.filter(job => {
         if (!filterText) return true;
         const searchText = filterText.toLowerCase();
+        const statusText = typeof job.status === 'object' ? job.status.name : job.status;
         return (
             job.title?.toLowerCase().includes(searchText) ||
             job.property?.name?.toLowerCase().includes(searchText) ||
             job.account?.name?.toLowerCase().includes(searchText) ||
             job.job_type?.name?.toLowerCase().includes(searchText) ||
-            job.status?.toLowerCase().includes(searchText)
+            statusText.toLowerCase().includes(searchText)
         );
     });
 

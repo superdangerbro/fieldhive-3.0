@@ -16,7 +16,7 @@ import {
     FormControlLabel,
     Checkbox
 } from '@mui/material';
-import { FormField } from './types';
+import { FormField } from '../types';
 
 interface Props {
     open: boolean;

@@ -8,7 +8,7 @@ export default function SettingsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Box sx={{ p: 3 }}>
+    <Box component="main" sx={{ height: '100%', width: '100%' }}>
       {children}
     </Box>
   );

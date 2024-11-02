@@ -5,15 +5,13 @@ import { CreateSettingDto, UpdateSettingDto } from '../types';
 import { logger } from '../../../core/utils/logger';
 
 export class SettingService {
-    private settingRepository: Repository<Setting>;
-
-    constructor() {
-        this.settingRepository = AppDataSource.getRepository(Setting);
+    private getRepository(): Repository<Setting> {
+        return AppDataSource.getRepository(Setting);
     }
 
     async findById(id: string): Promise<Setting | null> {
         try {
-            return await this.settingRepository.findOne({
+            return await this.getRepository().findOne({
                 where: { id }
             });
         } catch (error) {
@@ -24,7 +22,7 @@ export class SettingService {
 
     async findByKey(key: string): Promise<Setting | null> {
         try {
-            return await this.settingRepository.findOne({
+            return await this.getRepository().findOne({
                 where: { key }
             });
         } catch (error) {
@@ -35,8 +33,9 @@ export class SettingService {
 
     async create(settingData: CreateSettingDto): Promise<Setting> {
         try {
-            const setting = this.settingRepository.create(settingData);
-            return await this.settingRepository.save(setting);
+            const repository = this.getRepository();
+            const setting = repository.create(settingData);
+            return await repository.save(setting);
         } catch (error) {
             logger.error('Error creating setting:', error);
             throw error;
@@ -50,8 +49,9 @@ export class SettingService {
                 return null;
             }
 
-            this.settingRepository.merge(setting, settingData);
-            return await this.settingRepository.save(setting);
+            const repository = this.getRepository();
+            repository.merge(setting, settingData);
+            return await repository.save(setting);
         } catch (error) {
             logger.error('Error updating setting:', error);
             throw error;
@@ -60,10 +60,11 @@ export class SettingService {
 
     async upsertByKey(key: string, value: any): Promise<Setting> {
         try {
+            const repository = this.getRepository();
             let setting = await this.findByKey(key);
             
             if (!setting) {
-                setting = this.settingRepository.create({
+                setting = repository.create({
                     key,
                     value
                 });
@@ -71,7 +72,7 @@ export class SettingService {
                 setting.value = value;
             }
 
-            return await this.settingRepository.save(setting);
+            return await repository.save(setting);
         } catch (error) {
             logger.error('Error upserting setting:', error);
             throw error;

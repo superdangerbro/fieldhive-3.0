@@ -19,7 +19,7 @@ import {
     InputLabel
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { FormField } from './types';
+import { FormField } from '../types';
 
 interface Props {
     open: boolean;

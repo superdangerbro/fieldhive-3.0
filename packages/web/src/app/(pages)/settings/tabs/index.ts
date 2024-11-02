@@ -1,4 +1,4 @@
 export * from './AccountsTab';
-export * from './EquipmentTab';
-export * from './JobsTab';
+export * from './equipment/EquipmentTab';
+export * from './jobs/JobsTab';
 export * from './PropertiesTab';
