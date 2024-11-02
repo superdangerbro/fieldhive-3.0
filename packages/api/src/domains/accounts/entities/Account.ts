@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, ManyToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, ManyToMany, JoinTable } from 'typeorm';
 import { Property } from '../../properties/entities/Property';
 import { Address } from '../../addresses/entities/Address';
 import { AccountType, AccountStatus } from '../types';
@@ -6,7 +6,7 @@ import { AccountType, AccountStatus } from '../types';
 @Entity('accounts')
 export class Account {
     @PrimaryGeneratedColumn('uuid', { name: 'account_id' })
-    id: string;
+    account_id: string;
 
     @Column()
     name: string;
@@ -24,12 +24,23 @@ export class Account {
     @JoinColumn({ name: 'billing_address_id' })
     billingAddress: Address | null;
 
-    @ManyToMany(() => Property, (property: Property) => property.accounts)
+    @ManyToMany(() => Property)
+    @JoinTable({
+        name: 'properties_accounts',
+        joinColumn: {
+            name: 'account_id',
+            referencedColumnName: 'account_id'
+        },
+        inverseJoinColumn: {
+            name: 'property_id',
+            referencedColumnName: 'property_id'
+        }
+    })
     properties: Property[];
 
     @CreateDateColumn({ name: 'created_at' })
-    createdAt: Date;
+    created_at: Date;
 
     @UpdateDateColumn({ name: 'updated_at' })
-    updatedAt: Date;
+    updated_at: Date;
 }

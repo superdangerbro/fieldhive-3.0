@@ -1,128 +1,52 @@
-import winston, { Logger, format } from 'winston';
+import winston from 'winston';
+import { env } from '../../config/env';
 
-const { combine, timestamp, printf, colorize } = format;
+// Define log levels
+const levels = {
+    error: 0,
+    warn: 1,
+    info: 2,
+    http: 3,
+    debug: 4,
+};
 
-interface LogEntry {
-    level: string;
-    message: string;
-    timestamp?: string;
-    [key: string]: any;
-}
+// Define colors for each level
+const colors = {
+    error: 'red',
+    warn: 'yellow',
+    info: 'green',
+    http: 'magenta',
+    debug: 'white',
+};
 
-// Custom log format
-const logFormat = printf((info: LogEntry) => {
-    const { level, message, timestamp, ...metadata } = info;
-    
-    let msg = `[${timestamp}] ${level}: ${message}`;
-    
-    if (Object.keys(metadata).length > 0) {
-        msg += `\n${JSON.stringify(metadata, null, 2)}`;
-    }
-    
-    return msg;
-});
+// Add colors to winston
+winston.addColors(colors);
 
-// Create logger instance
-export const logger: Logger = winston.createLogger({
-    level: process.env.LOG_LEVEL || 'info',
-    format: combine(
-        timestamp({
-            format: 'YYYY-MM-DD HH:mm:ss'
-        }),
-        logFormat
+// Define format
+const format = winston.format.combine(
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
+    winston.format.colorize({ all: true }),
+    winston.format.printf(
+        (info) => `${info.timestamp} ${info.level}: ${info.message}`,
     ),
-    transports: [
-        // Console transport with colors for development
-        new winston.transports.Console({
-            format: combine(
-                colorize(),
-                timestamp({
-                    format: 'YYYY-MM-DD HH:mm:ss'
-                }),
-                logFormat
-            )
-        }),
-        // File transport for errors
-        new winston.transports.File({
-            filename: 'logs/error.log',
-            level: 'error',
-            maxsize: 5242880, // 5MB
-            maxFiles: 5,
-            tailable: true
-        }),
-        // File transport for all logs
-        new winston.transports.File({
-            filename: 'logs/combined.log',
-            maxsize: 5242880, // 5MB
-            maxFiles: 5,
-            tailable: true
-        })
-    ]
+);
+
+// Define transport array
+const transports = [
+    new winston.transports.Console(),
+    new winston.transports.File({
+        filename: 'logs/error.log',
+        level: 'error',
+    }),
+    new winston.transports.File({ filename: 'logs/all.log' }),
+];
+
+// Create the logger
+export const logger = winston.createLogger({
+    level: env.LOG_LEVEL || 'info',
+    levels,
+    format,
+    transports,
 });
 
-// Add request context if available
-export interface RequestContext {
-    requestId?: string;
-    method: string;
-    url: string;
-    ip: string;
-    userAgent?: string;
-}
-
-export const addRequestContext = (req: {
-    id?: string;
-    method: string;
-    originalUrl: string;
-    ip: string;
-    get: (header: string) => string | undefined;
-}): RequestContext => {
-    return {
-        requestId: req.id,
-        method: req.method,
-        url: req.originalUrl,
-        ip: req.ip,
-        userAgent: req.get('user-agent')
-    };
-};
-
-// Log levels
-export const LogLevel = {
-    ERROR: 'error',
-    WARN: 'warn',
-    INFO: 'info',
-    HTTP: 'http',
-    DEBUG: 'debug'
-} as const;
-
-export type LogLevel = typeof LogLevel[keyof typeof LogLevel];
-
-// Helper functions for structured logging
-export const logError = (message: string, error: Error, context?: Record<string, any>) => {
-    logger.error(message, {
-        error: {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-        },
-        ...context
-    });
-};
-
-export const logWarning = (message: string, context?: Record<string, any>) => {
-    logger.warn(message, context);
-};
-
-export const logInfo = (message: string, context?: Record<string, any>) => {
-    logger.info(message, context);
-};
-
-export const logDebug = (message: string, context?: Record<string, any>) => {
-    logger.debug(message, context);
-};
-
-export const logHttp = (message: string, context?: Record<string, any>) => {
-    logger.http(message, context);
-};
-
-// Export default logger instance
 export default logger;

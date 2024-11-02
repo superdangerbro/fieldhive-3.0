@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, ManyToMany, JoinTable } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, ManyToMany } from 'typeorm';
 import { Address } from '../../addresses/entities/Address';
 import { Account } from '../../accounts/entities/Account';
 import { PropertyType, PropertyStatus } from '../types';
@@ -6,41 +6,43 @@ import { PropertyType, PropertyStatus } from '../types';
 @Entity('properties')
 export class Property {
     @PrimaryGeneratedColumn('uuid', { name: 'property_id' })
-    id: string;
+    property_id: string;
 
     @Column()
     name: string;
 
-    @Column({ type: 'varchar' })
+    @Column({ name: 'property_type', type: 'varchar' })
     type: PropertyType;
 
     @Column({ type: 'varchar', default: 'Active' })
     status: PropertyStatus;
 
+    @Column({ type: 'jsonb', nullable: true })
+    location: any;
+
+    @Column({ type: 'jsonb', nullable: true })
+    boundary: any;
+
     @Column({ name: 'service_address_id', nullable: true })
     service_address_id: string | null;
+
+    @Column({ name: 'billing_address_id', nullable: true })
+    billing_address_id: string | null;
 
     @ManyToOne(() => Address, { nullable: true })
     @JoinColumn({ name: 'service_address_id' })
     serviceAddress: Address | null;
 
+    @ManyToOne(() => Address, { nullable: true })
+    @JoinColumn({ name: 'billing_address_id' })
+    billingAddress: Address | null;
+
     @ManyToMany(() => Account, account => account.properties)
-    @JoinTable({
-        name: 'properties_accounts',
-        joinColumn: {
-            name: 'property_id',
-            referencedColumnName: 'id'
-        },
-        inverseJoinColumn: {
-            name: 'account_id',
-            referencedColumnName: 'id'
-        }
-    })
     accounts: Account[];
 
     @CreateDateColumn({ name: 'created_at' })
-    createdAt: Date;
+    created_at: Date;
 
     @UpdateDateColumn({ name: 'updated_at' })
-    updatedAt: Date;
+    updated_at: Date;
 }

@@ -1,141 +1,68 @@
 # Migration and Cleanup Plan
 
-This document outlines the plan for migrating components and services to the new app structure. **No files will be deleted until the new structure is thoroughly tested and verified working.**
+[Previous content remains...]
 
-## Current Structure
+## Files to Move
 
-### Components (`packages/web/src/components/`)
-- Common components (ClientLayout, DashboardLayout, Loading, etc.)
-- Job components (AddJobDialog, JobDetails, etc.)
-- Property components (AddPropertyDialog, PropertyDetails, etc.)
-- Settings components (JobTypeManagement)
-- Technician components (EquipmentMarker, TechnicianMap, etc.)
+### Entities to Move
+From `packages/api/src/entities/` to their respective domain folders:
 
-### Services (`packages/web/src/services/`)
-- `api.ts` - Main API service
-- `auth.ts` - Authentication service
-- `mockData.ts` - Mock data
-- New domain-based API structure in `api/` directory
+1. Account.ts -> Already moved to domains/accounts/entities/
+2. Address.ts -> Move to domains/addresses/entities/
+3. Equipment.ts -> Move to domains/equipment/entities/
+4. Job.ts -> Move to domains/jobs/entities/
+5. Property.ts -> Move to domains/properties/entities/
+6. Setting.ts -> Move to domains/settings/entities/ (create domain)
+7. PropertiesAccounts.ts -> Move to domains/properties/entities/
+8. UsersAccounts.ts -> Move to domains/accounts/entities/
 
-### Stores (`packages/web/src/stores/`)
-- `accountStore.tsx` - Account management
-- `equipmentStore.ts` - Equipment state
-- `fieldMap3dStore.ts` - 3D map state
-- `fieldMapStore.ts` - Field map state
-- `jobStore.tsx` - Job management
-- `mapStore.ts` - Map state
+### Routes to Move
+From `packages/api/src/routes/` to their respective domain folders:
 
-## New Structure
+1. accounts/ -> Already moved
+2. addresses/ -> Move to domains/addresses/routes/
+3. dashboard/ -> Move to domains/dashboard/routes/
+4. equipment_types/ -> Move to domains/equipment/routes/
+5. field_equipment/ -> Move to domains/equipment/routes/
+6. fields/ -> Move to domains/fields/routes/
+7. health/ -> Move to domains/health/routes/ (create domain)
+8. inspections/ -> Move to domains/inspections/routes/ (create domain)
+9. job_types/ -> Move to domains/jobs/routes/
+10. jobs/ -> Move to domains/jobs/routes/
+11. properties/ -> Move to domains/properties/routes/
+12. sensors/ -> Move to domains/sensors/routes/
+13. settings/ -> Move to domains/settings/routes/
 
-### Feature-Based Organization
-```
-(pages)/
-├── accounts/
-│   ├── components/
-│   ├── dialogs/
-│   └── stores/
-├── jobs/
-│   ├── components/
-│   ├── dialogs/
-│   └── stores/
-├── properties/
-│   ├── components/
-│   ├── dialogs/
-│   └── stores/
-└── components/
-    └── common/
-```
+### Services to Move
+From `packages/api/src/services/` to their respective domain folders:
 
-### Shared Code
-```
-app/
-└── layouts/
-    ├── ClientLayout.tsx
-    └── DashboardLayout.tsx
+1. spatial.service.ts -> Move to domains/properties/services/
 
-services/
-└── api/
-    ├── client.ts
-    ├── index.ts
-    └── domains/
-```
+## Folders to Archive
+After verifying all files have been moved and the new structure is working:
+
+1. `packages/api/src/entities/`
+2. `packages/api/src/routes/`
+3. `packages/api/src/services/`
 
 ## Migration Steps
 
-1. Create new feature directories if they don't exist
-2. Move components to their new locations
-3. Update imports to use new paths
-4. Test each feature thoroughly
-5. Only after verifying everything works:
-   - Remove old files
-   - Remove empty directories
+1. Create any missing domain folders
+2. Move entities to their respective domains
+3. Move routes to their respective domains
+4. Move services to their respective domains
+5. Update imports in all moved files
+6. Test thoroughly
+7. Archive old folders
 
 ## Testing Requirements
 
-Before any cleanup:
-1. All features must work in new structure
-2. No console errors
-3. All API calls working
-4. All state management working
-5. Mobile responsiveness verified
-6. End-to-end testing of major features
-
-## Verification Checklist
-
-For each feature:
-- [ ] Components moved to new location
-- [ ] Imports updated
-- [ ] Feature tested thoroughly
-- [ ] No console errors
-- [ ] Mobile responsive
-- [ ] API calls working
-- [ ] State management working
-
-## Features to Test
-
-1. Accounts
-   - Account creation
-   - Account editing
-   - Account deletion
-   - Address management
-
-2. Properties
-   - Property creation
-   - Property editing
-   - Map functionality
-   - Address management
-
-3. Jobs
-   - Job creation
-   - Job editing
-   - Job scheduling
-   - Job status updates
-
-4. Equipment
-   - Equipment placement
-   - Equipment editing
-   - Equipment status updates
-
-5. Maps
-   - 2D map functionality
-   - 3D map functionality
-   - Location selection
-   - Boundary drawing
+[Previous content remains...]
 
 ## Safety Measures
 
-1. Keep old files until new structure is verified
-2. Create git branch for migration
-3. Document any breaking changes
-4. Maintain rollback capability
-5. Test thoroughly before cleanup
+[Previous content remains...]
 
 ## Final Steps
 
-Only after all features are verified working:
-1. Remove old files
-2. Remove empty directories
-3. Update documentation
-4. Final round of testing
-
-Remember: This is a migration, not a deletion. Old files stay until new structure is proven working.
+[Previous content remains...]

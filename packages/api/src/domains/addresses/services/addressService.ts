@@ -1,7 +1,7 @@
-import { AppDataSource } from '../../../core/config/database';
+import { AppDataSource } from '../../../config/database';
 import { Address } from '../entities/Address';
 import { CreateAddressDto, UpdateAddressDto, AddressFilters } from '../types';
-import { logger } from '../../../core/utils/logger';
+import { logger } from '../../../utils/logger';
 
 export class AddressService {
     private addressRepository = AppDataSource.getRepository(Address);

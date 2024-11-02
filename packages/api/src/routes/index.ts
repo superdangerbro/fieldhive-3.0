@@ -1,34 +1,19 @@
 import { Router } from 'express';
-import accountsRouter, { createAccount, updateAccount, listAccounts, deleteAccount } from './accounts';
-import propertiesRouter from './properties';
-import jobsRouter from './jobs';
-import settingsRouter from './settings';
-import addressesRouter from './addresses';
-import equipmentTypesRouter from './equipment_types';
-import fieldEquipmentRouter from './field_equipment';
+import accountsRouter from '../domains/accounts/routes';
+import addressesRouter from '../domains/addresses/routes';
+import propertiesRouter from '../domains/properties/routes';
+import jobsRouter from '../domains/jobs/routes';
+import inspectionsRouter from '../domains/inspections/routes';
+import settingsRouter from '../domains/settings/routes';
 
 const router = Router();
 
-// Account routes
-router.get('/accounts', listAccounts);
-router.post('/accounts', createAccount);
-router.put('/accounts/:id', updateAccount);
-router.delete('/accounts/:id', deleteAccount);
-
-// Properties routes
-router.use('/properties', propertiesRouter);
-
-// Jobs routes
-router.use('/jobs', jobsRouter);
-
-// Settings routes
-router.use('/settings', settingsRouter);
-
-// Addresses routes
-router.use('/addresses', addressesRouter);
-
-// Equipment routes
-router.use('/equipment_types', equipmentTypesRouter);
-router.use('/field_equipment', fieldEquipmentRouter);
+// Mount domain routes
+if (accountsRouter) router.use('/accounts', accountsRouter);
+if (addressesRouter) router.use('/addresses', addressesRouter);
+if (propertiesRouter) router.use('/properties', propertiesRouter);
+if (jobsRouter) router.use('/jobs', jobsRouter);
+if (inspectionsRouter) router.use('/inspections', inspectionsRouter);
+if (settingsRouter) router.use('/settings', settingsRouter);
 
 export default router;

@@ -1,8 +1,8 @@
-import { AppDataSource } from '../../../core/config/database';
+import { AppDataSource } from '../../../config/database';
 import { Account } from '../entities/Account';
 import { CreateAccountDto, UpdateAccountDto, AccountFilters, AccountStatus } from '../types';
 import { AddressService } from '../../addresses/services/addressService';
-import { logger } from '../../../core/utils/logger';
+import { logger } from '../../../utils/logger';
 
 export class AccountService {
     private accountRepository = AppDataSource.getRepository(Account);
@@ -11,11 +11,58 @@ export class AccountService {
     async findById(id: string): Promise<Account | null> {
         try {
             return await this.accountRepository.findOne({
-                where: { id },
+                where: { account_id: id },
                 relations: ['billingAddress', 'properties']
             });
         } catch (error) {
             logger.error('Error finding account by ID:', error);
+            throw error;
+        }
+    }
+
+    async findByFilters(filters: AccountFilters & { limit?: number; offset?: number }): Promise<{ accounts: Account[]; total: number }> {
+        try {
+            const query = this.accountRepository.createQueryBuilder('account')
+                .leftJoinAndSelect('account.billingAddress', 'billingAddress')
+                .leftJoinAndSelect('account.properties', 'properties');
+
+            if (filters.type) {
+                query.andWhere('account.type = :type', { type: filters.type });
+            }
+
+            if (filters.status) {
+                query.andWhere('account.status = :status', { status: filters.status });
+            }
+
+            if (filters.name) {
+                query.andWhere('account.name ILIKE :name', { name: `%${filters.name}%` });
+            }
+
+            // Get total count before applying pagination
+            const total = await query.getCount();
+
+            // Apply pagination if provided
+            if (filters.limit !== undefined) {
+                query.take(filters.limit);
+            }
+            if (filters.offset !== undefined) {
+                query.skip(filters.offset);
+            }
+
+            const accounts = await query.getMany();
+
+            // Transform the response to match frontend expectations
+            const transformedAccounts = accounts.map(account => ({
+                ...account,
+                billing_address: account.billingAddress
+            }));
+
+            return {
+                accounts: transformedAccounts,
+                total
+            };
+        } catch (error) {
+            logger.error('Error finding accounts by filters:', error);
             throw error;
         }
     }
@@ -70,31 +117,6 @@ export class AccountService {
         }
     }
 
-    async findByFilters(filters: AccountFilters): Promise<Account[]> {
-        try {
-            const query = this.accountRepository.createQueryBuilder('account')
-                .leftJoinAndSelect('account.billingAddress', 'billingAddress')
-                .leftJoinAndSelect('account.properties', 'properties');
-
-            if (filters.type) {
-                query.andWhere('account.type = :type', { type: filters.type });
-            }
-
-            if (filters.status) {
-                query.andWhere('account.status = :status', { status: filters.status });
-            }
-
-            if (filters.name) {
-                query.andWhere('account.name ILIKE :name', { name: `%${filters.name}%` });
-            }
-
-            return await query.getMany();
-        } catch (error) {
-            logger.error('Error finding accounts by filters:', error);
-            throw error;
-        }
-    }
-
     async updateBillingAddress(id: string, addressId: string): Promise<Account | null> {
         try {
             const account = await this.findById(id);
@@ -143,3 +165,5 @@ export class AccountService {
         }
     }
 }
+
+export const accountService = new AccountService();

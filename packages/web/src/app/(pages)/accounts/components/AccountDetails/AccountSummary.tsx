@@ -23,6 +23,9 @@ export function AccountSummary({ account, onEditAddress }: AccountSummaryProps) 
               {account.billingAddress ? (
                 <>
                   {account.billingAddress.address1}<br />
+                  {account.billingAddress.address2 && (
+                    <>{account.billingAddress.address2}<br /></>
+                  )}
                   {account.billingAddress.city}, {account.billingAddress.province}<br />
                   {account.billingAddress.postal_code}
                 </>

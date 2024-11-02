@@ -1,13 +1,13 @@
 import { DataSource } from 'typeorm';
-import { logger } from '../utils/logger';
-import { dbConfig, env } from './env';
-import { Property } from '../entities/Property';
-import { Account } from '../entities/Account';
-import { Address } from '../entities/Address';
-import { PropertiesAccounts } from '../entities/PropertiesAccounts';
-import { UsersAccounts } from '../entities/UsersAccounts';
-import { Job } from '../entities/Job';
-import { Setting } from '../entities/Setting';
+import { logger } from '../../utils/logger';
+import { dbConfig, env } from '../../config/env';
+import { Property } from '../../domains/properties/entities/Property';
+import { Account } from '../../domains/accounts/entities/Account';
+import { Address } from '../../domains/addresses/entities/Address';
+import { PropertiesAccounts } from '../../jointables/PropertiesAccounts';
+import { UsersAccounts } from '../../jointables/UsersAccounts';
+import { Job } from '../../domains/jobs/entities/Job';
+import { Setting } from '../../domains/settings/entities/Setting';
 
 export const AppDataSource = new DataSource({
     type: 'postgres',
