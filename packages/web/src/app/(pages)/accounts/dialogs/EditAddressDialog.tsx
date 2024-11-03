@@ -6,8 +6,8 @@ import {
     DialogTitle, 
     DialogContent
 } from '@mui/material';
-import { Address } from '@fieldhive/shared';
-import { AddressForm } from '@/app/(pages)/components/common';
+import { Address } from '@/app/globaltypes';
+import { AddressForm } from '@/app/globalComponents/AddressForm';
 
 interface EditAddressDialogProps {
     open: boolean;

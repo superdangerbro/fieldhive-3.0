@@ -4,12 +4,17 @@ import React, { useState } from 'react';
 import { Box } from '@mui/material';
 import { AccountDetails, AccountSearch, AccountsTable } from './components';
 import { AddAccountDialog } from './dialogs';
-import type { Account } from '@fieldhive/shared';
-import { getAccounts } from '@/services/api';
+import type { Account } from '@/app/globaltypes';
+import { useAccountStore } from './store';
 
 export default function AccountsPage() {
-    const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-    const [accounts, setAccounts] = useState<Account[]>([]);
+    const { 
+        selectedAccount, 
+        setSelectedAccount,
+        accounts,
+        refreshAccounts
+    } = useAccountStore();
+    
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
@@ -33,26 +38,11 @@ export default function AccountsPage() {
 
         // If we have a selected account, refresh its data
         if (selectedAccount) {
-            try {
-                const response = await getAccounts({
-                    limit: 1,
-                    offset: 0,
-                    search: selectedAccount.account_id
-                });
-
-                if (response.accounts.length > 0) {
-                    const freshAccount = response.accounts[0];
-                    setSelectedAccount(freshAccount);
-                }
-            } catch (error) {
-                console.error('Failed to refresh selected account:', error);
-            }
+            await refreshAccounts();
         }
     };
 
     const handleAccountsLoad = (loadedAccounts: Account[]) => {
-        setAccounts(loadedAccounts);
-        
         // If we have a selected account, update it with fresh data
         if (selectedAccount) {
             const updatedAccount = loadedAccounts.find(a => a.account_id === selectedAccount.account_id);

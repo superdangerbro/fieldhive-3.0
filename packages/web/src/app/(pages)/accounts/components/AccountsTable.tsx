@@ -5,8 +5,8 @@ import { Box, Card, CardContent, TextField, IconButton, Tooltip, Menu, MenuItem,
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import { getAccounts } from '@/services/api';
-import type { Account } from '@fieldhive/shared';
+import { useAccountStore } from '../store';
+import type { Account } from '@/app/globaltypes';
 
 interface AccountsTableProps {
   refreshTrigger?: number;
@@ -95,10 +95,9 @@ export function AccountsTable({
   selectedAccount,
   onAccountsLoad
 }: AccountsTableProps) {
+  const { accounts, isLoading, fetchAccounts, setSelectedAccount } = useAccountStore();
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(0);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(true);
   const [totalRows, setTotalRows] = useState(0);
   const [filterText, setFilterText] = useState('');
   const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns.map(col => col.field));
@@ -129,34 +128,21 @@ export function AccountsTable({
       filterable: true
     }));
 
-  const fetchAccounts = async () => {
-    try {
-      setLoading(true);
-      const response = await getAccounts({
-        limit: pageSize,
-        offset: page * pageSize,
-        search: filterText
-      });
-      
-      const accountsData = response.accounts;
-      setAccounts(accountsData);
-      onAccountsLoad(accountsData);
-      setTotalRows(response.total);
-    } catch (error) {
-      console.error('Failed to fetch accounts:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchAccounts();
-  }, [page, pageSize, refreshTrigger, filterText]);
+  }, [page, pageSize, refreshTrigger, filterText, fetchAccounts]);
+
+  useEffect(() => {
+    if (accounts) {
+      setTotalRows(accounts.length);
+      onAccountsLoad(accounts);
+    }
+  }, [accounts, onAccountsLoad]);
 
   const handleRowClick = (params: any) => {
-    // Find the full account data from our accounts state
     const account = accounts.find(a => a.account_id === params.id);
     if (account) {
+      setSelectedAccount(account);
       onAccountSelect(account);
     }
   };
@@ -231,7 +217,7 @@ export function AccountsTable({
         columns={columns}
         getRowId={(row) => row.account_id}
         rowCount={totalRows}
-        loading={loading}
+        loading={isLoading}
         paginationMode="server"
         page={page}
         pageSize={pageSize}

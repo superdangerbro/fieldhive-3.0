@@ -3,7 +3,7 @@
 import React from 'react';
 import { Autocomplete, TextField, Box, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import type { Account } from '@fieldhive/shared';
+import type { Account } from '@/app/globaltypes';
 
 interface AccountSearchProps {
   accounts: Account[];

@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { Box, Tabs, Tab } from '@mui/material';
-import { EquipmentTab, JobsTab, AccountsTab, PropertiesTab } from './tabs';
+import { EquipmentTab } from './equipment/EquipmentTab';
+import { JobsTab } from './jobs/JobsTab';
+import { AccountsTab } from './accounts/AccountsTab';
+import { PropertiesTab } from './properties/PropertiesTab';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 interface TabPanelProps {

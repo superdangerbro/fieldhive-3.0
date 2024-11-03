@@ -17,9 +17,9 @@ import {
     CircularProgress,
     Alert
 } from '@mui/material';
-import { AccountType, CreateAddressDto } from '@fieldhive/shared';
-import { createAccount, getSetting, createAddress } from '@/services/api';
-import { AddressForm } from '@/app/(pages)/components/common';
+import { AccountType, CreateAddressDto } from '@/app/globaltypes';
+import { useAccountStore } from '@/app/(pages)/accounts/store/accountStore';
+import { AddressForm } from '@/app/globalComponents/AddressForm';
 
 interface AddAccountDialogProps {
     open: boolean;
@@ -34,8 +34,8 @@ interface FormData {
 }
 
 export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDialogProps) {
+    const { createAccount, isLoading, error: storeError } = useAccountStore();
     const [accountTypes, setAccountTypes] = useState<string[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState<FormData>({
         name: '',
@@ -53,7 +53,11 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
     useEffect(() => {
         const loadAccountTypes = async () => {
             try {
-                const types = await getSetting('account_types');
+                const response = await fetch('/api/settings/account_types');
+                if (!response.ok) {
+                    throw new Error('Failed to load account types');
+                }
+                const types = await response.json();
                 if (Array.isArray(types) && types.length > 0) {
                     setAccountTypes(types);
                     setFormData(prev => ({
@@ -114,7 +118,6 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
             return;
         }
 
-        setIsLoading(true);
         setError(null);
 
         try {
@@ -130,33 +133,24 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
                 throw new Error('Please fill in all required address fields');
             }
 
-            // First create the address
-            const addressData = {
-                address1: formData.address.address1.trim(),
-                address2: formData.address.address2?.trim(),
-                city: formData.address.city.trim(),
-                province: formData.address.province.trim(),
-                postal_code: formData.address.postal_code.trim(),
-                country: formData.address.country.trim() || 'Canada',
-            };
-
-            const createdAddress = await createAddress(addressData);
-
-            // Then create the account with the address ID
-            const accountData = {
+            await createAccount({
                 name: formData.name.trim(),
                 type: formData.type as AccountType,
-                billing_address_id: createdAddress.address_id
-            };
+                address: {
+                    address1: formData.address.address1.trim(),
+                    address2: formData.address.address2?.trim(),
+                    city: formData.address.city.trim(),
+                    province: formData.address.province.trim(),
+                    postal_code: formData.address.postal_code.trim(),
+                    country: formData.address.country.trim() || 'Canada',
+                }
+            });
 
-            await createAccount(accountData);
             onAccountAdded();
             onClose();
-        } catch (error: any) {
+        } catch (error) {
             console.error('Failed to create account:', error);
-            setError(error.message || 'Failed to create account. Please try again.');
-        } finally {
-            setIsLoading(false);
+            setError(error instanceof Error ? error.message : 'Failed to create account. Please try again.');
         }
     };
 
@@ -173,9 +167,9 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
         >
             <DialogTitle>Add New Account</DialogTitle>
             <DialogContent>
-                {error && (
+                {(error || storeError) && (
                     <Alert severity="error" sx={{ mb: 2 }}>
-                        {error}
+                        {error || storeError}
                     </Alert>
                 )}
                 

@@ -3,10 +3,15 @@
 import React from 'react';
 import { Box, Typography, IconButton, Grid } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
-import type { Account } from '@fieldhive/shared';
+import { Address } from '@/app/globaltypes';
 
 interface AccountSummaryProps {
-  account: Account;
+  account: {
+    account_id: string;
+    name: string;
+    type: string;
+    billingAddress: Address | null;
+  };
   onEditAddress: () => void;
 }
 
