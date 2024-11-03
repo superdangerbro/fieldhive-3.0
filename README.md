@@ -16,6 +16,10 @@ A modern field service management platform built with Next.js, TypeScript, and P
   - Modern Material UI design
   - Real-time data updates
   - Intuitive navigation
+- ⚙️ Configurable settings
+  - Customizable statuses and types for all domains
+  - Color-coded status management
+  - Field definitions for types
 
 ## Tech Stack
 
@@ -25,6 +29,7 @@ A modern field service management platform built with Next.js, TypeScript, and P
 - Material UI
 - Mapbox GL JS
 - React Map GL
+- Zustand for state management
 
 ### Backend
 - Node.js
@@ -86,30 +91,63 @@ pnpm dev
 ```
 fieldhive-3.0/
 ├── packages/
-│   ├── api/               # Backend API server
+│   ├── api/                    # Backend API server
 │   │   ├── src/
-│   │   │   ├── config/   # Configuration
-│   │   │   ├── entities/ # Database entities
-│   │   │   ├── routes/   # API routes
-│   │   │   └── services/ # Business logic
+│   │   │   ├── config/        # Configuration
+│   │   │   ├── domains/       # Domain-driven structure
+│   │   │   │   ├── accounts/  # Account management
+│   │   │   │   ├── equipment/ # Equipment management
+│   │   │   │   ├── jobs/      # Job management
+│   │   │   │   ├── properties/# Property management
+│   │   │   │   └── settings/  # Settings management
+│   │   │   ├── utils/         # Shared utilities
+│   │   │   └── websocket/     # WebSocket functionality
 │   │   └── package.json
-│   ├── shared/           # Shared types and utilities
-│   │   └── src/
-│   │       └── types/    # TypeScript types
-│   └── web/              # Frontend Next.js app
+│   └── web/                   # Frontend Next.js app
 │       ├── src/
-│       │   ├── app/      # Next.js pages
-│       │   ├── components/
-│       │   └── services/ # API clients
+│       │   ├── app/
+│       │   │   ├── (auth)/    # Authentication pages
+│       │   │   ├── (pages)/   # Domain pages
+│       │   │   │   ├── accounts/
+│       │   │   │   ├── equipment/
+│       │   │   │   ├── jobs/
+│       │   │   │   ├── properties/
+│       │   │   │   └── settings/
+│       │   │   ├── globalComponents/
+│       │   │   └── layouts/   # Shared layouts
+│       │   ├── services/      # Core services
+│       │   └── theme/         # MUI theme config
 │       └── package.json
 └── package.json
 ```
+
+## Architecture
+
+### Domain-Driven Design
+- Each domain (accounts, equipment, jobs, properties) has its own:
+  - API handlers and routes
+  - React components and pages
+  - Zustand stores for state management
+  - Type definitions
+
+### State Management
+- Zustand stores with direct fetch calls
+- Domain-specific stores co-located with components
+- Proper loading and error states
+- Automatic re-fetch on failed updates
+
+### Type Safety
+- Centralized types in globaltypes.ts
+- Domain-specific types in domain folders
+- Consistent interface patterns
+- Full TypeScript coverage
 
 ## Documentation
 
 - [Initial Setup](docs/ai-chats/initial-setup.md)
 - [Schema Management](docs/ai-chats/schema-management.md)
 - [Property Creation Flow](docs/ai-chats/property-creation-flow.md)
+- [Settings Page Improvements](docs/settings-page-improvements.md)
 
 ## Contributing
 

@@ -2,8 +2,9 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../../config/database';
 import { Account } from './entities/Account';
 import { logger } from '../../utils/logger';
+import { Repository } from 'typeorm';
 
-const accountRepository = AppDataSource.getRepository(Account);
+const accountRepository: Repository<Account> = AppDataSource.getRepository(Account);
 
 // Get accounts with filters
 export async function getAccounts(req: Request, res: Response) {
@@ -11,32 +12,26 @@ export async function getAccounts(req: Request, res: Response) {
         const { type, status, search, limit, offset } = req.query;
         
         const query = accountRepository
-            .createQueryBuilder('account')
-            .leftJoinAndSelect('account.billingAddress', 'billingAddress')
-            .leftJoinAndSelect('account.properties', 'properties');
+            .createQueryBuilder('accounts')
+            .leftJoinAndSelect('accounts.billingAddress', 'billingAddress')
+            .leftJoinAndSelect('accounts.properties', 'properties')
+            .leftJoinAndSelect('accounts.users', 'users');
 
         // Add filters
         if (type) {
-            query.andWhere('account.type = :type', { type });
+            query.andWhere('accounts.type = :type', { type });
         }
         if (status) {
-            query.andWhere('account.status = :status', { status });
+            query.andWhere('accounts.status = :status', { status });
         }
         if (search) {
             // Check if it's a UUID (account_id)
             if (String(search).match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-                logger.info('Searching by account_id:', search);
-                query.andWhere('account.account_id = :id', { id: search });
+                query.andWhere('accounts.account_id = :id', { id: search });
             } else {
-                logger.info('Searching by name:', search);
-                query.andWhere('account.name ILIKE :name', { name: `%${search}%` });
+                query.andWhere('accounts.name ILIKE :name', { name: `%${search}%` });
             }
         }
-
-        // Log the generated SQL
-        const sqlQuery = query.getSql();
-        const sqlParams = query.getParameters();
-        logger.info('Generated SQL:', { sql: sqlQuery, params: sqlParams });
 
         // Get total count
         const total = await query.getCount();
@@ -51,20 +46,8 @@ export async function getAccounts(req: Request, res: Response) {
 
         // Get accounts
         const accounts = await query
-            .orderBy('account.name', 'ASC')
+            .orderBy('accounts.name', 'ASC')
             .getMany();
-
-        // Log the results
-        logger.info('Query results:', {
-            total,
-            accountCount: accounts.length,
-            firstAccount: accounts[0] ? {
-                id: accounts[0].account_id,
-                name: accounts[0].name,
-                billing_address_id: accounts[0].billing_address_id,
-                billingAddress: accounts[0].billingAddress
-            } : null
-        });
 
         res.json({ accounts, total });
     } catch (error) {
@@ -83,7 +66,7 @@ export async function getAccount(req: Request, res: Response) {
         const { id } = req.params;
         const account = await accountRepository.findOne({
             where: { account_id: id },
-            relations: ['billingAddress', 'properties']
+            relations: ['billingAddress', 'properties', 'users']
         });
 
         if (!account) {
@@ -122,21 +105,28 @@ export async function createAccount(req: Request, res: Response) {
             });
         }
 
-        // Create account
-        const account = accountRepository.create({
+        // Create account with timestamps
+        const now = new Date();
+        const newAccount = accountRepository.create({
             ...req.body,
-            status: 'Active'
+            status: 'Active',
+            created_at: now,
+            updated_at: now
         });
 
-        await accountRepository.save(account);
+        const savedAccount = await accountRepository.save(newAccount);
 
         // Return account with relations
-        const savedAccount = await accountRepository.findOne({
-            where: { account_id: account.account_id },
-            relations: ['billingAddress', 'properties']
+        const accountWithRelations = await accountRepository.findOne({
+            where: { account_id: savedAccount.account_id },
+            relations: ['billingAddress', 'properties', 'users']
         });
 
-        res.status(201).json(savedAccount);
+        if (!accountWithRelations) {
+            throw new Error('Failed to retrieve saved account');
+        }
+
+        res.status(201).json(accountWithRelations);
     } catch (error) {
         logger.error('Error creating account:', error);
         res.status(500).json({
@@ -153,7 +143,7 @@ export async function updateAccount(req: Request, res: Response) {
         const { id } = req.params;
         const account = await accountRepository.findOne({
             where: { account_id: id },
-            relations: ['billingAddress', 'properties']
+            relations: ['billingAddress', 'properties', 'users']
         });
 
         if (!account) {
@@ -178,8 +168,11 @@ export async function updateAccount(req: Request, res: Response) {
             });
         }
 
-        // Update account
-        accountRepository.merge(account, req.body);
+        // Update account with new timestamp
+        accountRepository.merge(account, {
+            ...req.body,
+            updated_at: new Date()
+        });
         const updatedAccount = await accountRepository.save(account);
 
         res.json(updatedAccount);
@@ -188,6 +181,45 @@ export async function updateAccount(req: Request, res: Response) {
         res.status(500).json({
             error: 'Internal server error',
             message: 'Failed to update account',
+            details: error instanceof Error ? error.message : String(error)
+        });
+    }
+}
+
+// Delete account
+export async function deleteAccount(req: Request, res: Response) {
+    try {
+        const { id } = req.params;
+        const account = await accountRepository.findOne({
+            where: { account_id: id },
+            relations: ['billingAddress', 'properties', 'users']
+        });
+
+        if (!account) {
+            return res.status(404).json({
+                error: 'Not found',
+                message: 'Account not found'
+            });
+        }
+
+        // Remove relationships first
+        account.properties = [];
+        account.users = [];
+        await accountRepository.save(account);
+
+        // Then delete the account
+        await accountRepository.remove(account);
+
+        // Send a simple success response
+        res.json({
+            success: true,
+            message: 'Account deleted successfully'
+        });
+    } catch (error) {
+        logger.error('Error deleting account:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: 'Failed to delete account',
             details: error instanceof Error ? error.message : String(error)
         });
     }
@@ -209,6 +241,7 @@ export async function archiveAccount(req: Request, res: Response) {
         }
 
         account.status = 'Archived';
+        account.updated_at = new Date();
         const archivedAccount = await accountRepository.save(account);
 
         res.json(archivedAccount);

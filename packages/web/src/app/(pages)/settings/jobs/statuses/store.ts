@@ -1,13 +1,9 @@
 'use client';
 
 import { create } from 'zustand';
-import { api } from '@/services/api';
+import { JobStatus } from '@/app/globaltypes';
 
-export interface JobStatus {
-    value: string;
-    label: string;
-    color: string;
-}
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface JobStatusStore {
     // Data
@@ -28,8 +24,14 @@ export const useJobStatuses = create<JobStatusStore>((set) => ({
     fetch: async () => {
         try {
             set({ isLoading: true, error: null });
-            const response = await api.get<{ statuses: JobStatus[] }>('/settings/jobs/statuses');
-            set({ statuses: response.statuses });
+            const response = await fetch(`${BASE_URL}/settings/jobs/statuses`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch job statuses');
+            }
+
+            const data = await response.json();
+            set({ statuses: data.statuses });
         } catch (error) {
             console.error('Failed to fetch job statuses:', error);
             set({ error: 'Failed to load job statuses' });
@@ -41,9 +43,20 @@ export const useJobStatuses = create<JobStatusStore>((set) => ({
     update: async (statuses) => {
         try {
             set({ isLoading: true, error: null });
-            await api.put('/settings/jobs/statuses', { 
-                value: { statuses } 
+            const response = await fetch(`${BASE_URL}/settings/jobs/statuses`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    value: { statuses } 
+                })
             });
+
+            if (!response.ok) {
+                throw new Error('Failed to update job statuses');
+            }
+
             set({ statuses });
         } catch (error) {
             console.error('Failed to update job statuses:', error);

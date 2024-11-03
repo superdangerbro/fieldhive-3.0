@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../../config/database';
 import { Property } from './entities/Property';
 import { Account } from '../accounts/entities/Account';
-import { logger } from '../../core/utils/logger';
+import { logger } from '../../utils/logger';
 
 const propertyRepository = AppDataSource.getRepository(Property);
 const accountRepository = AppDataSource.getRepository(Account);

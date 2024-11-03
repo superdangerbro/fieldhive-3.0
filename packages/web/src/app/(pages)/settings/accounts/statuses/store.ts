@@ -1,7 +1,8 @@
 'use client';
 
 import { create } from 'zustand';
-import { api } from '@/services/api';
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 export interface AccountStatus {
     value: string;
@@ -28,8 +29,14 @@ export const useAccountStatuses = create<AccountStatusStore>((set) => ({
     fetch: async () => {
         try {
             set({ isLoading: true, error: null });
-            const response = await api.get<{ statuses: AccountStatus[] }>('/settings/accounts/statuses');
-            set({ statuses: response.statuses });
+            const response = await fetch(`${BASE_URL}/settings/accounts/statuses`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch account statuses');
+            }
+
+            const data = await response.json();
+            set({ statuses: data.statuses });
         } catch (error) {
             console.error('Failed to fetch account statuses:', error);
             set({ error: 'Failed to load account statuses' });
@@ -41,9 +48,20 @@ export const useAccountStatuses = create<AccountStatusStore>((set) => ({
     update: async (statuses) => {
         try {
             set({ isLoading: true, error: null });
-            await api.put('/settings/accounts/statuses', { 
-                value: { statuses } 
+            const response = await fetch(`${BASE_URL}/settings/accounts/statuses`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    value: { statuses } 
+                })
             });
+
+            if (!response.ok) {
+                throw new Error('Failed to update account statuses');
+            }
+
             set({ statuses });
         } catch (error) {
             console.error('Failed to update account statuses:', error);

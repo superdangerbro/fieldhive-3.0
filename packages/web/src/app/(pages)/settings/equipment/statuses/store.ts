@@ -1,13 +1,9 @@
 'use client';
 
 import { create } from 'zustand';
-import { api } from '@/services/api';
+import { EquipmentStatus } from '@/app/globaltypes';
 
-export interface EquipmentStatus {
-    value: string;
-    label: string;
-    color: string;
-}
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface EquipmentStatusStore {
     // Data
@@ -28,8 +24,14 @@ export const useEquipmentStatuses = create<EquipmentStatusStore>((set) => ({
     fetch: async () => {
         try {
             set({ isLoading: true, error: null });
-            const response = await api.get<{ statuses: EquipmentStatus[] }>('/settings/equipment/statuses');
-            set({ statuses: response.statuses });
+            const response = await fetch(`${BASE_URL}/settings/equipment/statuses`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch equipment statuses');
+            }
+
+            const data = await response.json();
+            set({ statuses: data.statuses });
         } catch (error) {
             console.error('Failed to fetch equipment statuses:', error);
             set({ error: 'Failed to load equipment statuses' });
@@ -41,9 +43,20 @@ export const useEquipmentStatuses = create<EquipmentStatusStore>((set) => ({
     update: async (statuses) => {
         try {
             set({ isLoading: true, error: null });
-            await api.put('/settings/equipment/statuses', { 
-                value: { statuses } 
+            const response = await fetch(`${BASE_URL}/settings/equipment/statuses`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    value: { statuses } 
+                })
             });
+
+            if (!response.ok) {
+                throw new Error('Failed to update equipment statuses');
+            }
+
             set({ statuses });
         } catch (error) {
             console.error('Failed to update equipment statuses:', error);

@@ -1,12 +1,9 @@
 'use client';
 
 import { create } from 'zustand';
-import { api } from '@/services/api';
+import { JobType } from '@/app/globaltypes';
 
-export interface JobType {
-    name: string;
-    fields: any[]; // TODO: Define field types when needed
-}
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface JobTypeStore {
     // Data
@@ -27,8 +24,14 @@ export const useJobTypes = create<JobTypeStore>((set) => ({
     fetch: async () => {
         try {
             set({ isLoading: true, error: null });
-            const response = await api.get<JobType[]>('/settings/jobs/types');
-            set({ types: response });
+            const response = await fetch(`${BASE_URL}/settings/jobs/types`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch job types');
+            }
+
+            const data = await response.json();
+            set({ types: data });
         } catch (error) {
             console.error('Failed to fetch job types:', error);
             set({ error: 'Failed to load job types' });
@@ -40,7 +43,18 @@ export const useJobTypes = create<JobTypeStore>((set) => ({
     update: async (types) => {
         try {
             set({ isLoading: true, error: null });
-            await api.put('/settings/jobs/types', types);
+            const response = await fetch(`${BASE_URL}/settings/jobs/types`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(types)
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update job types');
+            }
+
             set({ types });
         } catch (error) {
             console.error('Failed to update job types:', error);

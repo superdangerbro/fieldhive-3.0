@@ -43,13 +43,22 @@ export function AddressForm({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
+    const updatedData = {
+      ...formData,
       [name]: value
-    }));
+    };
+    setFormData(updatedData);
+    // Only call onSubmit if we're hiding buttons (inline mode)
+    if (hideButtons) {
+      onSubmit(updatedData);
+    }
   };
 
   const handleSubmit = () => {
+    // Validate required fields before submitting
+    if (!formData.address1 || !formData.city || !formData.province || !formData.postal_code) {
+      return;
+    }
     onSubmit(formData);
   };
 
@@ -65,6 +74,7 @@ export function AddressForm({
             value={formData.address1}
             onChange={handleChange}
             disabled={disabled}
+            error={!formData.address1}
           />
         </Grid>
         <Grid item xs={12}>
@@ -86,6 +96,7 @@ export function AddressForm({
             value={formData.city}
             onChange={handleChange}
             disabled={disabled}
+            error={!formData.city}
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -97,6 +108,7 @@ export function AddressForm({
             value={formData.province}
             onChange={handleChange}
             disabled={disabled}
+            error={!formData.province}
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -108,6 +120,7 @@ export function AddressForm({
             value={formData.postal_code}
             onChange={handleChange}
             disabled={disabled}
+            error={!formData.postal_code}
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -130,7 +143,7 @@ export function AddressForm({
           <Button 
             onClick={handleSubmit}
             variant="contained"
-            disabled={disabled}
+            disabled={disabled || !formData.address1 || !formData.city || !formData.province || !formData.postal_code}
             sx={{
               backgroundImage: 'linear-gradient(to right, #6366f1, #4f46e5)',
               '&:hover': {

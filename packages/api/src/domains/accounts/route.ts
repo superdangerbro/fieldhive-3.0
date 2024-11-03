@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAccounts, getAccount, createAccount, updateAccount, archiveAccount } from './handler';
+import { getAccounts, getAccount, createAccount, updateAccount, archiveAccount, deleteAccount } from './handler';
 
 const router = Router();
 
@@ -14,6 +14,9 @@ router.post('/', createAccount);
 
 // Update account
 router.put('/:id', updateAccount);
+
+// Delete account
+router.delete('/:id', deleteAccount);
 
 // Archive account
 router.post('/:id/archive', archiveAccount);

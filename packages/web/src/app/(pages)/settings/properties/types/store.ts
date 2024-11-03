@@ -1,12 +1,9 @@
 'use client';
 
 import { create } from 'zustand';
-import { api } from '@/services/api';
+import { PropertyType } from '@/app/globaltypes';
 
-export interface PropertyType {
-    name: string;
-    fields: any[]; // TODO: Define field types when needed
-}
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface PropertyTypeStore {
     // Data
@@ -27,8 +24,14 @@ export const usePropertyTypes = create<PropertyTypeStore>((set) => ({
     fetch: async () => {
         try {
             set({ isLoading: true, error: null });
-            const response = await api.get<PropertyType[]>('/settings/properties/types');
-            set({ types: response });
+            const response = await fetch(`${BASE_URL}/settings/properties/types`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch property types');
+            }
+
+            const data = await response.json();
+            set({ types: data });
         } catch (error) {
             console.error('Failed to fetch property types:', error);
             set({ error: 'Failed to load property types' });
@@ -40,7 +43,18 @@ export const usePropertyTypes = create<PropertyTypeStore>((set) => ({
     update: async (types) => {
         try {
             set({ isLoading: true, error: null });
-            await api.put('/settings/properties/types', types);
+            const response = await fetch(`${BASE_URL}/settings/properties/types`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(types)
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update property types');
+            }
+
             set({ types });
         } catch (error) {
             console.error('Failed to update property types:', error);

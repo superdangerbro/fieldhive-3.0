@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, ManyToMany, JoinTable } from 'typeorm';
 import { Property } from '../../properties/entities/Property';
 import { Address } from '../../addresses/entities/Address';
+import { User } from '../../users/entities/User';
 
 @Entity('accounts')
 export class Account {
@@ -36,6 +37,20 @@ export class Account {
         }
     })
     properties: Property[];
+
+    @ManyToMany(() => User)
+    @JoinTable({
+        name: 'users_accounts',
+        joinColumn: {
+            name: 'account_id',
+            referencedColumnName: 'account_id'
+        },
+        inverseJoinColumn: {
+            name: 'user_id',
+            referencedColumnName: 'user_id'
+        }
+    })
+    users: User[];
 
     @CreateDateColumn({ name: 'created_at' })
     created_at: Date;

@@ -1,7 +1,8 @@
 'use client';
 
 import { create } from 'zustand';
-import { api } from '@/services/api';
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 export interface AccountType {
     value: string;
@@ -27,8 +28,14 @@ export const useAccountTypes = create<AccountTypeStore>((set) => ({
     fetch: async () => {
         try {
             set({ isLoading: true, error: null });
-            const response = await api.get<AccountType[]>('/settings/accounts/types');
-            set({ types: response });
+            const response = await fetch(`${BASE_URL}/settings/accounts/types`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch account types');
+            }
+
+            const data = await response.json();
+            set({ types: data });
         } catch (error) {
             console.error('Failed to fetch account types:', error);
             set({ error: 'Failed to load account types' });
@@ -40,7 +47,18 @@ export const useAccountTypes = create<AccountTypeStore>((set) => ({
     update: async (types) => {
         try {
             set({ isLoading: true, error: null });
-            await api.put('/settings/accounts/types', types);
+            const response = await fetch(`${BASE_URL}/settings/accounts/types`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(types)
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update account types');
+            }
+
             set({ types });
         } catch (error) {
             console.error('Failed to update account types:', error);

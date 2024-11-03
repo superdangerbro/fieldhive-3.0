@@ -17,8 +17,8 @@ import {
     CircularProgress,
     Alert
 } from '@mui/material';
-import { AccountType, CreateAddressDto } from '@/app/globaltypes';
-import { useAccountStore } from '@/app/(pages)/accounts/store/accountStore';
+import { CreateAddressDto } from '@/app/globaltypes';
+import { useAccountStore } from '../store';
 import { AddressForm } from '@/app/globalComponents/AddressForm';
 
 interface AddAccountDialogProps {
@@ -34,8 +34,7 @@ interface FormData {
 }
 
 export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDialogProps) {
-    const { createAccount, isLoading, error: storeError } = useAccountStore();
-    const [accountTypes, setAccountTypes] = useState<string[]>([]);
+    const { createAccount, fetchAccountSettings, accountTypes, isLoading, error: storeError } = useAccountStore();
     const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState<FormData>({
         name: '',
@@ -51,30 +50,12 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
     });
 
     useEffect(() => {
-        const loadAccountTypes = async () => {
-            try {
-                const response = await fetch('/api/settings/account_types');
-                if (!response.ok) {
-                    throw new Error('Failed to load account types');
-                }
-                const types = await response.json();
-                if (Array.isArray(types) && types.length > 0) {
-                    setAccountTypes(types);
-                    setFormData(prev => ({
-                        ...prev,
-                        type: types[0]
-                    }));
-                } else {
-                    throw new Error('No account types available');
-                }
-            } catch (error) {
-                console.error('Failed to load account types:', error);
-                setError('Unable to load account types. Please try again or contact support.');
-            }
-        };
-
         if (open) {
-            loadAccountTypes();
+            fetchAccountSettings().catch((error: Error) => {
+                console.error('Failed to load account settings:', error);
+                setError('Unable to load account settings. Please try again or contact support.');
+            });
+
             // Reset form data when dialog opens
             setFormData({
                 name: '',
@@ -90,7 +71,17 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
             });
             setError(null);
         }
-    }, [open]);
+    }, [open, fetchAccountSettings]);
+
+    // Set initial type when account types are loaded
+    useEffect(() => {
+        if (accountTypes.length > 0 && !formData.type) {
+            setFormData(prev => ({
+                ...prev,
+                type: accountTypes[0].value.toLowerCase() // Ensure lowercase value
+            }));
+        }
+    }, [accountTypes, formData.type]);
 
     const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -100,7 +91,7 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
     const handleSelectChange = (e: SelectChangeEvent<string>) => {
         setFormData(prev => ({
             ...prev,
-            type: e.target.value
+            type: e.target.value.toLowerCase() // Ensure lowercase value
         }));
     };
 
@@ -109,6 +100,29 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
             ...prev,
             address
         }));
+    };
+
+    const validateForm = () => {
+        if (!formData.name.trim()) {
+            throw new Error('Account name is required');
+        }
+        if (!formData.type) {
+            throw new Error('Account type is required');
+        }
+        
+        const { address1, city, province, postal_code } = formData.address;
+        if (!address1?.trim()) {
+            throw new Error('Address Line 1 is required');
+        }
+        if (!city?.trim()) {
+            throw new Error('City is required');
+        }
+        if (!province?.trim()) {
+            throw new Error('Province is required');
+        }
+        if (!postal_code?.trim()) {
+            throw new Error('Postal Code is required');
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -121,28 +135,19 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
         setError(null);
 
         try {
-            // Validate required fields
-            if (!formData.name.trim()) {
-                throw new Error('Account name is required');
-            }
-            if (!formData.type) {
-                throw new Error('Account type is required');
-            }
-            if (!formData.address.address1.trim() || !formData.address.city.trim() || 
-                !formData.address.province.trim() || !formData.address.postal_code.trim()) {
-                throw new Error('Please fill in all required address fields');
-            }
+            // Validate form
+            validateForm();
 
             await createAccount({
                 name: formData.name.trim(),
-                type: formData.type as AccountType,
+                type: formData.type.toLowerCase(), // Ensure lowercase value
                 address: {
-                    address1: formData.address.address1.trim(),
+                    address1: formData.address.address1?.trim() || '',
                     address2: formData.address.address2?.trim(),
-                    city: formData.address.city.trim(),
-                    province: formData.address.province.trim(),
-                    postal_code: formData.address.postal_code.trim(),
-                    country: formData.address.country.trim() || 'Canada',
+                    city: formData.address.city?.trim() || '',
+                    province: formData.address.province?.trim() || '',
+                    postal_code: formData.address.postal_code?.trim() || '',
+                    country: formData.address.country?.trim() || 'Canada',
                 }
             });
 
@@ -151,6 +156,15 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
         } catch (error) {
             console.error('Failed to create account:', error);
             setError(error instanceof Error ? error.message : 'Failed to create account. Please try again.');
+        }
+    };
+
+    const isFormValid = () => {
+        try {
+            validateForm();
+            return true;
+        } catch {
+            return false;
         }
     };
 
@@ -184,6 +198,7 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
                     value={formData.name}
                     onChange={handleTextChange}
                     disabled={isLoading}
+                    error={!formData.name.trim()}
                 />
                 
                 <FormControl fullWidth margin="dense" required>
@@ -198,15 +213,15 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
                     >
                         {accountTypes.map(type => (
                             <MenuItem 
-                                key={type} 
-                                value={type}
+                                key={type.value} 
+                                value={type.value.toLowerCase()} // Ensure lowercase value
                                 sx={{ 
                                     minHeight: '48px',
                                     display: 'flex',
                                     alignItems: 'center'
                                 }}
                             >
-                                {type}
+                                {type.label}
                             </MenuItem>
                         ))}
                     </Select>
@@ -231,7 +246,7 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
                 <Button 
                     type="submit" 
                     variant="contained"
-                    disabled={isLoading || accountTypes.length === 0}
+                    disabled={isLoading || accountTypes.length === 0 || !isFormValid()}
                     startIcon={isLoading ? <CircularProgress size={20} /> : null}
                 >
                     {isLoading ? 'Adding...' : 'Add Account'}

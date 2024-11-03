@@ -7,9 +7,10 @@ import {
     DialogContent, 
     DialogContentText, 
     DialogActions, 
-    Button 
+    Button,
+    CircularProgress
 } from '@mui/material';
-import { deleteAccount, archiveAccount } from '@/services/api';
+import { useAccountStore } from '../store';
 
 interface DeleteAccountDialogProps {
     open: boolean;
@@ -24,6 +25,7 @@ export function DeleteAccountDialog({
     onClose, 
     onDeleted 
 }: DeleteAccountDialogProps) {
+    const { deleteAccount, archiveAccount, isLoading, error: storeError } = useAccountStore();
     const [error, setError] = React.useState<string | null>(null);
     const [canArchive, setCanArchive] = React.useState(false);
 
@@ -44,9 +46,20 @@ export function DeleteAccountDialog({
             onClose();
         } catch (error: any) {
             setError(error.message);
-            setCanArchive(error.canArchive);
+            // Check if the error response indicates we can archive
+            if (error.cause?.canArchive) {
+                setCanArchive(true);
+            }
         }
     };
+
+    // Reset state when dialog opens/closes
+    React.useEffect(() => {
+        if (!open) {
+            setError(null);
+            setCanArchive(false);
+        }
+    }, [open]);
 
     return (
         <Dialog
@@ -57,10 +70,10 @@ export function DeleteAccountDialog({
         >
             <DialogTitle>Delete Account</DialogTitle>
             <DialogContent>
-                {error ? (
+                {(error || storeError) ? (
                     <>
                         <DialogContentText color="error">
-                            {error}
+                            {error || storeError}
                         </DialogContentText>
                         {canArchive && (
                             <DialogContentText sx={{ mt: 2 }}>
@@ -76,18 +89,28 @@ export function DeleteAccountDialog({
                 )}
             </DialogContent>
             <DialogActions>
-                <Button onClick={onClose}>
+                <Button onClick={onClose} disabled={isLoading}>
                     Cancel
                 </Button>
-                {error ? (
+                {(error || storeError) ? (
                     canArchive && (
-                        <Button onClick={handleArchive} color="warning">
-                            Archive Account
+                        <Button 
+                            onClick={handleArchive} 
+                            color="warning"
+                            disabled={isLoading}
+                            startIcon={isLoading ? <CircularProgress size={20} /> : null}
+                        >
+                            {isLoading ? 'Archiving...' : 'Archive Account'}
                         </Button>
                     )
                 ) : (
-                    <Button onClick={handleDelete} color="error">
-                        Delete Account
+                    <Button 
+                        onClick={handleDelete} 
+                        color="error"
+                        disabled={isLoading}
+                        startIcon={isLoading ? <CircularProgress size={20} /> : null}
+                    >
+                        {isLoading ? 'Deleting...' : 'Delete Account'}
                     </Button>
                 )}
             </DialogActions>

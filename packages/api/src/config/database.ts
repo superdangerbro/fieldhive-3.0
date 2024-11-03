@@ -6,6 +6,7 @@ import { Account } from '../domains/accounts/entities/Account';
 import { Address } from '../domains/addresses/entities/Address';
 import { Job } from '../domains/jobs/entities/Job';
 import { Setting } from '../domains/settings/entities/Setting';
+import { User } from '../domains/users/entities/User';
 import { PropertiesAccounts, UsersAccounts } from '../jointables';
 
 export const AppDataSource = new DataSource({
@@ -23,6 +24,7 @@ export const AppDataSource = new DataSource({
         Account, 
         Address, 
         Job,
+        User,
         PropertiesAccounts,
         UsersAccounts
     ],

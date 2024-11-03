@@ -1,13 +1,9 @@
 'use client';
 
 import { create } from 'zustand';
-import { api } from '@/services/api';
+import { PropertyStatus } from '@/app/globaltypes';
 
-export interface PropertyStatus {
-    value: string;
-    label: string;
-    color: string;
-}
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface PropertyStatusStore {
     // Data
@@ -28,8 +24,14 @@ export const usePropertyStatuses = create<PropertyStatusStore>((set) => ({
     fetch: async () => {
         try {
             set({ isLoading: true, error: null });
-            const response = await api.get<{ statuses: PropertyStatus[] }>('/settings/properties/statuses');
-            set({ statuses: response.statuses });
+            const response = await fetch(`${BASE_URL}/settings/properties/statuses`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch property statuses');
+            }
+
+            const data = await response.json();
+            set({ statuses: data.statuses });
         } catch (error) {
             console.error('Failed to fetch property statuses:', error);
             set({ error: 'Failed to load property statuses' });
@@ -41,9 +43,20 @@ export const usePropertyStatuses = create<PropertyStatusStore>((set) => ({
     update: async (statuses) => {
         try {
             set({ isLoading: true, error: null });
-            await api.put('/settings/properties/statuses', { 
-                value: { statuses } 
+            const response = await fetch(`${BASE_URL}/settings/properties/statuses`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    value: { statuses } 
+                })
             });
+
+            if (!response.ok) {
+                throw new Error('Failed to update property statuses');
+            }
+
             set({ statuses });
         } catch (error) {
             console.error('Failed to update property statuses:', error);

@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Box, Card, CardContent, TextField, IconButton, Tooltip, Menu, MenuItem, Checkbox, FormControlLabel, Stack, Typography, Chip } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRowParams } from '@mui/x-data-grid';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import { useAccountStore } from '../store';
-import type { Account } from '@/app/globaltypes';
+import type { Account } from 'app/globaltypes';
 
 interface AccountsTableProps {
   refreshTrigger?: number;
@@ -15,103 +15,112 @@ interface AccountsTableProps {
   onAccountsLoad: (accounts: Account[]) => void;
 }
 
-const getTypeColor = (type: string) => {
-  switch (type) {
-    case 'Individual': return 'info';
-    case 'Company': return 'secondary';
-    case 'Property Manager': return 'primary';
-    default: return undefined;
-  }
-};
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'Active': return 'success';
-    case 'Inactive': return 'warning';
-    case 'Archived': return 'error';
-    default: return undefined;
-  }
-};
-
-const defaultColumns: GridColDef[] = [
-  {
-    field: 'name',
-    headerName: 'Account Name',
-    flex: 1,
-    minWidth: 200
-  },
-  {
-    field: 'billingAddress',
-    headerName: 'Billing Address',
-    flex: 1,
-    minWidth: 200,
-    valueGetter: (params) => {
-      const address = params.row.billingAddress;
-      if (!address || !address.address1) return 'No address';
-      return `${address.address1}${address.address2 ? `, ${address.address2}` : ''}, ${address.city}, ${address.province}`;
-    }
-  },
-  {
-    field: 'properties',
-    headerName: 'Properties',
-    flex: 1,
-    minWidth: 200,
-    valueGetter: (params) => {
-      const properties = params.value || [];
-      return properties.length ? properties.map((p: any) => p.name).join(', ') : 'No properties';
-    }
-  },
-  {
-    field: 'type',
-    headerName: 'Type',
-    width: 150,
-    renderCell: (params) => (
-      <Chip 
-        label={params.value} 
-        size="small" 
-        color={getTypeColor(params.value)}
-        sx={{ color: 'white' }}
-      />
-    )
-  },
-  {
-    field: 'status',
-    headerName: 'Status',
-    width: 120,
-    renderCell: (params) => (
-      <Chip 
-        label={params.value} 
-        size="small" 
-        color={getStatusColor(params.value)}
-        sx={{ color: 'white' }}
-      />
-    )
-  }
-];
-
 export function AccountsTable({ 
   refreshTrigger = 0, 
   onAccountSelect,
   selectedAccount,
   onAccountsLoad
 }: AccountsTableProps) {
-  const { accounts, isLoading, fetchAccounts, setSelectedAccount } = useAccountStore();
+  const { 
+    accounts, 
+    isLoading, 
+    fetchAccounts, 
+    getTypeColor, 
+    getStatusColor,
+    settingsLoaded 
+  } = useAccountStore();
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(0);
   const [totalRows, setTotalRows] = useState(0);
   const [filterText, setFilterText] = useState('');
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns.map(col => col.field));
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
 
-  const handleColumnMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+  const defaultColumns: GridColDef[] = [
+    {
+      field: 'name',
+      headerName: 'Account Name',
+      flex: 1,
+      minWidth: 200
+    },
+    {
+      field: 'billingAddress',
+      headerName: 'Billing Address',
+      flex: 1,
+      minWidth: 200,
+      valueGetter: (params) => {
+        const address = params.row.billingAddress;
+        if (!address) return 'No address';
+        return `${address.address1}${address.address2 ? `, ${address.address2}` : ''}, ${address.city}, ${address.province} ${address.postal_code}`;
+      }
+    },
+    {
+      field: 'properties',
+      headerName: 'Properties',
+      flex: 1,
+      minWidth: 200,
+      valueGetter: (params) => {
+        const properties = params.value || [];
+        return properties.length ? properties.map((p: any) => p.name).join(', ') : 'No properties';
+      }
+    },
+    {
+      field: 'type',
+      headerName: 'Type',
+      width: 150,
+      renderCell: (params) => {
+        if (!settingsLoaded) {
+          return <Chip label={params.value} size="small" />;
+        }
+        const color = getTypeColor(params.value);
+        return (
+          <Chip 
+            label={params.value} 
+            size="small" 
+            sx={{ 
+              backgroundColor: color,
+              color: color ? 'white' : 'inherit'
+            }}
+          />
+        );
+      }
+    },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 120,
+      renderCell: (params) => {
+        if (!settingsLoaded) {
+          return <Chip label={params.value} size="small" />;
+        }
+        const color = getStatusColor(params.value);
+        return (
+          <Chip 
+            label={params.value} 
+            size="small" 
+            sx={{ 
+              backgroundColor: color,
+              color: color ? 'white' : 'inherit'
+            }}
+          />
+        );
+      }
+    }
+  ];
+
+  useEffect(() => {
+    setVisibleColumns(defaultColumns.map(col => col.field));
+  }, []);
+
+  const handleColumnMenuOpen = useCallback((event: React.MouseEvent<HTMLElement>) => {
     setColumnMenuAnchor(event.currentTarget);
-  };
+  }, []);
 
-  const handleColumnMenuClose = () => {
+  const handleColumnMenuClose = useCallback(() => {
     setColumnMenuAnchor(null);
-  };
+  }, []);
 
-  const toggleColumn = (field: string) => {
+  const toggleColumn = useCallback((field: string) => {
     setVisibleColumns(prev => {
       if (prev.includes(field)) {
         return prev.filter(f => f !== field);
@@ -119,17 +128,21 @@ export function AccountsTable({
         return [...prev, field];
       }
     });
-  };
+  }, []);
 
-  const columns = defaultColumns
-    .filter(col => visibleColumns.includes(col.field))
-    .map(col => ({
-      ...col,
-      filterable: true
-    }));
+  const columns = useMemo(() => 
+    defaultColumns
+      .filter(col => visibleColumns.includes(col.field))
+      .map(col => ({
+        ...col,
+        filterable: true
+      }))
+  , [visibleColumns]);
 
   useEffect(() => {
-    fetchAccounts();
+    fetchAccounts().catch(error => {
+      console.error('Failed to fetch accounts:', error);
+    });
   }, [page, pageSize, refreshTrigger, filterText, fetchAccounts]);
 
   useEffect(() => {
@@ -139,13 +152,16 @@ export function AccountsTable({
     }
   }, [accounts, onAccountsLoad]);
 
-  const handleRowClick = (params: any) => {
+  const handleRowClick = useCallback((params: GridRowParams) => {
     const account = accounts.find(a => a.account_id === params.id);
-    if (account) {
-      setSelectedAccount(account);
+    if (account && account.account_id !== selectedAccount?.account_id) {
       onAccountSelect(account);
     }
-  };
+  }, [accounts, onAccountSelect, selectedAccount]);
+
+  const selectionModel = useMemo(() => 
+    selectedAccount?.account_id ? [selectedAccount.account_id] : []
+  , [selectedAccount?.account_id]);
 
   return (
     <Box sx={{ height: 600, width: '100%' }}>
@@ -227,7 +243,9 @@ export function AccountsTable({
         disableSelectionOnClick
         disableColumnMenu
         onRowClick={handleRowClick}
-        selectionModel={selectedAccount ? [selectedAccount.account_id] : []}
+        selectionModel={selectionModel}
+        isRowSelectable={() => true}
+        keepNonExistentRowsSelected={false}
         sx={{
           '& .MuiDataGrid-row': {
             cursor: 'pointer'

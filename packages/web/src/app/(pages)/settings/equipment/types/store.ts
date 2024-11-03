@@ -1,12 +1,9 @@
 'use client';
 
 import { create } from 'zustand';
-import { api } from '@/services/api';
+import { EquipmentType } from '@/app/globaltypes';
 
-export interface EquipmentType {
-    name: string;
-    fields: any[]; // TODO: Define field types when needed
-}
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface EquipmentTypeStore {
     // Data
@@ -27,8 +24,14 @@ export const useEquipmentTypes = create<EquipmentTypeStore>((set) => ({
     fetch: async () => {
         try {
             set({ isLoading: true, error: null });
-            const response = await api.get<EquipmentType[]>('/settings/equipment/types');
-            set({ types: response });
+            const response = await fetch(`${BASE_URL}/settings/equipment/types`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch equipment types');
+            }
+
+            const data = await response.json();
+            set({ types: data });
         } catch (error) {
             console.error('Failed to fetch equipment types:', error);
             set({ error: 'Failed to load equipment types' });
@@ -40,7 +43,18 @@ export const useEquipmentTypes = create<EquipmentTypeStore>((set) => ({
     update: async (types) => {
         try {
             set({ isLoading: true, error: null });
-            await api.put('/settings/equipment/types', types);
+            const response = await fetch(`${BASE_URL}/settings/equipment/types`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(types)
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update equipment types');
+            }
+
             set({ types });
         } catch (error) {
             console.error('Failed to update equipment types:', error);

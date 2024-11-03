@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../../../../config/database';
-import { Setting } from '../../../entities/Setting';
+import { Setting } from '../../entities/Setting';
 
 // Types that match the web side
 interface AccountStatus {
