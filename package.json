@@ -11,8 +11,7 @@
     "lint": "pnpm run --parallel lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "api:dev": "pnpm --filter @fieldhive/api dev",
-    "web:dev": "pnpm --filter @fieldhive/web dev",
-    "shared:build": "pnpm --filter @fieldhive/shared build"
+    "web:dev": "pnpm --filter @fieldhive/web dev"
   },
   "devDependencies": {
     "@types/node": "^20.8.0",
@@ -26,5 +25,12 @@
   "packageManager": "pnpm@8.8.0",
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@types/react-color": "^3.0.12",
+    "@types/ws": "^8.5.13",
+    "react-color": "^2.19.3",
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
   }
 }

@@ -21,6 +21,7 @@ export interface FormField {
 
 export interface EquipmentTypeConfig {
     name: string;
+    color: string;  // Added color support
     fields: FormField[];
 }
 

@@ -23,12 +23,8 @@ export class Job {
     @Column({ name: 'job_type_id', type: 'text' })
     job_type_id: string;
 
-    @Column({ 
-        type: 'text',
-        enum: ['pending', 'in_progress', 'completed', 'cancelled'],
-        default: 'pending'
-    })
-    status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+    @Column({ type: 'text' })
+    status: string;
 
     @Column({ name: 'use_custom_addresses', default: false })
     use_custom_addresses: boolean;

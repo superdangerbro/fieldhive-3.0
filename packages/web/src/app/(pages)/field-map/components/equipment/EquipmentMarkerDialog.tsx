@@ -19,7 +19,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useEquipmentStore } from '../../../equipment/stores/equipmentStore';
+import { useEquipmentStore } from '@/stores/equipmentStore';
 import type { Equipment, Field } from '../../../equipment/types';
 
 interface EquipmentMarkerDialogProps {
@@ -99,6 +99,9 @@ export function EquipmentMarkerDialog({
     }
   };
 
+  // Find the status configuration for the current equipment status
+  const statusConfig = equipmentStatuses.find(status => status.name === equipment.status);
+
   return (
     <Dialog 
       open={open} 
@@ -148,9 +151,11 @@ export function EquipmentMarkerDialog({
               Status
             </Typography>
             <Chip 
-              label={equipment.status} 
-              color="primary" 
-              variant="outlined" 
+              label={equipment.status}
+              sx={{
+                backgroundColor: statusConfig?.color || '#94a3b8',
+                color: 'white'
+              }}
               size="small"
             />
           </Box>

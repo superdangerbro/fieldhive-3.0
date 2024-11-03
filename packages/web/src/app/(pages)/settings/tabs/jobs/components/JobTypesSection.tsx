@@ -7,11 +7,6 @@ import EditIcon from '@mui/icons-material/Edit';
 import { getSetting, updateSetting } from '@/services/api';
 import { JobTypeConfig } from './types/job-types';
 
-interface JobType {
-    id: string;
-    name: string;
-}
-
 export function JobTypesSection() {
     const [jobTypes, setJobTypes] = useState<JobTypeConfig[]>([]);
     const [newJobType, setNewJobType] = useState('');
@@ -29,11 +24,10 @@ export function JobTypesSection() {
             setIsLoading(true);
             setError(null);
             const response = await getSetting('job_types');
-            // Handle both array and object response formats
-            const types = Array.isArray(response) 
-                ? response.map(name => ({ name, fields: [] }))
-                : response?.jobTypes?.map((type: JobType) => ({ name: type.name, fields: [] })) || [];
-            console.log('Loaded types:', types); // Debug log
+            // Handle both array and jobTypes object response
+            const types = Array.isArray(response) ? response : 
+                         response?.jobTypes ? response.jobTypes : [];
+            console.log('Loaded types:', types);
             setJobTypes(types);
         } catch (error) {
             console.error('Error loading job types:', error);
@@ -51,7 +45,8 @@ export function JobTypesSection() {
                     fields: []
                 };
                 const updatedTypes = [...jobTypes, newType];
-                await updateSetting('job_types', updatedTypes);
+                console.log('Sending update:', updatedTypes); // Debug log
+                await updateSetting('job_types', updatedTypes); // Don't wrap in { value: ... }
                 await loadTypes();
                 setNewJobType('');
             } catch (error) {
@@ -64,7 +59,7 @@ export function JobTypesSection() {
     const handleDeleteJobType = async (index: number) => {
         try {
             const updatedTypes = jobTypes.filter((_, i) => i !== index);
-            await updateSetting('job_types', updatedTypes);
+            await updateSetting('job_types', updatedTypes); // Don't wrap in { value: ... }
             await loadTypes();
         } catch (error) {
             console.error('Error deleting job type:', error);
@@ -76,9 +71,11 @@ export function JobTypesSection() {
         if (editingTypeIndex !== null && editValue.trim()) {
             try {
                 const updatedTypes = jobTypes.map((type, index) => 
-                    index === editingTypeIndex ? { ...type, name: editValue.trim() } : type
+                    index === editingTypeIndex 
+                        ? { ...type, name: editValue.trim() }
+                        : type
                 );
-                await updateSetting('job_types', updatedTypes);
+                await updateSetting('job_types', updatedTypes); // Don't wrap in { value: ... }
                 await loadTypes();
                 setEditingTypeIndex(null);
                 setEditValue('');

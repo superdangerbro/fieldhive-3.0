@@ -2,13 +2,13 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 import { DataSource } from 'typeorm';
 import { logger } from '../utils/logger';
-import { Property } from '../entities/Property';
-import { Address } from '../entities/Address';
-import { Job } from '../entities/Job';
-import { Account } from '../entities/Account';
-import { PropertiesAccounts } from '../entities/PropertiesAccounts';
-import { Setting } from '../entities/Setting';
-import { UsersAccounts } from '../entities/UsersAccounts';
+import { Property } from '../domains/properties/entities/Property';
+import { Address } from '../domains/addresses/entities/Address';
+import { Job } from '../domains/jobs/entities/Job';
+import { Account } from '../domains/accounts/entities/Account';
+import { PropertiesAccounts } from '../jointables/PropertiesAccounts';
+import { Setting } from '../domains/settings/entities/Setting';
+import { UsersAccounts } from '../jointables/UsersAccounts';
 
 // Load environment variables
 const envPath = resolve(__dirname, '../../.env');

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     TextField,
     Grid,
@@ -12,9 +12,13 @@ import {
     CircularProgress,
     Box
 } from '@mui/material';
-import { JobStatus } from '@fieldhive/shared';
-import { JOB_STATUSES } from '../utils';
+import { getSetting } from '@/services/api';
 import type { JobType } from '../types';
+
+interface JobStatus {
+    name: string;
+    color: string;
+}
 
 interface JobBasicInfoProps {
     title: string;
@@ -37,6 +41,28 @@ export function JobBasicInfo({
     onStatusChange,
     onJobTypeChange
 }: JobBasicInfoProps) {
+    const [statusOptions, setStatusOptions] = useState<JobStatus[]>([]);
+    const [loadingStatuses, setLoadingStatuses] = useState(true);
+
+    useEffect(() => {
+        const fetchStatuses = async () => {
+            try {
+                setLoadingStatuses(true);
+                const statuses = await getSetting('job_statuses');
+                if (Array.isArray(statuses)) {
+                    setStatusOptions(statuses);
+                }
+            } catch (error) {
+                console.error('Failed to fetch job statuses:', error);
+                setStatusOptions([]);
+            } finally {
+                setLoadingStatuses(false);
+            }
+        };
+
+        fetchStatuses();
+    }, []);
+
     return (
         <>
             <TextField
@@ -51,13 +77,37 @@ export function JobBasicInfo({
                     <FormControl fullWidth>
                         <InputLabel>Status</InputLabel>
                         <Select
-                            value={status}
-                            onChange={(e) => onStatusChange(e.target.value as JobStatus)}
+                            value={status.name}
+                            onChange={(e) => {
+                                const newStatus = statusOptions.find(s => s.name === e.target.value);
+                                if (newStatus) {
+                                    onStatusChange(newStatus);
+                                }
+                            }}
                             label="Status"
+                            disabled={loadingStatuses}
+                            startAdornment={
+                                loadingStatuses ? (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', pl: 1 }}>
+                                        <CircularProgress size={20} />
+                                    </Box>
+                                ) : null
+                            }
                         >
-                            {JOB_STATUSES.map((status) => (
-                                <MenuItem key={status} value={status}>
-                                    {status.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                            {statusOptions.map((status) => (
+                                <MenuItem key={status.name} value={status.name}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Box
+                                            sx={{
+                                                width: 16,
+                                                height: 16,
+                                                borderRadius: 1,
+                                                bgcolor: status.color,
+                                                mr: 1
+                                            }}
+                                        />
+                                        {status.name}
+                                    </Box>
                                 </MenuItem>
                             ))}
                         </Select>

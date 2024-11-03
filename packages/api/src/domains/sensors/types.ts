@@ -1,24 +1,18 @@
-import { Sensor } from './entities/Sensor';
+import { BaseModel, GeoPoint } from '../../core/types';
 
-export interface CreateSensorDto {
-    name: string;
-    description?: string;
-    isActive?: boolean;
+export interface Sensor extends BaseModel {
+    deviceId: string;
+    type: 'soil' | 'weather' | 'irrigation';
+    location: GeoPoint;
+    lastReading: Date;
+    status: 'online' | 'offline' | 'maintenance';
 }
 
-export interface UpdateSensorDto {
-    name?: string;
-    description?: string;
-    isActive?: boolean;
-}
-
-export interface SensorResponse extends Sensor {
-    sensor_id: string;
-    created_at: Date;
-    updated_at: Date;
-}
-
-export interface SensorFilters {
-    name?: string;
-    isActive?: boolean;
+export interface SensorReading extends BaseModel {
+    sensorId: string;
+    type: string;
+    value: number;
+    unit: string;
+    timestamp: Date;
+    location: GeoPoint;
 }

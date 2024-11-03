@@ -11,12 +11,17 @@ import {
     TextField,
     Alert
 } from '@mui/material';
-import type { Job, JobStatus, Address, Property, UpdateJobDto } from '@fieldhive/shared';
+import type { Job, Address, Property, UpdateJobDto } from '@fieldhive/shared';
 import { updateJob, getProperties, getPropertyAddresses, getJobTypes } from '@/services/api';
 import { JobBasicInfo } from './JobBasicInfo';
 import { JobPropertySelect } from './JobPropertySelect';
 import { JobAddressForms } from './JobAddressForms';
 import { AddressFormData, emptyAddressForm } from '../types';
+
+interface JobStatus {
+    name: string;
+    color: string;
+}
 
 interface EditJobDialogProps {
     open: boolean;
@@ -28,7 +33,11 @@ interface EditJobDialogProps {
 export function EditJobDialog({ open, job, onClose, onSuccess }: EditJobDialogProps) {
     // Basic Info State
     const [title, setTitle] = useState(job.title);
-    const [status, setStatus] = useState<JobStatus>(job.status);
+    const [status, setStatus] = useState<JobStatus>(
+        typeof job.status === 'string'
+            ? { name: job.status, color: '#94a3b8' }
+            : job.status
+    );
     const [description, setDescription] = useState(job.description || '');
     const [jobTypes, setJobTypes] = useState<Array<{ job_type_id: string; name: string }>>([]);
     const [selectedJobType, setSelectedJobType] = useState<string | null>(null);
@@ -188,7 +197,7 @@ export function EditJobDialog({ open, job, onClose, onSuccess }: EditJobDialogPr
 
             const data: UpdateJobDto = {
                 title,
-                status,
+                status: status.name, // Send just the status name to the API
                 description,
                 use_custom_addresses: useCustomAddresses,
                 job_type_id: selectedJobType || undefined

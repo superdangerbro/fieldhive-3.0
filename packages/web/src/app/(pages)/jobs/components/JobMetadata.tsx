@@ -2,29 +2,56 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Grid, FormControl, InputLabel, Select, MenuItem, Chip, SelectChangeEvent, Alert, CircularProgress, Typography, Paper, Stack } from '@mui/material';
-import type { Job, JobStatus } from '@fieldhive/shared';
+import type { Job, Address } from '@fieldhive/shared';
 import { updateJob, getSetting } from '@/services/api';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import BusinessIcon from '@mui/icons-material/Business';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import WorkIcon from '@mui/icons-material/Work';
-import { JOB_STATUSES, getStatusColor, formatAddress } from '../utils';
+
+interface JobStatus {
+  name: string;
+  color: string;
+}
 
 interface JobMetadataProps {
   job: Job;
   onUpdate?: () => void;
 }
 
+function formatAddress(address?: Address | null): string {
+  if (!address) return 'N/A';
+
+  const parts = [
+    address.address1,
+    address.address2,
+    address.city,
+    address.province,
+    address.postal_code,
+    address.country
+  ].filter(Boolean);
+
+  return parts.join(', ');
+}
+
 export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
   const [statusLoading, setStatusLoading] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState<JobStatus>(job.status);
-  const [statusOptions, setStatusOptions] = useState<JobStatus[]>(JOB_STATUSES);
+  const [currentStatus, setCurrentStatus] = useState<JobStatus>(
+    typeof job.status === 'string' 
+      ? { name: job.status, color: '#94a3b8' } 
+      : job.status
+  );
+  const [statusOptions, setStatusOptions] = useState<JobStatus[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
   useEffect(() => {
-    setCurrentStatus(job.status);
+    setCurrentStatus(
+      typeof job.status === 'string'
+        ? { name: job.status, color: '#94a3b8' }
+        : job.status
+    );
   }, [job]);
 
   useEffect(() => {
@@ -32,12 +59,12 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
       try {
         setIsLoadingSettings(true);
         const statuses = await getSetting('job_statuses');
-        if (Array.isArray(statuses) && statuses.length > 0) {
+        if (Array.isArray(statuses)) {
           setStatusOptions(statuses);
         }
       } catch (error) {
         console.error('Failed to fetch job statuses:', error);
-        setStatusOptions(JOB_STATUSES);
+        setStatusOptions([]);
       } finally {
         setIsLoadingSettings(false);
       }
@@ -47,7 +74,10 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
   }, []);
 
   const handleStatusChange = async (event: SelectChangeEvent<string>) => {
-    const newStatus = event.target.value as JobStatus;
+    const newStatusName = event.target.value;
+    const newStatus = statusOptions.find(s => s.name === newStatusName);
+    if (!newStatus) return;
+
     setStatusLoading(true);
     setError(null);
     
@@ -56,7 +86,7 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
     
     try {
       await updateJob(job.job_id, {
-        status: newStatus
+        status: newStatus.name // Send just the status name to the API
       });
       if (onUpdate) {
         onUpdate();
@@ -95,7 +125,7 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
               </Typography>
               <FormControl fullWidth size="small">
                 <Select
-                  value={currentStatus}
+                  value={currentStatus.name}
                   onChange={handleStatusChange}
                   disabled={statusLoading || isLoadingSettings}
                   startAdornment={
@@ -105,13 +135,19 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
                   }
                 >
                   {statusOptions.map((status) => (
-                    <MenuItem key={status} value={status}>
-                      <Chip 
-                        label={status.replace('_', ' ').toUpperCase()} 
-                        size="small" 
-                        color={getStatusColor(status)} 
-                        sx={{ color: 'white' }} 
-                      />
+                    <MenuItem key={status.name} value={status.name}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: 1,
+                            bgcolor: status.color,
+                            mr: 1
+                          }}
+                        />
+                        {status.name}
+                      </Box>
                     </MenuItem>
                   ))}
                 </Select>

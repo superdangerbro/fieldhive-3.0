@@ -1,7 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, ManyToMany, JoinTable } from 'typeorm';
 import { Property } from '../../properties/entities/Property';
 import { Address } from '../../addresses/entities/Address';
-import { AccountType, AccountStatus } from '../types';
 
 @Entity('accounts')
 export class Account {
@@ -11,11 +10,11 @@ export class Account {
     @Column()
     name: string;
 
-    @Column({ type: 'varchar' })
-    type: AccountType;
+    @Column({ type: 'text' })
+    type: string;
 
-    @Column({ type: 'varchar', default: 'Active' })
-    status: AccountStatus;
+    @Column({ type: 'text' })
+    status: string;
 
     @Column({ name: 'billing_address_id', nullable: true })
     billing_address_id: string | null;

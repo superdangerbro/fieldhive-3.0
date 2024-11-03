@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
-    TextField,
     Button,
     List,
     ListItem,
@@ -14,21 +13,20 @@ import {
     Dialog,
     DialogTitle,
     DialogContent,
-    DialogActions
+    DialogActions,
+    TextField
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { getSetting, updateSetting } from '@/services/api';
-import { JobStatusConfig } from './types/job-statuses';
+import { PropertyStatus } from './types/propertyStatus';
 import { StatusColorPicker } from '@/components/StatusColorPicker';
-
-const SETTING_KEY = 'job_statuses';
 
 interface EditDialogProps {
     open: boolean;
-    status: JobStatusConfig | null;
+    status: PropertyStatus | null;
     onClose: () => void;
-    onSave: (oldStatus: JobStatusConfig | null, newStatus: JobStatusConfig) => void;
+    onSave: (oldStatus: PropertyStatus | null, newStatus: PropertyStatus) => void;
 }
 
 function EditStatusDialog({ open, status, onClose, onSave }: EditDialogProps) {
@@ -46,7 +44,10 @@ function EditStatusDialog({ open, status, onClose, onSave }: EditDialogProps) {
     }, [status]);
 
     const handleSave = () => {
-        onSave(status, { name: name.trim(), color });
+        onSave(status, {
+            name: name.trim(),
+            color
+        });
         onClose();
     };
 
@@ -84,9 +85,9 @@ function EditStatusDialog({ open, status, onClose, onSave }: EditDialogProps) {
     );
 }
 
-export function JobStatusesSection() {
-    const [statuses, setStatuses] = useState<JobStatusConfig[]>([]);
-    const [editingStatus, setEditingStatus] = useState<JobStatusConfig | null>(null);
+export function PropertyStatusesSection() {
+    const [statuses, setStatuses] = useState<PropertyStatus[]>([]);
+    const [editingStatus, setEditingStatus] = useState<PropertyStatus | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -99,11 +100,11 @@ export function JobStatusesSection() {
         try {
             setIsLoading(true);
             setError(null);
-            const response = await getSetting(SETTING_KEY);
-            setStatuses(Array.isArray(response) ? response : []);
+            const response = await getSetting('property_statuses');
+            setStatuses(response?.statuses || []);
         } catch (error) {
-            console.error('Failed to load job statuses:', error);
-            setError('Failed to load job statuses');
+            console.error('Failed to load property statuses:', error);
+            setError('Failed to load property statuses');
         } finally {
             setIsLoading(false);
         }
@@ -114,23 +115,23 @@ export function JobStatusesSection() {
         setIsDialogOpen(true);
     };
 
-    const handleEditStatus = (status: JobStatusConfig) => {
+    const handleEditStatus = (status: PropertyStatus) => {
         setEditingStatus(status);
         setIsDialogOpen(true);
     };
 
-    const handleDeleteStatus = async (statusToDelete: JobStatusConfig) => {
+    const handleDeleteStatus = async (statusToDelete: PropertyStatus) => {
         try {
             const updatedStatuses = statuses.filter(status => status.name !== statusToDelete.name);
-            await updateSetting(SETTING_KEY, updatedStatuses);
+            await updateSetting('property_statuses', { statuses: updatedStatuses });
             await loadStatuses();
         } catch (error) {
-            console.error('Error deleting job status:', error);
-            setError('Failed to delete job status');
+            console.error('Error deleting property status:', error);
+            setError('Failed to delete property status');
         }
     };
 
-    const handleSaveStatus = async (oldStatus: JobStatusConfig | null, newStatus: JobStatusConfig) => {
+    const handleSaveStatus = async (oldStatus: PropertyStatus | null, newStatus: PropertyStatus) => {
         try {
             let updatedStatuses;
             if (oldStatus) {
@@ -143,11 +144,11 @@ export function JobStatusesSection() {
                 updatedStatuses = [...statuses, newStatus];
             }
             
-            await updateSetting(SETTING_KEY, updatedStatuses);
+            await updateSetting('property_statuses', { statuses: updatedStatuses });
             await loadStatuses();
         } catch (error) {
-            console.error('Error saving job status:', error);
-            setError('Failed to save job status');
+            console.error('Error saving property status:', error);
+            setError('Failed to save property status');
         }
     };
 
@@ -178,10 +179,10 @@ export function JobStatusesSection() {
     return (
         <Box>
             <Typography variant="h6" gutterBottom>
-                Job Statuses
+                Property Statuses
             </Typography>
             <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
-                Configure the available job statuses that can be assigned to jobs
+                Configure the available property statuses that can be assigned to properties
             </Typography>
 
             <Button 

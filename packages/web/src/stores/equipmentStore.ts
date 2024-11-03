@@ -8,7 +8,7 @@ interface Equipment {
     type: 'Point';
     coordinates: [number, number];
   };
-  status: string;
+  status: string;  // This remains a string (just the status name)
   data: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -53,10 +53,15 @@ interface EquipmentType {
   }>;
 }
 
+interface EquipmentStatus {
+  name: string;
+  color: string;
+}
+
 interface EquipmentStore {
   equipment: Equipment[];
   equipmentTypes: EquipmentType[];
-  equipmentStatuses: string[];
+  equipmentStatuses: EquipmentStatus[];  // Updated to store status objects
   selectedEquipment: Equipment | null;
   isPlacingEquipment: boolean;
   placementLocation: [number, number] | null;
@@ -81,7 +86,7 @@ interface EquipmentStore {
   closeAddEquipmentDialog: () => void;
   submitNewEquipment: (data: { 
     equipment_type_id: string;
-    status: string;
+    status: string;  // This remains a string (just the status name)
     data: Record<string, any>;
   }) => Promise<void>;
 
@@ -113,7 +118,14 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
   fetchEquipmentStatuses: async () => {
     try {
       const statuses = await getSetting('equipment_statuses');
-      set({ equipmentStatuses: statuses || [] });
+      // Convert any string statuses to objects with default color
+      const statusObjects = (statuses || []).map((status: string | EquipmentStatus) => {
+        if (typeof status === 'string') {
+          return { name: status, color: '#94a3b8' };  // Default gray color
+        }
+        return status;
+      });
+      set({ equipmentStatuses: statusObjects });
     } catch (error) {
       console.error('Error fetching equipment statuses:', error);
     }
@@ -233,7 +245,7 @@ export const useEquipmentStore = create<EquipmentStore>((set, get) => ({
     try {
       await updateSetting('add_equipment', {
         equipment_type_id: data.equipment_type_id,
-        status: data.status,
+        status: data.status,  // Just send the status name
         location: {
           type: 'Point',
           coordinates: placementLocation

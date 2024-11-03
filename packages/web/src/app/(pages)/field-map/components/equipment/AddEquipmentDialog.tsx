@@ -23,7 +23,7 @@ import {
   TextareaAutosize
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { useEquipmentStore } from '../../../equipment/stores/equipmentStore';
+import { useEquipmentStore } from '@/stores/equipmentStore';
 import type { Field, FormData, FieldCondition } from '../../../equipment/types';
 
 interface AddEquipmentDialogProps {
@@ -309,8 +309,19 @@ export function AddEquipmentDialog({
               required
             >
               {equipmentStatuses.map((status) => (
-                <MenuItem key={status} value={status}>
-                  {status}
+                <MenuItem key={status.name} value={status.name}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box
+                      sx={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: 1,
+                        bgcolor: status.color,
+                        mr: 1
+                      }}
+                    />
+                    {status.name}
+                  </Box>
                 </MenuItem>
               ))}
             </Select>

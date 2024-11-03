@@ -4,11 +4,29 @@ import { Setting } from '../entities/Setting';
 import { logger } from '../../../core/utils/logger';
 
 const JOB_TYPES_KEY = 'job_types';
-const DEFAULT_JOB_TYPES = ['Inspection', 'Maintenance', 'Repair'];
+
+interface JobTypeConfig {
+    name: string;
+    fields: Array<{
+        name: string;
+        type: string;
+        required: boolean;
+        options?: string[];
+        numberConfig?: {
+            min?: number;
+            max?: number;
+            step?: number;
+        };
+        showWhen?: Array<{
+            field: string;
+            value: any;
+            makeRequired?: boolean;
+        }>;
+    }>;
+}
 
 export async function getJobTypes(req: Request, res: Response) {
     try {
-        // Initialize repository for each request
         const settingRepository = AppDataSource.getRepository(Setting);
         
         const setting = await settingRepository.findOne({
@@ -16,23 +34,10 @@ export async function getJobTypes(req: Request, res: Response) {
         });
         
         if (!setting) {
-            // Return default types if none are set
-            const newSetting = settingRepository.create({
-                key: JOB_TYPES_KEY,
-                value: DEFAULT_JOB_TYPES
-            });
-            await settingRepository.save(newSetting);
-            return res.json({ jobTypes: DEFAULT_JOB_TYPES.map(name => ({ id: name.toLowerCase().replace(/\s+/g, '_'), name })) });
+            return res.json([]);
         }
 
-        // Return in consistent format
-        const types = setting.value as string[];
-        return res.json({ 
-            jobTypes: types.map(name => ({ 
-                id: name.toLowerCase().replace(/\s+/g, '_'),
-                name 
-            }))
-        });
+        return res.json(setting.value);
     } catch (error) {
         logger.error('Error getting job types:', error);
         return res.status(500).json({ 
@@ -44,27 +49,23 @@ export async function getJobTypes(req: Request, res: Response) {
 
 export async function updateJobTypes(req: Request, res: Response) {
     try {
-        // Initialize repository for each request
         const settingRepository = AppDataSource.getRepository(Setting);
+        const { value } = req.body; // Extract value from request body
 
-        const { value } = req.body;
-
-        // Handle both array and object formats
-        let types: string[];
-        if (Array.isArray(value)) {
-            types = value;
-        } else if (value?.jobTypes) {
-            types = value.jobTypes.map((type: any) => type.name);
-        } else {
+        if (!Array.isArray(value)) {
             return res.status(400).json({ 
-                message: 'Invalid job types format'
+                message: 'Job types must be an array'
             });
         }
 
-        // Validate each type is a string
-        if (!types.every(type => typeof type === 'string')) {
+        // Validate each type has required properties
+        if (!value.every(type => 
+            typeof type === 'object' &&
+            typeof type.name === 'string' &&
+            Array.isArray(type.fields)
+        )) {
             return res.status(400).json({
-                message: 'Each type must be a string'
+                message: 'Each type must have a name (string) and fields array'
             });
         }
 
@@ -75,21 +76,14 @@ export async function updateJobTypes(req: Request, res: Response) {
         if (!setting) {
             setting = settingRepository.create({
                 key: JOB_TYPES_KEY,
-                value: types
+                value
             });
         } else {
-            setting.value = types;
+            setting.value = value;
         }
 
         const updated = await settingRepository.save(setting);
-        
-        // Return in consistent format
-        return res.json({ 
-            jobTypes: (updated.value as string[]).map(name => ({ 
-                id: name.toLowerCase().replace(/\s+/g, '_'),
-                name 
-            }))
-        });
+        return res.json(updated.value);
     } catch (error) {
         logger.error('Error updating job types:', error);
         return res.status(500).json({ 

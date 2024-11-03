@@ -4,31 +4,92 @@ import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
-    TextField,
     Button,
     List,
     ListItem,
     ListItemText,
     IconButton,
     CircularProgress,
-    Select,
-    MenuItem,
-    Chip
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import { AccountStatus, StatusColor } from '@fieldhive/shared';
 import { getSetting, updateSetting } from '@/services/api';
+import { AccountStatus } from './types/accountStatus';
+import { StatusColorPicker } from '@/components/StatusColorPicker';
 
-const SETTING_KEY = 'account_statuses';
-const AVAILABLE_COLORS: StatusColor[] = ['default', 'primary', 'secondary', 'error', 'info', 'success', 'warning'];
+interface EditDialogProps {
+    open: boolean;
+    status: AccountStatus | null;
+    onClose: () => void;
+    onSave: (oldStatus: AccountStatus | null, newStatus: AccountStatus) => void;
+}
+
+function EditStatusDialog({ open, status, onClose, onSave }: EditDialogProps) {
+    const [name, setName] = useState(status?.label || '');
+    const [color, setColor] = useState(status?.color || '#94a3b8');
+
+    useEffect(() => {
+        if (status) {
+            setName(status.label);
+            setColor(status.color);
+        } else {
+            setName('');
+            setColor('#94a3b8');
+        }
+    }, [status]);
+
+    const handleSave = () => {
+        onSave(status, {
+            value: name.trim().toLowerCase(),
+            label: name.trim(),
+            color
+        });
+        onClose();
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose}>
+            <DialogTitle>
+                {status ? 'Edit Status' : 'New Status'}
+            </DialogTitle>
+            <DialogContent>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 300, mt: 2 }}>
+                    <TextField
+                        label="Status Name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        fullWidth
+                    />
+                    
+                    <StatusColorPicker 
+                        color={color}
+                        onChange={setColor}
+                    />
+                </Box>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Cancel</Button>
+                <Button 
+                    onClick={handleSave}
+                    variant="contained"
+                    disabled={!name.trim()}
+                >
+                    Save
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
 
 export function AccountStatusesSection() {
     const [statuses, setStatuses] = useState<AccountStatus[]>([]);
-    const [newStatus, setNewStatus] = useState('');
-    const [editingIndex, setEditingIndex] = useState<number | null>(null);
-    const [editValue, setEditValue] = useState('');
-    const [editColor, setEditColor] = useState<StatusColor>('default');
+    const [editingStatus, setEditingStatus] = useState<AccountStatus | null>(null);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -40,7 +101,7 @@ export function AccountStatusesSection() {
         try {
             setIsLoading(true);
             setError(null);
-            const response = await getSetting(SETTING_KEY);
+            const response = await getSetting('account_statuses');
             setStatuses(response?.statuses || []);
         } catch (error) {
             console.error('Failed to load account statuses:', error);
@@ -50,29 +111,20 @@ export function AccountStatusesSection() {
         }
     };
 
-    const handleAddStatus = async () => {
-        if (newStatus.trim()) {
-            try {
-                const newStatusConfig: AccountStatus = {
-                    value: newStatus.trim().toLowerCase(),
-                    label: newStatus.trim(),
-                    color: 'default'
-                };
-                const updatedStatuses = [...statuses, newStatusConfig];
-                await updateSetting(SETTING_KEY, { statuses: updatedStatuses });
-                await loadStatuses();
-                setNewStatus('');
-            } catch (error) {
-                console.error('Error adding account status:', error);
-                setError('Failed to add account status');
-            }
-        }
+    const handleAddStatus = () => {
+        setEditingStatus(null);
+        setIsDialogOpen(true);
     };
 
-    const handleDeleteStatus = async (index: number) => {
+    const handleEditStatus = (status: AccountStatus) => {
+        setEditingStatus(status);
+        setIsDialogOpen(true);
+    };
+
+    const handleDeleteStatus = async (statusToDelete: AccountStatus) => {
         try {
-            const updatedStatuses = statuses.filter((_, i) => i !== index);
-            await updateSetting(SETTING_KEY, { statuses: updatedStatuses });
+            const updatedStatuses = statuses.filter(status => status.value !== statusToDelete.value);
+            await updateSetting('account_statuses', { statuses: updatedStatuses });
             await loadStatuses();
         } catch (error) {
             console.error('Error deleting account status:', error);
@@ -80,26 +132,24 @@ export function AccountStatusesSection() {
         }
     };
 
-    const handleEditStatus = async () => {
-        if (editingIndex !== null && editValue.trim()) {
-            try {
-                const updatedStatuses = statuses.map((status, index) => 
-                    index === editingIndex ? { 
-                        ...status,
-                        value: editValue.trim().toLowerCase(),
-                        label: editValue.trim(),
-                        color: editColor
-                    } : status
+    const handleSaveStatus = async (oldStatus: AccountStatus | null, newStatus: AccountStatus) => {
+        try {
+            let updatedStatuses;
+            if (oldStatus) {
+                // Edit existing status
+                updatedStatuses = statuses.map(status => 
+                    status.value === oldStatus.value ? newStatus : status
                 );
-                await updateSetting(SETTING_KEY, { statuses: updatedStatuses });
-                await loadStatuses();
-                setEditingIndex(null);
-                setEditValue('');
-                setEditColor('default');
-            } catch (error) {
-                console.error('Error updating account status:', error);
-                setError('Failed to update account status');
+            } else {
+                // Add new status
+                updatedStatuses = [...statuses, newStatus];
             }
+            
+            await updateSetting('account_statuses', { statuses: updatedStatuses });
+            await loadStatuses();
+        } catch (error) {
+            console.error('Error saving account status:', error);
+            setError('Failed to save account status');
         }
     };
 
@@ -136,33 +186,13 @@ export function AccountStatusesSection() {
                 Configure the available account statuses that can be assigned to accounts
             </Typography>
 
-            <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
-                <TextField
-                    placeholder="New Account Status"
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddStatus()}
-                    sx={{
-                        flex: 1,
-                        '& .MuiOutlinedInput-root': {
-                            backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                        }
-                    }}
-                />
-                <Button 
-                    variant="contained" 
-                    onClick={handleAddStatus}
-                    disabled={!newStatus.trim()}
-                    sx={{ 
-                        bgcolor: 'primary.main',
-                        '&:hover': {
-                            bgcolor: 'primary.dark',
-                        }
-                    }}
-                >
-                    Add Status
-                </Button>
-            </Box>
+            <Button 
+                variant="contained" 
+                onClick={handleAddStatus}
+                sx={{ mb: 3 }}
+            >
+                Add Status
+            </Button>
 
             <List>
                 {statuses.map((status, index) => (
@@ -175,68 +205,35 @@ export function AccountStatusesSection() {
                             }
                         }}
                     >
-                        {editingIndex === index ? (
-                            <Box sx={{ display: 'flex', gap: 2, flex: 1, alignItems: 'center' }}>
-                                <TextField
-                                    value={editValue}
-                                    onChange={(e) => setEditValue(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && handleEditStatus()}
-                                    sx={{
-                                        flex: 1,
-                                        '& .MuiOutlinedInput-root': {
-                                            backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                                        }
-                                    }}
-                                />
-                                <Select
-                                    value={editColor}
-                                    onChange={(e) => setEditColor(e.target.value as StatusColor)}
-                                    sx={{ width: 150 }}
-                                >
-                                    {AVAILABLE_COLORS.map((color) => (
-                                        <MenuItem key={color} value={color}>
-                                            <Chip 
-                                                label={color} 
-                                                color={color}
-                                                size="small"
-                                            />
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                                <Button onClick={handleEditStatus}>Save</Button>
-                                <Button onClick={() => {
-                                    setEditingIndex(null);
-                                    setEditValue('');
-                                    setEditColor('default');
-                                }}>Cancel</Button>
-                            </Box>
-                        ) : (
-                            <>
-                                <Box 
-                                    sx={{ 
-                                        width: 16, 
-                                        height: 16, 
-                                        borderRadius: 1,
-                                        bgcolor: `${status.color}.main`,
-                                        mr: 2
-                                    }} 
-                                />
-                                <ListItemText primary={status.label} />
-                                <IconButton onClick={() => {
-                                    setEditingIndex(index);
-                                    setEditValue(status.label);
-                                    setEditColor(status.color);
-                                }}>
-                                    <EditIcon />
-                                </IconButton>
-                                <IconButton onClick={() => handleDeleteStatus(index)}>
-                                    <DeleteIcon />
-                                </IconButton>
-                            </>
-                        )}
+                        <Box 
+                            sx={{ 
+                                width: 16, 
+                                height: 16, 
+                                borderRadius: 1,
+                                bgcolor: status.color,
+                                mr: 2
+                            }} 
+                        />
+                        <ListItemText primary={status.label} />
+                        <IconButton onClick={() => handleEditStatus(status)}>
+                            <EditIcon />
+                        </IconButton>
+                        <IconButton onClick={() => handleDeleteStatus(status)}>
+                            <DeleteIcon />
+                        </IconButton>
                     </ListItem>
                 ))}
             </List>
+
+            <EditStatusDialog
+                open={isDialogOpen}
+                status={editingStatus}
+                onClose={() => {
+                    setIsDialogOpen(false);
+                    setEditingStatus(null);
+                }}
+                onSave={handleSaveStatus}
+            />
         </Box>
     );
 }

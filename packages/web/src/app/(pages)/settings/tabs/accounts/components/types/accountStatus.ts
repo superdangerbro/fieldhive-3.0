@@ -1,4 +1,8 @@
-import { AccountStatus, StatusColor } from '@fieldhive/shared';
+export interface AccountStatus {
+    value: string;
+    label: string;
+    color: string;
+}
 
 export interface AccountStatusSettings {
     statuses: AccountStatus[];
@@ -8,6 +12,3 @@ export interface EditingStatus {
     index: number;
     value: AccountStatus;
 }
-
-// Re-export shared types for convenience
-export type { AccountStatus, StatusColor };

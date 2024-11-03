@@ -10,18 +10,14 @@ export class Equipment implements Omit<IEquipment, 'location'> {
     @Column()
     name: string;
 
-    @Column()
+    @Column({ type: 'text' })
     type: string;
 
     @Column({ nullable: true })
     description?: string;
 
-    @Column({
-        type: 'enum',
-        enum: ['active', 'inactive', 'maintenance'],
-        default: 'active'
-    })
-    status: 'active' | 'inactive' | 'maintenance';
+    @Column({ type: 'text' })
+    status: string;
 
     @Column('geometry', {
         spatialFeatureType: 'Point',

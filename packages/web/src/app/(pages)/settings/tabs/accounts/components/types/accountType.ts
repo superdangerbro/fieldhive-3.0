@@ -1,5 +1,6 @@
 export interface AccountType {
     name: string;
+    color: string;  // Added color support
 }
 
 export interface AccountTypeSettings {

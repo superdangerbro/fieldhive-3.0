@@ -1,7 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, ManyToMany } from 'typeorm';
 import { Address } from '../../addresses/entities/Address';
 import { Account } from '../../accounts/entities/Account';
-import { PropertyType, PropertyStatus } from '../types';
 
 @Entity('properties')
 export class Property {
@@ -11,11 +10,11 @@ export class Property {
     @Column()
     name: string;
 
-    @Column({ name: 'property_type', type: 'varchar' })
-    type: PropertyType;
+    @Column({ name: 'property_type', type: 'text' })
+    type: string;
 
-    @Column({ type: 'varchar', default: 'Active' })
-    status: PropertyStatus;
+    @Column({ type: 'text' })
+    status: string;
 
     @Column({ type: 'jsonb', nullable: true })
     location: any;

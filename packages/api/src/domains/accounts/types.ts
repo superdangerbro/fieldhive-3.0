@@ -1,36 +1,21 @@
-import { Account } from './entities/Account';
-import { Address } from '../addresses';
-
-export type AccountType = 'Individual' | 'Company' | 'Property Manager';
-export type AccountStatus = 'Active' | 'Inactive' | 'Archived';
-
 export interface CreateAccountDto {
     name: string;
-    type: AccountType;
+    type: string;
+    status?: string;
     billing_address_id?: string;
-    status?: AccountStatus;
+    data?: Record<string, any>;
 }
 
 export interface UpdateAccountDto {
     name?: string;
-    type?: AccountType;
-    status?: AccountStatus;
+    type?: string;
+    status?: string;
     billing_address_id?: string;
-}
-
-export interface AccountResponse extends Omit<Account, 'billingAddress'> {
-    account_id: string;
-    billing_address?: Address;
-    created_at: Date;
-    updated_at: Date;
+    data?: Record<string, any>;
 }
 
 export interface AccountFilters {
-    type?: AccountType;
-    status?: AccountStatus;
+    type?: string;
+    status?: string;
     name?: string;
-}
-
-export interface AccountWithRelations extends Account {
-    billing_address?: Address;
 }

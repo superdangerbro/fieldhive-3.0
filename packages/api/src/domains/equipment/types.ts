@@ -1,34 +1,34 @@
-import { Equipment } from './entities/Equipment';
-
-export type EquipmentType = 'Type1' | 'Type2' | 'Type3';
-
 export interface CreateEquipmentDto {
     name: string;
-    type: EquipmentType;
     description?: string;
-    status?: 'active' | 'inactive' | 'maintenance';
+    type: string;
+    status?: string;
+    location?: {
+        type: 'Point';
+        coordinates: [number, number];
+    };
+    data?: Record<string, any>;
 }
 
 export interface UpdateEquipmentDto {
     name?: string;
-    type?: EquipmentType;
     description?: string;
-    status?: 'active' | 'inactive' | 'maintenance';
-}
-
-export interface EquipmentResponse extends Equipment {
-    equipment_id: string;
-    created_at: Date;
-    updated_at: Date;
+    type?: string;
+    status?: string;
+    location?: {
+        type: 'Point';
+        coordinates: [number, number];
+    };
+    data?: Record<string, any>;
 }
 
 export interface EquipmentFilters {
-    type?: EquipmentType;
-    status?: 'active' | 'inactive' | 'maintenance';
+    type?: string;
+    status?: string;
     name?: string;
-}
-
-// For eager loading relationships
-export interface EquipmentWithRelations extends Equipment {
-    // Define any relationships if needed
+    location?: {
+        type: 'Point';
+        coordinates: [number, number];
+        radius: number; // in meters
+    };
 }

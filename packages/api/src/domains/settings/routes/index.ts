@@ -6,6 +6,8 @@ import { getJobStatuses, updateJobStatuses } from './jobStatusHandler';
 import { getJobTypes, updateJobTypes } from './jobTypeHandler';
 import { getAccountStatuses, updateAccountStatuses } from './accountStatusHandler';
 import { getAccountTypes, updateAccountTypes } from './accountTypeHandler';
+import { getPropertyStatuses, updatePropertyStatuses } from './propertyStatusHandler';
+import { getPropertyTypes, updatePropertyTypes } from './propertyTypeHandler';
 
 const router = Router();
 
@@ -32,6 +34,14 @@ router.put('/account_statuses', updateAccountStatuses);
 // Account type routes
 router.get('/account_types', getAccountTypes);
 router.put('/account_types', updateAccountTypes);
+
+// Property status routes
+router.get('/property_statuses', getPropertyStatuses);
+router.put('/property_statuses', updatePropertyStatuses);
+
+// Property type routes
+router.get('/property_types', getPropertyTypes);
+router.put('/property_types', updatePropertyTypes);
 
 // General settings routes
 router.get('/:id', getSetting);
