@@ -1,161 +1,51 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Box, Card, CardContent, IconButton, Tooltip, Menu, MenuItem, Checkbox, FormControlLabel, Stack, Typography, TextField, Button } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import React, { useCallback } from 'react';
+import { Box, Card, CardContent, IconButton, Tooltip, Menu, MenuItem, Checkbox, FormControlLabel, Stack, Typography, TextField, Button, Alert } from '@mui/material';
+import { DataGrid, GridRowParams } from '@mui/x-data-grid';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
-import { getProperties, getAddress } from '@/services/api';
-import type { Property, Address, PropertyType } from '@fieldhive/shared';
+import { useQueryClient } from '@tanstack/react-query';
+import { usePropertyUIStore } from '../store/uiStore';
+import { useProperties, useDeleteProperty, prefetchProperty } from '../hooks/useProperties';
+import type { Property } from '../../../globalTypes/property';
 import { StatusChip, formatStatus } from './PropertyStatus';
 
 interface PropertiesTableProps {
-  refreshTrigger?: number;
   onPropertySelect: (property: Property | null) => void;
-  selectedProperty: Property | null;
-  onPropertiesLoad: (properties: Property[]) => void;
   onAddClick: () => void;
 }
 
-export default function PropertiesTable({ 
-  refreshTrigger = 0, 
-  onPropertySelect,
-  selectedProperty,
-  onPropertiesLoad,
-  onAddClick
-}: PropertiesTableProps) {
-  const [pageSize, setPageSize] = useState(25);
-  const [page, setPage] = useState(0);
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [totalRows, setTotalRows] = useState(0);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(['name', 'property_type', 'service_address', 'status']);
-  const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
-  const [addressCache, setAddressCache] = useState<Record<string, Address>>({});
-  const [filterText, setFilterText] = useState('');
+export default function PropertiesTable({ onPropertySelect, onAddClick }: PropertiesTableProps) {
+  const queryClient = useQueryClient();
+  const [pageSize, setPageSize] = React.useState(25);
+  const [page, setPage] = React.useState(0);
+  const [columnMenuAnchor, setColumnMenuAnchor] = React.useState<null | HTMLElement>(null);
 
-  const loadAddress = async (addressId: string | null | undefined) => {
-    if (addressId && !addressCache[addressId]) {
-      try {
-        const address = await getAddress(addressId);
-        setAddressCache(prev => ({ ...prev, [addressId]: address }));
-      } catch (error) {
-        console.error('Failed to fetch address:', error);
-        setAddressCache(prev => ({ ...prev, [addressId]: { 
-          address_id: addressId,
-          address1: 'Not available',
-          city: '',
-          province: '',
-          postal_code: '',
-          country: ''
-        }}));
-      }
-    }
-  };
+  // UI state from Zustand
+  const {
+    selectedProperty,
+    visibleColumns,
+    filterText,
+    setSelectedProperty,
+    toggleColumn,
+    setFilterText
+  } = usePropertyUIStore();
 
-  const formatAddress = (address: Address | undefined) => {
-    if (!address) return 'Not set';
-    if (address.address1 === 'Not available') return 'Address not available';
-    const parts = [
-      address.address1,
-      address.address2,
-      address.city,
-      address.province,
-      address.postal_code,
-      address.country
-    ].filter(Boolean);
-    return parts.join(', ');
-  };
+  // Data fetching with React Query
+  const { 
+    data: properties = [], 
+    isLoading,
+    error,
+    refetch 
+  } = useProperties({
+    limit: pageSize,
+    offset: page * pageSize
+  });
 
-  const defaultColumns: GridColDef[] = [
-    {
-      field: 'name',
-      headerName: 'Property Name',
-      flex: 1,
-      minWidth: 200
-    },
-    {
-      field: 'property_type',
-      headerName: 'Type',
-      width: 150,
-      valueGetter: (params) => {
-        const type = params.value as PropertyType;
-        return type.charAt(0).toUpperCase() + type.slice(1);
-      }
-    },
-    {
-      field: 'service_address',
-      headerName: 'Service Address',
-      flex: 1,
-      minWidth: 200,
-      valueGetter: (params) => {
-        const addressId = params.row.service_address_id;
-        if (addressId) {
-          loadAddress(addressId);
-          return formatAddress(addressCache[addressId]);
-        }
-        return 'Not set';
-      }
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      width: 120,
-      renderCell: (params) => {
-        const status = params.value || 'active';
-        return <StatusChip status={formatStatus(status)} />;
-      }
-    },
-    // Hidden columns
-    {
-      field: 'property_id',
-      headerName: 'Property ID',
-      width: 150,
-      hide: true
-    },
-    {
-      field: 'created_at',
-      headerName: 'Created At',
-      width: 200,
-      hide: true,
-      valueGetter: (params) => new Date(params.value).toLocaleString()
-    },
-    {
-      field: 'updated_at',
-      headerName: 'Updated At',
-      width: 200,
-      hide: true,
-      valueGetter: (params) => new Date(params.value).toLocaleString()
-    },
-    {
-      field: 'billing_address',
-      headerName: 'Billing Address',
-      width: 200,
-      hide: true,
-      valueGetter: (params) => {
-        const addressId = params.row.billing_address_id;
-        if (addressId) {
-          loadAddress(addressId);
-          return formatAddress(addressCache[addressId]);
-        }
-        return 'Not set';
-      }
-    },
-    {
-      field: 'location',
-      headerName: 'Location',
-      width: 200,
-      hide: true,
-      valueGetter: (params) => {
-        const location = params.value;
-        if (location && location.coordinates) {
-          return `${location.coordinates[1].toFixed(6)}, ${location.coordinates[0].toFixed(6)}`;
-        }
-        return 'N/A';
-      }
-    }
-  ];
+  // Delete mutation
+  const { mutate: deleteProperty, isPending: isDeleting } = useDeleteProperty();
 
   const handleColumnMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setColumnMenuAnchor(event.currentTarget);
@@ -165,67 +55,69 @@ export default function PropertiesTable({
     setColumnMenuAnchor(null);
   };
 
-  const toggleColumn = (field: string) => {
-    setVisibleColumns(prev => {
-      if (prev.includes(field)) {
-        return prev.filter(f => f !== field);
-      } else {
-        return [...prev, field];
+  const defaultColumns = [
+    {
+      field: 'name',
+      headerName: 'Property Name',
+      flex: 1,
+      minWidth: 200
+    },
+    {
+      field: 'type',
+      headerName: 'Type',
+      width: 150,
+      valueGetter: (params: any) => {
+        const type = params.value as string;
+        return type.charAt(0).toUpperCase() + type.slice(1);
       }
-    });
-  };
+    },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 120,
+      renderCell: (params: any) => {
+        const status = params.value || 'active';
+        return <StatusChip status={formatStatus(status)} />;
+      }
+    }
+  ];
 
   const columns = defaultColumns.map(col => ({
     ...col,
     hide: !visibleColumns.includes(col.field)
   }));
 
-  const fetchProperties = async () => {
-    try {
-      setLoading(true);
-      const response = await getProperties({
-        limit: pageSize,
-        offset: page * pageSize
-      });
-      
-      const propertiesData = response.properties;
-      setProperties(propertiesData);
-      onPropertiesLoad(propertiesData);
-      setTotalRows(response.total);
-
-      // Pre-fetch addresses for visible properties
-      propertiesData.forEach((property: Property) => {
-        if (property.service_address_id) loadAddress(property.service_address_id);
-        if (property.billing_address_id) loadAddress(property.billing_address_id);
-      });
-    } catch (error) {
-      console.error('Failed to fetch properties:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProperties();
-  }, [page, pageSize, refreshTrigger]);
-
-  const filteredProperties = useMemo(() => {
+  const filteredProperties = React.useMemo(() => {
     if (!filterText) return properties;
 
     const searchText = filterText.toLowerCase();
-    return properties.filter(property => {
-      const serviceAddress = property.service_address_id ? addressCache[property.service_address_id] : undefined;
-      const billingAddress = property.billing_address_id ? addressCache[property.billing_address_id] : undefined;
-      
-      return (
-        property.name.toLowerCase().includes(searchText) ||
-        property.property_type.toLowerCase().includes(searchText) ||
-        (serviceAddress && formatAddress(serviceAddress).toLowerCase().includes(searchText)) ||
-        (billingAddress && formatAddress(billingAddress).toLowerCase().includes(searchText)) ||
-        (property.status && property.status.toLowerCase().includes(searchText))
-      );
-    });
-  }, [properties, filterText, addressCache]);
+    return properties.filter((property: Property) => 
+      property.name.toLowerCase().includes(searchText) ||
+      property.type.toLowerCase().includes(searchText) ||
+      (property.status && property.status.toLowerCase().includes(searchText))
+    );
+  }, [properties, filterText]);
+
+  const handlePropertySelect = (property: Property) => {
+    setSelectedProperty(property);
+    onPropertySelect(property);
+  };
+
+  if (error) {
+    return (
+      <Alert 
+        severity="error" 
+        sx={{ mb: 2 }}
+        action={
+          <Button color="inherit" size="small" onClick={() => refetch()}>
+            Try Again
+          </Button>
+        }
+      >
+        Error loading properties: {error instanceof Error ? error.message : 'Unknown error'}
+      </Alert>
+    );
+  }
 
   return (
     <Box sx={{ height: 600, width: '100%' }}>
@@ -255,6 +147,7 @@ export default function PropertiesTable({
               color="primary"
               startIcon={<AddIcon />}
               onClick={onAddClick}
+              disabled={isLoading || isDeleting}
             >
               Add Property
             </Button>
@@ -298,8 +191,8 @@ export default function PropertiesTable({
         rows={filteredProperties}
         columns={columns}
         getRowId={(row) => row.property_id}
-        rowCount={totalRows}
-        loading={loading}
+        rowCount={filteredProperties.length}
+        loading={isLoading || isDeleting}
         paginationMode="server"
         page={page}
         pageSize={pageSize}
@@ -308,8 +201,18 @@ export default function PropertiesTable({
         onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
         disableSelectionOnClick
         disableColumnMenu
-        onRowClick={(params) => onPropertySelect(params.row as Property)}
+        onRowClick={(params: GridRowParams<Property>) => handlePropertySelect(params.row)}
         selectionModel={selectedProperty ? [selectedProperty.property_id] : []}
+        componentsProps={{
+          row: {
+            onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => {
+              const id = e.currentTarget.getAttribute('data-id');
+              if (id) {
+                prefetchProperty(queryClient, id);
+              }
+            }
+          }
+        }}
         sx={{
           '& .MuiDataGrid-row': {
             cursor: 'pointer'

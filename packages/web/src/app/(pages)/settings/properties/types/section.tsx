@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import { usePropertyTypes, PropertyType } from './store';
+import { usePropertyTypes } from './store';
 
 export function PropertyTypeSection() {
     const { types, isLoading, error, fetch, update } = usePropertyTypes();
@@ -28,27 +28,20 @@ export function PropertyTypeSection() {
 
     const handleAddType = async () => {
         if (newType.trim()) {
-            const newTypeConfig: PropertyType = {
-                name: newType.trim(),
-                fields: []
-            };
-            await update([...types, newTypeConfig]);
+            await update([...types, newType.trim()]);
             setNewType('');
         }
     };
 
     const handleDeleteType = async (index: number) => {
-        const updatedTypes = types.filter((_: PropertyType, i: number) => i !== index);
+        const updatedTypes = types.filter((_: string, i: number) => i !== index);
         await update(updatedTypes);
     };
 
     const handleEditType = async () => {
         if (editingIndex !== null && editValue.trim()) {
-            const updatedTypes = types.map((type: PropertyType, index: number) => 
-                index === editingIndex ? {
-                    ...type,
-                    name: editValue.trim()
-                } : type
+            const updatedTypes = types.map((type: string, index: number) => 
+                index === editingIndex ? editValue.trim() : type
             );
             await update(updatedTypes);
             setEditingIndex(null);
@@ -118,7 +111,7 @@ export function PropertyTypeSection() {
             </Box>
 
             <List>
-                {types.map((type: PropertyType, index: number) => (
+                {types.map((type: string, index: number) => (
                     <ListItem 
                         key={index}
                         sx={{ 
@@ -149,13 +142,10 @@ export function PropertyTypeSection() {
                             </Box>
                         ) : (
                             <>
-                                <ListItemText 
-                                    primary={type.name}
-                                    secondary={`${type.fields.length} fields configured`}
-                                />
+                                <ListItemText primary={type} />
                                 <IconButton onClick={() => {
                                     setEditingIndex(index);
-                                    setEditValue(type.name);
+                                    setEditValue(type);
                                 }}>
                                     <EditIcon />
                                 </IconButton>

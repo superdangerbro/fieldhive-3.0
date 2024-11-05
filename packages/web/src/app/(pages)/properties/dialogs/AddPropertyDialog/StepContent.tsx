@@ -6,7 +6,8 @@ import { AddressFormStep } from './AddressFormStep';
 import { AccountStep } from './AccountStep';
 import { LocationStep } from './LocationStep';
 import { BoundaryStep } from './BoundaryStep';
-import { PropertyFormData, Account, Contact } from '@/app/globaltypes';
+import type { Account } from '../../../../globalTypes/account';
+import type { PropertyFormData } from '../../hooks/usePropertyForm';
 
 interface StepContentProps {
   step: number;
@@ -21,9 +22,6 @@ interface StepContentProps {
   accounts: Account[];
   showAddAccount: boolean;
   setShowAddAccount: (show: boolean) => void;
-  fetchAccounts: () => Promise<void>;
-  contacts: Contact[];
-  setContacts: (contacts: Contact[]) => void;
 }
 
 export const StepContent: React.FC<StepContentProps> = ({
@@ -39,9 +37,6 @@ export const StepContent: React.FC<StepContentProps> = ({
   accounts,
   showAddAccount,
   setShowAddAccount,
-  fetchAccounts,
-  contacts,
-  setContacts,
 }) => {
   const handleEditLocation = () => {
     setActiveStep(2); // Jump to Location step
@@ -65,9 +60,6 @@ export const StepContent: React.FC<StepContentProps> = ({
           accounts={accounts}
           showAddAccount={showAddAccount}
           setShowAddAccount={setShowAddAccount}
-          fetchAccounts={fetchAccounts}
-          contacts={contacts}
-          setContacts={setContacts}
         />
       );
     case 2:

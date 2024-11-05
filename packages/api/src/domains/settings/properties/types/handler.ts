@@ -1,76 +1,72 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../../../../config/database';
 import { Setting } from '../../entities/Setting';
+import { logger } from '../../../../utils/logger';
 
-// Types that match the web side
-interface PropertyType {
-    name: string;
-    fields: any[]; // TODO: Define field types when needed
-}
-
+const settingRepository = AppDataSource.getRepository(Setting);
 const SETTING_KEY = 'property_types';
 
-/**
- * Get property types from settings
- */
 export async function getPropertyTypes(req: Request, res: Response) {
     try {
-        const setting = await AppDataSource
-            .getRepository(Setting)
-            .findOne({ where: { key: SETTING_KEY } });
-        
+        const setting = await settingRepository.findOne({
+            where: { key: SETTING_KEY }
+        });
+
         if (!setting) {
+            logger.warn(`Setting not found: ${SETTING_KEY}`);
             return res.json([]);
         }
 
-        // Return array directly
-        return res.json(Array.isArray(setting.value) ? setting.value : []);
+        // If value is not in the expected format, return empty array
+        if (!Array.isArray(setting.value)) {
+            logger.warn(`Invalid setting format for: ${SETTING_KEY}`);
+            return res.json([]);
+        }
+
+        logger.info(`Retrieved property types:`, setting.value);
+        res.json(setting.value);
     } catch (error) {
-        return res.status(500).json({ 
-            message: 'Failed to get property types',
-            error: error instanceof Error ? error.message : 'Unknown error'
+        logger.error('Error fetching property types:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: 'Failed to fetch property types',
+            details: error instanceof Error ? error.message : String(error)
         });
     }
 }
 
-/**
- * Update property types in settings
- */
 export async function updatePropertyTypes(req: Request, res: Response) {
     try {
-        const types = req.body;
-        const repository = AppDataSource.getRepository(Setting);
-
-        // Validate the structure
-        if (!Array.isArray(types)) {
-            return res.status(400).json({ 
-                message: 'Invalid format - expected array of property types'
+        const { types } = req.body;
+        if (!Array.isArray(types) || types.some(type => typeof type !== 'string')) {
+            return res.status(400).json({
+                error: 'Validation failed',
+                message: 'Types must be an array of strings'
             });
         }
 
-        // Validate each type
-        for (const type of types) {
-            if (!type.name || !Array.isArray(type.fields)) {
-                return res.status(400).json({
-                    message: 'Each type must have name and fields properties'
-                });
-            }
-        }
+        let setting = await settingRepository.findOne({
+            where: { key: SETTING_KEY }
+        });
 
-        // Update or create the setting
-        let setting = await repository.findOne({ where: { key: SETTING_KEY } });
         if (!setting) {
-            setting = repository.create({ key: SETTING_KEY, value: types });
+            setting = settingRepository.create({
+                key: SETTING_KEY,
+                value: types
+            });
         } else {
             setting.value = types;
         }
 
-        const updated = await repository.save(setting);
-        return res.json(updated.value);
+        await settingRepository.save(setting);
+        logger.info(`Updated property types:`, types);
+        res.json(setting.value);
     } catch (error) {
-        return res.status(500).json({ 
+        logger.error('Error updating property types:', error);
+        res.status(500).json({
+            error: 'Internal server error',
             message: 'Failed to update property types',
-            error: error instanceof Error ? error.message : 'Unknown error'
+            details: error instanceof Error ? error.message : String(error)
         });
     }
 }

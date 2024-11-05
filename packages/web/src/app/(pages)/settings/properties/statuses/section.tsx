@@ -25,7 +25,7 @@ interface EditDialogProps {
     open: boolean;
     status: PropertyStatus | null;
     onClose: () => void;
-    onSave: (oldStatus: PropertyStatus | null, newStatus: PropertyStatus) => void;
+    onSave: (status: PropertyStatus) => void;
 }
 
 function EditStatusDialog({ open, status, onClose, onSave }: EditDialogProps) {
@@ -34,7 +34,7 @@ function EditStatusDialog({ open, status, onClose, onSave }: EditDialogProps) {
 
     useEffect(() => {
         if (status) {
-            setName(status.label);
+            setName(status.value);
             setColor(status.color);
         } else {
             setName('');
@@ -43,15 +43,13 @@ function EditStatusDialog({ open, status, onClose, onSave }: EditDialogProps) {
     }, [status]);
 
     const handleSave = () => {
-        const trimmedName = (name || '').trim();
+        const trimmedName = name.trim();
         if (!trimmedName) return;
 
-        onSave(status, {
+        onSave({
             value: trimmedName.toLowerCase(),
-            label: trimmedName,
             color
         });
-        onClose();
     };
 
     return (
@@ -79,7 +77,7 @@ function EditStatusDialog({ open, status, onClose, onSave }: EditDialogProps) {
                 <Button 
                     onClick={handleSave}
                     variant="contained"
-                    disabled={!(name || '').trim()}
+                    disabled={!name.trim()}
                 >
                     Save
                 </Button>
@@ -112,13 +110,14 @@ export function PropertyStatusSection() {
         await update(updatedStatuses);
     };
 
-    const handleSaveStatus = async (oldStatus: PropertyStatus | null, newStatus: PropertyStatus) => {
-        const updatedStatuses = oldStatus
-            ? statuses.map(status => status.value === oldStatus.value ? newStatus : status)
+    const handleSaveStatus = async (newStatus: PropertyStatus) => {
+        const updatedStatuses = editingStatus
+            ? statuses.map(status => status.value === editingStatus.value ? newStatus : status)
             : [...statuses, newStatus];
         
         await update(updatedStatuses);
         setIsDialogOpen(false);
+        setEditingStatus(null);
     };
 
     if (isLoading) {
@@ -163,9 +162,9 @@ export function PropertyStatusSection() {
             </Button>
 
             <List>
-                {statuses.map((status, index) => (
+                {statuses.map((status) => (
                     <ListItem 
-                        key={index}
+                        key={status.value}
                         sx={{ 
                             p: 1,
                             '&:hover': {
@@ -182,7 +181,9 @@ export function PropertyStatusSection() {
                                 mr: 2
                             }} 
                         />
-                        <ListItemText primary={status.label} />
+                        <ListItemText 
+                            primary={status.value.charAt(0).toUpperCase() + status.value.slice(1)} 
+                        />
                         <IconButton onClick={() => handleEditStatus(status)}>
                             <EditIcon />
                         </IconButton>

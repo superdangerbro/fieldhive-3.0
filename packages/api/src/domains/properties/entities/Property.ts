@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, ManyToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, ManyToMany, JoinTable } from 'typeorm';
 import { Address } from '../../addresses/entities/Address';
 import { Account } from '../../accounts/entities/Account';
 
@@ -37,6 +37,17 @@ export class Property {
     billingAddress: Address | null;
 
     @ManyToMany(() => Account, account => account.properties)
+    @JoinTable({
+        name: 'properties_accounts',
+        joinColumn: {
+            name: 'property_id',
+            referencedColumnName: 'property_id'
+        },
+        inverseJoinColumn: {
+            name: 'account_id',
+            referencedColumnName: 'account_id'
+        }
+    })
     accounts: Account[];
 
     @CreateDateColumn({ name: 'created_at' })
@@ -44,4 +55,11 @@ export class Property {
 
     @UpdateDateColumn({ name: 'updated_at' })
     updated_at: Date;
+
+    constructor() {
+        this.service_address_id = null;
+        this.billing_address_id = null;
+        this.serviceAddress = null;
+        this.billingAddress = null;
+    }
 }

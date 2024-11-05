@@ -1,0 +1,60 @@
+/* Import mapbox-gl styles */
+@import url('https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css');
+
+/* Reset Mapbox control styles */
+.mapboxgl-ctrl-group {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Position controls */
+.mapboxgl-ctrl-top-right {
+  top: 16px !important;
+  right: 16px !important;
+}
+
+.mapboxgl-ctrl-top-right .mapboxgl-ctrl {
+  margin: 0 !important;
+  float: none !important;
+}
+
+/* Hide Mapbox logo and attribution */
+.mapboxgl-ctrl-logo,
+.mapboxgl-ctrl-attrib-inner {
+  display: none !important;
+}
+
+/* Style navigation controls */
+.mapboxgl-ctrl-group button {
+  background-color: white !important;
+  border: 1px solid #e2e8f0 !important;
+  margin: 2px !important;
+}
+
+.mapboxgl-ctrl-group button:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Style map container */
+.mapboxgl-map {
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+/* Style popup */
+.mapboxgl-popup-content {
+  padding: 12px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+.mapboxgl-popup-close-button {
+  padding: 4px 8px !important;
+  color: #64748b !important;
+}
+
+.mapboxgl-popup-close-button:hover {
+  color: #475569 !important;
+  background-color: transparent !important;
+}

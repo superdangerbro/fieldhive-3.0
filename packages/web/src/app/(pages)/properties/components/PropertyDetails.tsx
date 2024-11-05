@@ -1,9 +1,25 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, Divider, SelectChangeEvent } from '@mui/material';
-import type { Property, PropertyType, PropertyStatus, Address } from '@fieldhive/shared';
-import { deleteProperty, updatePropertyMetadata, getSetting, getPropertyAddresses } from '@/services/api';
+import { 
+    Card, 
+    CardContent, 
+    Dialog, 
+    DialogTitle, 
+    DialogContent, 
+    DialogContentText, 
+    DialogActions, 
+    Button, 
+    Divider, 
+    SelectChangeEvent,
+    CircularProgress,
+    Box
+} from '@mui/material';
+import { useQueryClient } from '@tanstack/react-query';
+import type { Property } from '@/app/globalTypes/property';
+import { useUpdatePropertyMetadata, useDeleteProperty } from '../hooks/usePropertyMetadata';
+import { useSetting } from '../hooks/useSettings';
+import { usePropertyStore } from '../store/propertyStore';
 
 // Import all components from the same directory
 import PropertyHeader from './PropertyHeader';
@@ -13,144 +29,143 @@ import PropertyLocation from './PropertyLocation';
 import PropertyTabs from './PropertyTabs';
 
 interface PropertyDetailsProps {
-  property: Property | null;
+  property: Property;
   onEdit: (property: Property) => void;
-  onUpdate?: () => void;
   onPropertySelect: (property: Property | null) => void;
 }
 
-const DEFAULT_STATUSES: PropertyStatus[] = ['active', 'inactive', 'archived', 'pending'];
-const DEFAULT_PROPERTY_TYPES: PropertyType[] = ['residential', 'commercial', 'industrial', 'agricultural', 'other'];
-
-export default function PropertyDetails({ property, onEdit, onUpdate, onPropertySelect }: PropertyDetailsProps) {
-  const [localProperty, setLocalProperty] = useState<Property | null>(property);
+export default function PropertyDetails({ 
+  property, 
+  onEdit, 
+  onPropertySelect 
+}: PropertyDetailsProps) {
   const [tabValue, setTabValue] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [statusLoading, setStatusLoading] = useState(false);
-  const [typeLoading, setTypeLoading] = useState(false);
-  const [statusOptions, setStatusOptions] = useState<PropertyStatus[]>(DEFAULT_STATUSES);
-  const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>(DEFAULT_PROPERTY_TYPES);
-  const [serviceAddress, setServiceAddress] = useState<Address | null>(null);
-  const [billingAddress, setBillingAddress] = useState<Address | null>(null);
+  const { setSelectedProperty, refreshProperty, updatePropertyInStore } = usePropertyStore();
+  const queryClient = useQueryClient();
 
+  // React Query mutations
+  const { 
+    mutate: updateMetadata, 
+    isPending: isUpdating 
+  } = useUpdatePropertyMetadata();
+
+  const { 
+    mutate: deleteProperty, 
+    isPending: isDeleting,
+    error: deleteError
+  } = useDeleteProperty();
+
+  // Fetch settings
+  const { 
+    data: statusOptions = [], 
+    isLoading: statusLoading,
+    error: statusError
+  } = useSetting<string>('property_statuses');
+
+  const { 
+    data: propertyTypes = [],
+    isLoading: typeLoading,
+    error: typeError
+  } = useSetting<string>('property_types');
+
+  // Refresh property data when it changes
   useEffect(() => {
-    setLocalProperty(property);
-  }, [property]);
-
-  useEffect(() => {
-    getSetting('property_statuses')
-      .then((statuses: PropertyStatus[]) => {
-        if (Array.isArray(statuses) && statuses.length > 0) {
-          setStatusOptions(statuses);
-        }
-      })
-      .catch(console.error);
-
-    getSetting('property_types')
-      .then((types: PropertyType[]) => {
-        if (Array.isArray(types) && types.length > 0) {
-          setPropertyTypes(types);
-        }
-      })
-      .catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    if (localProperty) {
-      // Fetch addresses
-      getPropertyAddresses(localProperty.property_id)
-        .then(({ service_address, billing_address }) => {
-          setServiceAddress(service_address);
-          setBillingAddress(billing_address);
-        })
-        .catch(console.error);
+    if (property) {
+      refreshProperty(property.property_id).catch(console.error);
     }
-  }, [localProperty]);
+  }, [property.property_id, refreshProperty]);
 
   const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!localProperty) return;
-    try {
-      await deleteProperty(localProperty.property_id);
-      setDeleteDialogOpen(false);
-      onPropertySelect(null);
-      if (onUpdate) onUpdate();
-    } catch (error: any) {
-      setDeleteError(error.message);
-    }
+  const handleConfirmDelete = () => {
+    deleteProperty(property.property_id, {
+      onSuccess: () => {
+        setDeleteDialogOpen(false);
+        onPropertySelect(null);
+        setSelectedProperty(null);
+      }
+    });
   };
 
   const handleStatusChange = async (event: SelectChangeEvent<string>) => {
-    if (!localProperty) return;
-    setStatusLoading(true);
-    
-    // Update local state immediately
-    const newStatus = event.target.value as PropertyStatus;
-    const updatedProperty = { ...localProperty, status: newStatus };
-    setLocalProperty(updatedProperty);
-
     try {
-      await updatePropertyMetadata(localProperty.property_id, {
-        status: newStatus
+      await updateMetadata({
+        id: property.property_id,
+        data: { status: event.target.value }
       });
-      if (onUpdate) onUpdate();
+      await refreshProperty(property.property_id);
     } catch (error) {
-      console.error(error);
-      // Revert local state on error
-      setLocalProperty(localProperty);
-    } finally {
-      setStatusLoading(false);
+      console.error('Failed to update status:', error);
     }
   };
 
   const handleTypeChange = async (event: SelectChangeEvent<string>) => {
-    if (!localProperty) return;
-    setTypeLoading(true);
-
-    // Update local state immediately
-    const newType = event.target.value as PropertyType;
-    const updatedProperty = { ...localProperty, property_type: newType };
-    setLocalProperty(updatedProperty);
-
     try {
-      await updatePropertyMetadata(localProperty.property_id, {
-        property_type: newType
+      await updateMetadata({
+        id: property.property_id,
+        data: { type: event.target.value }
       });
-      if (onUpdate) onUpdate();
+      await refreshProperty(property.property_id);
     } catch (error) {
-      console.error(error);
-      // Revert local state on error
-      setLocalProperty(localProperty);
-    } finally {
-      setTypeLoading(false);
+      console.error('Failed to update type:', error);
     }
   };
 
-  if (!localProperty) return null;
+  const handleUpdate = async () => {
+    try {
+      await refreshProperty(property.property_id);
+      await queryClient.invalidateQueries({ 
+        queryKey: ['property', property.property_id]
+      });
+    } catch (error) {
+      console.error('Failed to refresh property:', error);
+    }
+  };
+
+  const isLoading = statusLoading || typeLoading;
+  const hasError = statusError || typeError;
+
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight={200}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight={200}>
+        <DialogContentText color="error">
+          Failed to load property settings. Please try again later.
+        </DialogContentText>
+      </Box>
+    );
+  }
 
   return (
     <>
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <PropertyHeader 
-            property={localProperty}
+            property={property}
             onEdit={onEdit}
             onDelete={handleDeleteClick}
-            linkedAccounts={localProperty.accounts || []}
+            linkedAccounts={property.accounts || []}
+            onUpdate={handleUpdate}
           />
 
           <Divider sx={{ my: 2 }} />
 
           <PropertyMetadata
-            property={localProperty}
+            property={property}
             propertyTypes={propertyTypes}
             statusOptions={statusOptions}
-            typeLoading={typeLoading}
-            statusLoading={statusLoading}
+            typeLoading={isUpdating}
+            statusLoading={isUpdating}
             onTypeChange={handleTypeChange}
             onStatusChange={handleStatusChange}
           />
@@ -158,15 +173,16 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
           <Divider sx={{ my: 2 }} />
 
           <PropertyAddresses
-            serviceAddress={serviceAddress}
-            billingAddress={billingAddress}
+            propertyId={property.property_id}
+            serviceAddress={property.serviceAddress}
+            billingAddress={property.billingAddress}
+            onUpdate={handleUpdate}
           />
 
           <Divider sx={{ my: 2 }} />
 
           <PropertyLocation
-            property={localProperty}
-            onUpdate={onUpdate}
+            property={property}
           />
 
           <Divider sx={{ my: 2 }} />
@@ -187,7 +203,9 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
         <DialogTitle>Delete Property</DialogTitle>
         <DialogContent>
           {deleteError ? (
-            <DialogContentText color="error">{deleteError}</DialogContentText>
+            <DialogContentText color="error">
+              {deleteError instanceof Error ? deleteError.message : 'Failed to delete property'}
+            </DialogContentText>
           ) : (
             <DialogContentText>
               Are you sure you want to delete this property? This action cannot be undone.
@@ -195,8 +213,19 @@ export default function PropertyDetails({ property, onEdit, onUpdate, onProperty
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleConfirmDelete} color="error">Delete</Button>
+          <Button 
+            onClick={() => setDeleteDialogOpen(false)}
+            disabled={isDeleting}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmDelete} 
+            color="error"
+            disabled={isDeleting}
+          >
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
     </>

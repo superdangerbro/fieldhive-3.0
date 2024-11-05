@@ -1,19 +1,17 @@
 'use client';
 
 import { create } from 'zustand';
-import { PropertyType } from '@/app/globaltypes';
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+import { ENV_CONFIG } from '@/config/environment';
 
 interface PropertyTypeStore {
     // Data
-    types: PropertyType[];
+    types: string[];
     isLoading: boolean;
     error: string | null;
 
     // Actions
     fetch: () => Promise<void>;
-    update: (types: PropertyType[]) => Promise<void>;
+    update: (types: string[]) => Promise<void>;
 }
 
 export const usePropertyTypes = create<PropertyTypeStore>((set) => ({
@@ -24,7 +22,9 @@ export const usePropertyTypes = create<PropertyTypeStore>((set) => ({
     fetch: async () => {
         try {
             set({ isLoading: true, error: null });
-            const response = await fetch(`${BASE_URL}/settings/properties/types`);
+            const response = await fetch(`${ENV_CONFIG.api.baseUrl}/settings/properties/types`, {
+                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout)
+            });
             
             if (!response.ok) {
                 throw new Error('Failed to fetch property types');
@@ -43,19 +43,21 @@ export const usePropertyTypes = create<PropertyTypeStore>((set) => ({
     update: async (types) => {
         try {
             set({ isLoading: true, error: null });
-            const response = await fetch(`${BASE_URL}/settings/properties/types`, {
+            const response = await fetch(`${ENV_CONFIG.api.baseUrl}/settings/properties/types`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(types)
+                body: JSON.stringify({ types }),
+                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout)
             });
 
             if (!response.ok) {
                 throw new Error('Failed to update property types');
             }
 
-            set({ types });
+            const data = await response.json();
+            set({ types: data });
         } catch (error) {
             console.error('Failed to update property types:', error);
             set({ error: 'Failed to save property types' });

@@ -2,25 +2,27 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography, IconButton } from '@mui/material';
-import Map, { Marker, NavigationControl, Source, Layer } from 'react-map-gl';
+import Map, { Marker, NavigationControl, Source, Layer, MapLayerMouseEvent, MarkerDragEvent } from 'react-map-gl';
 import DeleteIcon from '@mui/icons-material/Delete';
 import UndoIcon from '@mui/icons-material/Undo';
 import RedoIcon from '@mui/icons-material/Redo';
+import type { LngLat } from 'mapbox-gl';
+import '../styles/mapbox.css';
 
 interface MapDialogProps {
   open: boolean;
   onClose: () => void;
-  initialLocation: [number, number];
+  initialLocation: [number, number];  // [latitude, longitude]
   mode: 'marker' | 'polygon';
-  onLocationSelect?: (coordinates: [number, number]) => void;
+  onLocationSelect?: (coordinates: [number, number]) => void;  // Will return [latitude, longitude]
   onBoundarySelect?: (polygon: {
     type: 'Polygon';
-    coordinates: Array<Array<[number, number]>>;
+    coordinates: Array<Array<[number, number]>>;  // Will return array of [longitude, latitude]
   }) => void;
   title?: string;
   initialBoundary?: {
     type: string;
-    coordinates: Array<Array<[number, number]>>;
+    coordinates: Array<Array<[number, number]>>;  // Expects GeoJSON format [longitude, latitude]
   };
 }
 
@@ -29,6 +31,42 @@ const APP_THEME_COLOR = '#6366f1';
 // Helper function to compare coordinates
 function areCoordinatesEqual(coord1: [number, number], coord2: [number, number]): boolean {
   return coord1[0] === coord2[0] && coord1[1] === coord2[1];
+}
+
+// Helper function to validate coordinates in display format [lat, lng]
+function validateCoordinates(lat: number, lng: number): boolean {
+  // Add debug logging
+  console.log('Validating coordinates:', { lat, lng });
+  const isValid = !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+  console.log('Coordinates valid:', isValid);
+  return isValid;
+}
+
+// Helper function to validate coordinates in GeoJSON format [lng, lat]
+function validateGeoJsonCoordinates(lng: number, lat: number): boolean {
+  return !isNaN(lng) && !isNaN(lat) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
+
+// Helper function to safely convert GeoJSON coordinates to display coordinates
+function safeGeoJsonToDisplay(coord: [number, number]): [number, number] | null {
+  try {
+    // GeoJSON coordinates are [longitude, latitude]
+    const [lng, lat] = coord;
+    
+    // Validate coordinates in GeoJSON order
+    if (validateGeoJsonCoordinates(lng, lat)) {
+      return [lat, lng];  // Return as [latitude, longitude]
+    }
+    return null;
+  } catch (err) {
+    console.error('Error converting coordinates:', err);
+    return null;
+  }
+}
+
+// Helper function to convert display coordinates to GeoJSON coordinates
+function displayToGeoJson(coords: [number, number]): [number, number] {
+  return [coords[1], coords[0]];  // Convert [lat, lng] to [lng, lat]
 }
 
 export default function MapDialog({ 
@@ -42,56 +80,55 @@ export default function MapDialog({
   initialBoundary
 }: MapDialogProps) {
   const [selectedLocation, setSelectedLocation] = useState<[number, number]>(initialLocation);
-  const [cssLoaded, setCssLoaded] = useState(false);
   const [polygonPoints, setPolygonPoints] = useState<Array<[number, number]>>([]);
   const [history, setHistory] = useState<Array<Array<[number, number]>>>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [drawingInstructions, setDrawingInstructions] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const dragTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize polygon points from initialBoundary if provided
   useEffect(() => {
     if (mode === 'polygon' && initialBoundary?.coordinates?.[0]) {
-      console.log('Initializing polygon with boundary:', initialBoundary);
-      // Remove the last point if it's the same as the first (closing point)
-      const points = initialBoundary.coordinates[0];
-      const uniquePoints = areCoordinatesEqual(
-        points[0], 
-        points[points.length - 1]
-      ) ? points.slice(0, -1) : points;
-      
-      setPolygonPoints(uniquePoints);
-      setHistory([uniquePoints]);
-      setHistoryIndex(0);
-      setDrawingInstructions(false);
+      try {
+        console.log('Raw boundary data:', initialBoundary);
+        
+        // Convert and validate each coordinate
+        const points = initialBoundary.coordinates[0];
+        const validPoints: [number, number][] = [];
+        
+        for (const coord of points) {
+          const displayCoord = safeGeoJsonToDisplay(coord as [number, number]);
+          if (displayCoord) {
+            validPoints.push(displayCoord);
+          }
+        }
+        
+        console.log('Converted points:', validPoints);
+        
+        if (validPoints.length < 3) {
+          throw new Error('Not enough valid points to form a polygon');
+        }
+        
+        // Remove closing point if polygon is closed
+        const uniquePoints = areCoordinatesEqual(
+          validPoints[0], 
+          validPoints[validPoints.length - 1]
+        ) ? validPoints.slice(0, -1) : validPoints;
+        
+        console.log('Final points:', uniquePoints);
+        
+        setPolygonPoints(uniquePoints);
+        setHistory([uniquePoints]);
+        setHistoryIndex(0);
+        setDrawingInstructions(false);
+      } catch (err) {
+        console.error('Error initializing polygon:', err);
+        setError('Failed to initialize polygon boundary');
+      }
     }
   }, [mode, initialBoundary]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    // Add Mapbox CSS when dialog opens
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css';
-    document.head.appendChild(link);
-
-    // Wait for CSS to load
-    link.onload = () => {
-      console.log('Mapbox CSS loaded');
-      setCssLoaded(true);
-    };
-
-    return () => {
-      // Remove CSS when dialog closes
-      document.head.removeChild(link);
-      setCssLoaded(false);
-      if (dragTimeout.current) {
-        clearTimeout(dragTimeout.current);
-      }
-    };
-  }, [open]);
 
   const addToHistory = (points: Array<[number, number]>) => {
     const newHistory = history.slice(0, historyIndex + 1);
@@ -126,19 +163,26 @@ export default function MapDialog({
     );
   };
 
-  const handleClick = (event: any) => {
+  const handleClick = (event: MapLayerMouseEvent) => {
     if (isDragging) return;
     
     const { lng, lat } = event.lngLat;
+    console.log('Click coordinates:', { lat, lng });
+
+    // Validate coordinates
+    if (!validateCoordinates(lat, lng)) {
+      setError('Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.');
+      return;
+    }
+    
+    const displayCoords: [number, number] = [lat, lng];  // Store as [latitude, longitude]
     
     if (mode === 'marker') {
       console.log('Map clicked (marker):', { lat, lng });
-      setSelectedLocation([lat, lng]);
+      setSelectedLocation(displayCoords);
     } else if (mode === 'polygon') {
-      const newPoint: [number, number] = [lng, lat];
-      
       if (polygonPoints.length < 2) {
-        const newPoints = [...polygonPoints, newPoint];
+        const newPoints = [...polygonPoints, displayCoords];
         setPolygonPoints(newPoints);
         addToHistory(newPoints);
         setDrawingInstructions(false);
@@ -148,7 +192,7 @@ export default function MapDialog({
 
         for (let i = 0; i < polygonPoints.length - 1; i++) {
           const distance = distanceToLineSegment(
-            newPoint,
+            displayCoords,
             polygonPoints[i],
             polygonPoints[i + 1]
           );
@@ -161,13 +205,13 @@ export default function MapDialog({
         if (minDistance < 0.0001) {
           const newPoints = [
             ...polygonPoints.slice(0, insertIndex),
-            newPoint,
+            displayCoords,
             ...polygonPoints.slice(insertIndex)
           ];
           setPolygonPoints(newPoints);
           addToHistory(newPoints);
         } else {
-          const newPoints = [...polygonPoints, newPoint];
+          const newPoints = [...polygonPoints, displayCoords];
           setPolygonPoints(newPoints);
           addToHistory(newPoints);
         }
@@ -205,10 +249,20 @@ export default function MapDialog({
     }
   };
 
-  const handleDragEnd = (index: number, event: any) => {
+  const handleDragEnd = (index: number, event: MarkerDragEvent) => {
     const { lng, lat } = event.lngLat;
+    console.log('Drag end coordinates:', { lat, lng });
+
+    // Validate coordinates
+    if (!validateCoordinates(lat, lng)) {
+      setError('Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.');
+      return;
+    }
+
+    // Keep coordinates in [latitude, longitude] format consistently
+    const displayCoords: [number, number] = [lat, lng];
     const newPoints = [...polygonPoints];
-    newPoints[index] = [lng, lat];
+    newPoints[index] = displayCoords;
     setPolygonPoints(newPoints);
     addToHistory(newPoints);
     
@@ -219,23 +273,29 @@ export default function MapDialog({
   };
 
   const handleSave = () => {
-    if (mode === 'marker' && onLocationSelect) {
-      console.log('Saving location:', selectedLocation);
-      onLocationSelect(selectedLocation);
-    } else if (mode === 'polygon' && onBoundarySelect && polygonPoints.length >= 3) {
-      // Create a properly typed closed polygon
-      const closedPolygon: Array<[number, number]> = [...polygonPoints];
-      if (!areCoordinatesEqual(closedPolygon[0], closedPolygon[closedPolygon.length - 1])) {
-        closedPolygon.push([...closedPolygon[0]]);
+    try {
+      if (mode === 'marker' && onLocationSelect) {
+        console.log('Saving location:', selectedLocation);
+        onLocationSelect(selectedLocation);  // Already in [latitude, longitude] format
+      } else if (mode === 'polygon' && onBoundarySelect && polygonPoints.length >= 3) {
+        // Convert to GeoJSON format and ensure polygon is closed
+        const geoJsonPoints = polygonPoints.map(displayToGeoJson);  // Convert to [lng, lat]
+        const closedPoints = [...geoJsonPoints];
+        if (!areCoordinatesEqual(closedPoints[0], closedPoints[closedPoints.length - 1])) {
+          closedPoints.push([...closedPoints[0]]);
+        }
+        
+        console.log('Saving polygon:', closedPoints);
+        onBoundarySelect({
+          type: 'Polygon',
+          coordinates: [closedPoints]  // GeoJSON format [longitude, latitude]
+        });
       }
-      
-      console.log('Saving polygon:', closedPolygon);
-      onBoundarySelect({
-        type: 'Polygon',
-        coordinates: [closedPolygon]
-      });
+      onClose();
+    } catch (err) {
+      console.error('Error saving:', err);
+      setError('Failed to save changes');
     }
-    onClose();
   };
 
   const handleReset = () => {
@@ -243,6 +303,7 @@ export default function MapDialog({
     setHistory([]);
     setHistoryIndex(-1);
     setDrawingInstructions(true);
+    setError(null);
   };
 
   const polygonData = polygonPoints.length >= 3 ? {
@@ -250,7 +311,7 @@ export default function MapDialog({
     geometry: {
       type: 'Polygon',
       coordinates: [
-        [...polygonPoints, polygonPoints[0]]
+        [...polygonPoints.map(displayToGeoJson), polygonPoints.map(displayToGeoJson)[0]]
       ]
     },
     properties: {}
@@ -260,10 +321,26 @@ export default function MapDialog({
     type: 'Feature',
     geometry: {
       type: 'LineString',
-      coordinates: polygonPoints
+      coordinates: polygonPoints.map(displayToGeoJson)
     },
     properties: {}
   };
+
+  if (!process.env.NEXT_PUBLIC_MAPBOX_TOKEN) {
+    return (
+      <Dialog open={open} onClose={onClose}>
+        <DialogTitle>Error</DialogTitle>
+        <DialogContent>
+          <Typography color="error">
+            Mapbox token is not configured. Please check your environment configuration.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog
@@ -284,6 +361,12 @@ export default function MapDialog({
         )}
       </DialogTitle>
       <DialogContent>
+        {error && (
+          <Typography color="error" sx={{ mb: 2 }}>
+            {error}
+          </Typography>
+        )}
+        
         {mode === 'polygon' && (
           <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
             <IconButton 
@@ -312,102 +395,104 @@ export default function MapDialog({
         )}
         
         <Box sx={{ height: 500, position: 'relative' }}>
-          {cssLoaded && (
-            <Map
-              initialViewState={{
-                longitude: initialLocation[1],
-                latitude: initialLocation[0],
-                zoom: 17
-              }}
-              style={{ width: '100%', height: '100%' }}
-              mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
-              mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
-              onClick={handleClick}
-              attributionControl={false}
-            >
-              {mode === 'marker' && (
-                <Marker
-                  longitude={selectedLocation[1]}
-                  latitude={selectedLocation[0]}
-                  draggable
-                  onDragEnd={(event) => {
-                    const { lat, lng } = event.lngLat;
+          <Map
+            initialViewState={{
+              longitude: initialLocation[1],  // Use longitude for x-coordinate
+              latitude: initialLocation[0],   // Use latitude for y-coordinate
+              zoom: 17
+            }}
+            style={{ width: '100%', height: '100%' }}
+            mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+            mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+            onClick={handleClick}
+            attributionControl={false}
+          >
+            {mode === 'marker' && (
+              <Marker
+                longitude={selectedLocation[1]}  // Use longitude for x-coordinate
+                latitude={selectedLocation[0]}   // Use latitude for y-coordinate
+                draggable
+                onDragEnd={(event) => {
+                  const { lat, lng } = event.lngLat;
+                  if (validateCoordinates(lat, lng)) {
                     console.log('Marker dragged to:', { lat, lng });
                     setSelectedLocation([lat, lng]);
-                  }}
-                  color={APP_THEME_COLOR}
-                />
-              )}
+                  } else {
+                    setError('Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.');
+                  }
+                }}
+                color={APP_THEME_COLOR}
+              />
+            )}
 
-              {mode === 'polygon' && (
-                <>
-                  {/* Draw lines */}
-                  <Source type="geojson" data={lineData}>
+            {mode === 'polygon' && (
+              <>
+                {/* Draw lines */}
+                <Source type="geojson" data={lineData}>
+                  <Layer
+                    id="line-layer"
+                    type="line"
+                    paint={{
+                      'line-color': APP_THEME_COLOR,
+                      'line-width': 2
+                    }}
+                  />
+                </Source>
+                
+                {/* Draw filled polygon if we have enough points */}
+                {polygonData && (
+                  <Source type="geojson" data={polygonData}>
                     <Layer
-                      id="line-layer"
-                      type="line"
+                      id="polygon-layer"
+                      type="fill"
                       paint={{
-                        'line-color': APP_THEME_COLOR,
-                        'line-width': 2
+                        'fill-color': APP_THEME_COLOR,
+                        'fill-opacity': 0.3
                       }}
                     />
                   </Source>
-                  
-                  {/* Draw filled polygon if we have enough points */}
-                  {polygonData && (
-                    <Source type="geojson" data={polygonData}>
-                      <Layer
-                        id="polygon-layer"
-                        type="fill"
-                        paint={{
-                          'fill-color': APP_THEME_COLOR,
-                          'fill-opacity': 0.3
+                )}
+
+                {/* Draw draggable points */}
+                {polygonPoints.map((point, index) => (
+                  <Marker
+                    key={index}
+                    longitude={point[1]}  // Use longitude for x-coordinate
+                    latitude={point[0]}   // Use latitude for y-coordinate
+                    draggable
+                    onDragStart={handleDragStart}
+                    onDragEnd={(event) => handleDragEnd(index, event)}
+                  >
+                    <Box
+                      sx={{
+                        width: '24px',
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'move'
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          backgroundColor: APP_THEME_COLOR,
+                          borderRadius: '50%'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePoint(index);
                         }}
                       />
-                    </Source>
-                  )}
-
-                  {/* Draw draggable points */}
-                  {polygonPoints.map((point, index) => (
-                    <Marker
-                      key={index}
-                      longitude={point[0]}
-                      latitude={point[1]}
-                      draggable
-                      onDragStart={handleDragStart}
-                      onDragEnd={(event) => handleDragEnd(index, event)}
-                    >
-                      <Box
-                        sx={{
-                          width: '24px',
-                          height: '24px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'move'
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: '14px',
-                            height: '14px',
-                            backgroundColor: APP_THEME_COLOR,
-                            borderRadius: '50%'
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeletePoint(index);
-                          }}
-                        />
-                      </Box>
-                    </Marker>
-                  ))}
-                </>
-              )}
-              
-              <NavigationControl />
-            </Map>
-          )}
+                    </Box>
+                  </Marker>
+                ))}
+              </>
+            )}
+            
+            <NavigationControl />
+          </Map>
         </Box>
       </DialogContent>
       <DialogActions>

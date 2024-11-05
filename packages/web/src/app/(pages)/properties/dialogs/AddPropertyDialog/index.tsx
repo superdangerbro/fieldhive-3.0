@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -14,15 +14,15 @@ import {
   CircularProgress,
   Box
 } from '@mui/material';
-import { usePropertyForm } from '../hooks/usePropertyForm';
-import { StepContent } from './AddPropertyDialog/StepContent';
-import { createProperty, getAccounts } from '@/services/api';
-import type { CreatePropertyDto } from '@fieldhive/shared';
+import { usePropertyForm } from '../../hooks/usePropertyForm';
+import { StepContent } from './StepContent';
+import { useCreateProperty } from '../../hooks/useProperties';
+import type { CreatePropertyDto } from '@/app/globalTypes/property';
+import { usePropertyStore } from '../../store/propertyStore';
 
 interface AddPropertyDialogProps {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
 }
 
 const steps = [
@@ -32,22 +32,20 @@ const steps = [
   'Property Boundary'
 ];
 
-export default function AddPropertyDialog({ open, onClose, onSuccess }: AddPropertyDialogProps) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export default function AddPropertyDialog({ open, onClose }: AddPropertyDialogProps) {
+  const { mutate: createProperty, isPending: loading, error } = useCreateProperty();
+  const { setSelectedProperty } = usePropertyStore();
+  
   const {
     activeStep,
     setActiveStep,
     accounts,
-    setAccounts,
     selectedAccounts,
     setSelectedAccounts,
     showAddAccount,
     setShowAddAccount,
     formErrors,
     setFormErrors,
-    contacts,
-    setContacts,
     propertyData,
     setPropertyData,
     handleFieldChange,
@@ -62,89 +60,71 @@ export default function AddPropertyDialog({ open, onClose, onSuccess }: AddPrope
     onClose();
   };
 
-  const fetchAccounts = async () => {
-    try {
-      const response = await getAccounts({ limit: 100 });
-      setAccounts(response.accounts);
-    } catch (error) {
-      console.error('Failed to fetch accounts:', error);
-      setError('Failed to load accounts');
-    }
-  };
-
   const handleSubmit = async () => {
     if (selectedAccounts.length === 0) {
-      setError('Please select at least one account');
+      setFormErrors(prev => ({ ...prev, accounts: 'Please select at least one account' }));
       return;
     }
 
     if (!propertyData.location) {
-      setError('Please select a property location');
+      setFormErrors(prev => ({ ...prev, location: 'Please select a property location' }));
       return;
     }
 
     // Validate service address
     const { serviceAddress } = propertyData;
     if (!serviceAddress.address1 || !serviceAddress.city || !serviceAddress.province || !serviceAddress.postalCode) {
-      setError('Service address is incomplete');
+      setFormErrors(prev => ({ ...prev, serviceAddress: 'Service address is incomplete' }));
       return;
     }
 
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Convert service address to the format expected by the API
-      const service_address = {
-        address1: propertyData.serviceAddress.address1,
-        address2: propertyData.serviceAddress.address2 || '',
-        city: propertyData.serviceAddress.city,
-        province: propertyData.serviceAddress.province,
-        postal_code: propertyData.serviceAddress.postalCode,
-        country: propertyData.serviceAddress.country,
-      };
+    // Convert service address to the format expected by the API
+    const service_address = {
+      address1: propertyData.serviceAddress.address1,
+      address2: propertyData.serviceAddress.address2 || '',
+      city: propertyData.serviceAddress.city,
+      province: propertyData.serviceAddress.province,
+      postal_code: propertyData.serviceAddress.postalCode,
+      country: propertyData.serviceAddress.country || 'Canada',
+    };
 
-      // Use service address for billing if useDifferentBillingAddress is false
-      const billing_address = propertyData.useDifferentBillingAddress ? {
-        address1: propertyData.billingAddress.address1,
-        address2: propertyData.billingAddress.address2 || '',
-        city: propertyData.billingAddress.city,
-        province: propertyData.billingAddress.province,
-        postal_code: propertyData.billingAddress.postalCode,
-        country: propertyData.billingAddress.country,
-      } : undefined;
+    // Use service address for billing if useDifferentBillingAddress is false
+    const billing_address = propertyData.useDifferentBillingAddress ? {
+      address1: propertyData.billingAddress.address1,
+      address2: propertyData.billingAddress.address2 || '',
+      city: propertyData.billingAddress.city,
+      province: propertyData.billingAddress.province,
+      postal_code: propertyData.billingAddress.postalCode,
+      country: propertyData.billingAddress.country || 'Canada',
+    } : service_address;  // Use service address as billing address if not different
 
-      // Prepare boundary data ensuring it matches the expected format
-      const boundaryCoordinates = propertyData.boundary?.coordinates[0] || [];
-      const closedBoundary = boundaryCoordinates.length > 0 ? 
-        [...boundaryCoordinates, boundaryCoordinates[0]] : [];
+    // Prepare boundary data ensuring it matches the expected format
+    const boundaryCoordinates = propertyData.boundary?.coordinates[0] || [];
+    const closedBoundary = boundaryCoordinates.length > 0 ? 
+      [...boundaryCoordinates, boundaryCoordinates[0]] : [];
 
-      const createPropertyData: CreatePropertyDto = {
-        name: propertyData.useCustomName ? propertyData.customName : propertyData.serviceAddress.address1,
-        property_type: propertyData.type,
-        location: {
-          type: 'Point',
-          coordinates: propertyData.location.coordinates as [number, number]
-        },
-        boundary: boundaryCoordinates.length > 0 ? {
-          type: 'Polygon',
-          coordinates: [closedBoundary as [number, number][]]
-        } : undefined,
-        service_address,
-        billing_address,
-        account_id: selectedAccounts[0].account_id,
-      };
+    const createPropertyData: CreatePropertyDto = {
+      name: propertyData.useCustomName ? propertyData.customName : propertyData.serviceAddress.address1,
+      type: propertyData.type,
+      location: {
+        type: 'Point',
+        coordinates: propertyData.location.coordinates as [number, number]
+      },
+      boundary: boundaryCoordinates.length > 0 ? {
+        type: 'Polygon',
+        coordinates: [closedBoundary as [number, number][]]
+      } : undefined,
+      service_address,
+      billing_address,
+      account_id: selectedAccounts[0].account_id,
+    };
 
-      console.log('Creating property with data:', JSON.stringify(createPropertyData, null, 2));
-      await createProperty(createPropertyData);
-      onSuccess();
-      handleClose();
-    } catch (err) {
-      console.error('Error creating property:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create property');
-    } finally {
-      setLoading(false);
-    }
+    createProperty(createPropertyData, {
+      onSuccess: (newProperty) => {
+        setSelectedProperty(newProperty);  // Select the newly created property
+        handleClose();
+      }
+    });
   };
 
   const handleStepNext = () => {
@@ -157,13 +137,6 @@ export default function AddPropertyDialog({ open, onClose, onSuccess }: AddPrope
     }
   };
 
-  // Fetch accounts when dialog opens
-  React.useEffect(() => {
-    if (open) {
-      fetchAccounts();
-    }
-  }, [open]);
-
   return (
     <Dialog 
       open={open} 
@@ -175,7 +148,7 @@ export default function AddPropertyDialog({ open, onClose, onSuccess }: AddPrope
       <DialogContent>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
+            {error instanceof Error ? error.message : 'Failed to create property'}
           </Alert>
         )}
         
@@ -201,9 +174,6 @@ export default function AddPropertyDialog({ open, onClose, onSuccess }: AddPrope
             accounts={accounts}
             showAddAccount={showAddAccount}
             setShowAddAccount={setShowAddAccount}
-            fetchAccounts={fetchAccounts}
-            contacts={contacts}
-            setContacts={setContacts}
           />
         </Box>
       </DialogContent>

@@ -1,30 +1,65 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Box, Paper, Typography, Stack, Button } from '@mui/material';
+import { Box, Paper, Typography, Stack, Button, CircularProgress } from '@mui/material';
 import Map, { Marker, Source, Layer } from 'react-map-gl';
-import type { Property } from '@fieldhive/shared';
-import MapDialog from './MapDialog';
+import type { Property } from '../../../globalTypes/property';
+import MapDialog from '../dialogs/MapDialog';
 import EditIcon from '@mui/icons-material/Edit';
-import { getPropertyLocation } from '@/services/api';
-import { PropertyLocationUpdater } from '../utils/PropertyLocationUpdater';
+import { usePropertyLocation, useUpdatePropertyLocation, useUpdatePropertyBoundary } from '../hooks/usePropertyLocation';
 
 interface PropertyLocationProps {
   property: Property;
-  onUpdate?: () => void;
 }
 
 const APP_THEME_COLOR = '#6366f1';
-const DEFAULT_LOCATION: [number, number] = [-123.1207, 49.2827]; // Vancouver [lng, lat]
 
-export default function PropertyLocation({ property, onUpdate }: PropertyLocationProps) {
+// Default location from environment variables
+const DEFAULT_LOCATION: [number, number] = [
+  Number(process.env.NEXT_PUBLIC_DEFAULT_LONGITUDE) || -123.1207,
+  Number(process.env.NEXT_PUBLIC_DEFAULT_LATITUDE) || 49.2827
+];
+
+const DEFAULT_ZOOM = Number(process.env.NEXT_PUBLIC_DEFAULT_ZOOM) || 12;
+
+// Helper function to format coordinates
+const formatCoordinates = (coords: [number, number]) => {
+  if (!coords || !Array.isArray(coords) || coords.length !== 2) {
+    return 'Not set';
+  }
+  try {
+    // GeoJSON format is [longitude, latitude]
+    const [longitude, latitude] = coords;
+    return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+  } catch (error) {
+    console.error('Error formatting coordinates:', error);
+    return 'Invalid format';
+  }
+};
+
+export default function PropertyLocation({ property }: PropertyLocationProps) {
   const [cssLoaded, setCssLoaded] = useState(false);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [boundaryDialogOpen, setBoundaryDialogOpen] = useState(false);
-  const [locationData, setLocationData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const locationUpdater = new PropertyLocationUpdater(property.property_id);
+
+  // React Query hooks
+  const { 
+    data: locationData, 
+    isLoading,
+    error: queryError 
+  } = usePropertyLocation(property.property_id);
+
+  const { 
+    mutate: updateLocation,
+    isPending: isUpdatingLocation,
+    error: updateLocationError
+  } = useUpdatePropertyLocation();
+
+  const { 
+    mutate: updateBoundary,
+    isPending: isUpdatingBoundary,
+    error: updateBoundaryError
+  } = useUpdatePropertyBoundary();
   
   useEffect(() => {
     // Add Mapbox CSS
@@ -46,73 +81,55 @@ export default function PropertyLocation({ property, onUpdate }: PropertyLocatio
     };
   }, []);
 
-  useEffect(() => {
-    const fetchLocationData = async () => {
-      try {
-        const response = await getPropertyLocation(property.property_id);
-        console.log('Location data:', response);
-        setLocationData(response.data);
-        setError(null);
-      } catch (error) {
-        console.error('Error fetching location data:', error);
-        setError('Failed to load location data');
-      } finally {
-        setLoading(false);
+  const handleLocationSelect = (coordinates: [number, number]) => {
+    // Convert [lat, lng] to [lng, lat] for GeoJSON
+    const geoJsonCoords: [number, number] = [coordinates[1], coordinates[0]];
+    updateLocation(
+      { propertyId: property.property_id, coordinates: geoJsonCoords },
+      {
+        onSuccess: () => {
+          setLocationDialogOpen(false);
+        }
       }
-    };
+    );
+  };
 
-    fetchLocationData();
-  }, [property.property_id]);
+  const handleBoundarySelect = (polygon: any) => {
+    if (!polygon?.coordinates?.[0]) {
+      return;
+    }
 
-  if (loading || !locationData) {
+    // Convert coordinates from [lat, lng] to [lng, lat] for GeoJSON
+    const geoJsonCoords = polygon.coordinates[0].map((coord: [number, number]) => [coord[1], coord[0]]);
+
+    updateBoundary(
+      { propertyId: property.property_id, coordinates: geoJsonCoords },
+      {
+        onSuccess: () => {
+          setBoundaryDialogOpen(false);
+        }
+      }
+    );
+  };
+
+  const getErrorMessage = (error: Error | null) => {
+    if (!error) return null;
+    return error instanceof Error ? error.message : 'An unexpected error occurred';
+  };
+
+  if (isLoading) {
     return (
-      <Paper sx={{ p: 2 }}>
-        <Typography>Loading location data...</Typography>
+      <Paper sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
       </Paper>
     );
   }
 
-  if (error) {
-    return (
-      <Paper sx={{ p: 2 }}>
-        <Typography color="error">{error}</Typography>
-      </Paper>
-    );
-  }
-
-  const coordinates = locationData.location.geometry.coordinates;
-  const initialLocation: [number, number] = [coordinates[1], coordinates[0]]; // Convert to [lat, lng]
-
-  const handleLocationSelect = async (coordinates: [number, number]) => {
-    try {
-      const updatedData = await locationUpdater.updateLocation(coordinates);
-      setLocationData(updatedData);
-      setError(null);
-      if (onUpdate) onUpdate();
-      setLocationDialogOpen(false);
-    } catch (error) {
-      console.error('Failed to update location:', error);
-      setError('Failed to update location');
-    }
-  };
-
-  const handleBoundarySelect = async (polygon: any) => {
-    try {
-      if (!polygon?.coordinates?.[0]) {
-        setError('Invalid polygon data');
-        return;
-      }
-
-      const updatedData = await locationUpdater.updateBoundary(polygon.coordinates[0]);
-      setLocationData(updatedData);
-      setError(null);
-      if (onUpdate) onUpdate();
-      setBoundaryDialogOpen(false);
-    } catch (error) {
-      console.error('Failed to update boundary:', error);
-      setError('Failed to update boundary');
-    }
-  };
+  // Get coordinates from locationData or use default
+  // Convert from GeoJSON [lng, lat] to [lat, lng] for display
+  const coordinates = locationData?.location?.geometry?.coordinates 
+    ? [locationData.location.geometry.coordinates[1], locationData.location.geometry.coordinates[0]]
+    : DEFAULT_LOCATION;
 
   return (
     <Paper sx={{ p: 2, display: 'flex', gap: 2 }}>
@@ -123,24 +140,30 @@ export default function PropertyLocation({ property, onUpdate }: PropertyLocatio
             <Typography variant="h6" gutterBottom>Location</Typography>
             <Stack direction="row" spacing={2} alignItems="center">
               <Typography variant="body2" sx={{ minWidth: 140, fontFamily: 'monospace' }}>
-                {`${coordinates[1].toFixed(6)}, ${coordinates[0].toFixed(6)}`}
+                {locationData?.location ? formatCoordinates(locationData.location.geometry.coordinates) : 'Not set'}
               </Typography>
               <Button
                 variant="outlined"
                 size="small"
                 startIcon={<EditIcon />}
                 onClick={() => setLocationDialogOpen(true)}
+                disabled={isUpdatingLocation}
               >
-                Edit Location
+                {locationData?.location ? 'Edit Location' : 'Add Location'}
               </Button>
             </Stack>
+            {updateLocationError && (
+              <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+                {getErrorMessage(updateLocationError as Error)}
+              </Typography>
+            )}
           </Box>
 
           <Box>
             <Typography variant="h6" gutterBottom>Boundary</Typography>
             <Stack direction="row" spacing={2} alignItems="center">
               <Typography variant="body2" sx={{ minWidth: 140, fontFamily: 'monospace' }}>
-                {locationData.boundary 
+                {locationData?.boundary 
                   ? `${locationData.boundary.geometry.coordinates[0].length - 1} points` 
                   : 'Not set'}
               </Typography>
@@ -149,17 +172,17 @@ export default function PropertyLocation({ property, onUpdate }: PropertyLocatio
                 size="small"
                 startIcon={<EditIcon />}
                 onClick={() => setBoundaryDialogOpen(true)}
+                disabled={isUpdatingBoundary}
               >
-                {locationData.boundary ? 'Edit Boundary' : 'Add Boundary'}
+                {locationData?.boundary ? 'Edit Boundary' : 'Add Boundary'}
               </Button>
             </Stack>
+            {updateBoundaryError && (
+              <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+                {getErrorMessage(updateBoundaryError as Error)}
+              </Typography>
+            )}
           </Box>
-
-          {error && (
-            <Typography color="error" variant="body2">
-              {error}
-            </Typography>
-          )}
         </Stack>
       </Box>
 
@@ -168,21 +191,23 @@ export default function PropertyLocation({ property, onUpdate }: PropertyLocatio
         {cssLoaded && (
           <Map
             initialViewState={{
-              longitude: coordinates[0],
-              latitude: coordinates[1],
-              zoom: 17
+              longitude: coordinates[1],  // Use longitude for x-coordinate
+              latitude: coordinates[0],   // Use latitude for y-coordinate
+              zoom: locationData?.location ? 17 : DEFAULT_ZOOM
             }}
             style={{ width: '100%', height: '100%' }}
             mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
             mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
             interactive={true}
           >
-            <Marker
-              longitude={coordinates[0]}
-              latitude={coordinates[1]}
-              color={APP_THEME_COLOR}
-            />
-            {locationData.boundary && (
+            {locationData?.location && (
+              <Marker
+                longitude={locationData.location.geometry.coordinates[0]}  // Use longitude from GeoJSON
+                latitude={locationData.location.geometry.coordinates[1]}   // Use latitude from GeoJSON
+                color={APP_THEME_COLOR}
+              />
+            )}
+            {locationData?.boundary && (
               <Source
                 type="geojson"
                 data={locationData.boundary}
@@ -213,21 +238,21 @@ export default function PropertyLocation({ property, onUpdate }: PropertyLocatio
       <MapDialog
         open={locationDialogOpen}
         onClose={() => setLocationDialogOpen(false)}
-        initialLocation={initialLocation}
+        initialLocation={coordinates}
         mode="marker"
         onLocationSelect={handleLocationSelect}
-        title="Edit Property Location"
+        title={locationData?.location ? 'Edit Property Location' : 'Add Property Location'}
       />
 
       {/* Boundary Dialog */}
       <MapDialog
         open={boundaryDialogOpen}
         onClose={() => setBoundaryDialogOpen(false)}
-        initialLocation={initialLocation}
+        initialLocation={coordinates}
         mode="polygon"
         onBoundarySelect={handleBoundarySelect}
-        initialBoundary={locationData.boundary?.geometry}
-        title="Edit Property Boundary"
+        initialBoundary={locationData?.boundary?.geometry}
+        title={locationData?.boundary ? 'Edit Property Boundary' : 'Add Property Boundary'}
       />
     </Paper>
   );

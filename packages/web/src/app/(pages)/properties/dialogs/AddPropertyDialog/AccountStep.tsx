@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
@@ -10,21 +10,20 @@ import {
   Button,
   IconButton,
   Collapse,
+  CircularProgress
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { Account, Contact } from '../../types';
-import AccountSelector, { MinimalAccount } from '../AccountSelector';
+import type { Account } from '../../../../globalTypes/account';
+import AccountSelector from '../../components/AccountSelector';
+import { useAccountContacts, useCreateContact, useDeleteContact, useUpdateContact, type Contact } from '../../hooks/useContacts';
 
 interface AccountStepProps {
-  selectedAccounts: MinimalAccount[];
-  setSelectedAccounts: (accounts: MinimalAccount[]) => void;
+  selectedAccounts: Account[];
+  setSelectedAccounts: (accounts: Account[]) => void;
   accounts: Account[];
   showAddAccount: boolean;
   setShowAddAccount: (show: boolean) => void;
-  fetchAccounts: () => Promise<void>;
-  contacts: Contact[];
-  setContacts: (contacts: Contact[]) => void;
 }
 
 export const AccountStep: React.FC<AccountStepProps> = ({
@@ -32,35 +31,55 @@ export const AccountStep: React.FC<AccountStepProps> = ({
   setSelectedAccounts,
   showAddAccount,
   setShowAddAccount,
-  contacts,
-  setContacts,
 }) => {
+  // Local state for new contacts before they're saved
+  const [newContacts, setNewContacts] = useState<Partial<Contact>[]>([]);
+  
+  // Get existing contacts if an account is selected
+  const accountId = selectedAccounts[0]?.account_id;
+  const { data: existingContacts = [], isLoading: loadingContacts } = useAccountContacts(accountId);
+  
+  // Mutations for contact management
+  const { mutate: createContact, isPending: isCreating } = useCreateContact();
+  const { mutate: deleteContact, isPending: isDeleting } = useDeleteContact();
+  const { mutate: updateContact, isPending: isUpdating } = useUpdateContact();
+
   const handleContactChange = (index: number, field: keyof Contact, value: string) => {
-    const newContacts = [...contacts];
-    newContacts[index] = {
-      ...newContacts[index],
+    const newContactsList = [...newContacts];
+    newContactsList[index] = {
+      ...newContactsList[index],
       [field]: value,
     };
-    setContacts(newContacts);
+    setNewContacts(newContactsList);
   };
 
   const handleAddContact = () => {
-    setContacts([
-      ...contacts,
+    setNewContacts([
+      ...newContacts,
       {
-        id: `temp-${Date.now()}`,
         name: '',
         email: '',
         phone: '',
         role: '',
-        isPrimary: contacts.length === 0,
+        isPrimary: newContacts.length === 0 && existingContacts.length === 0,
       },
     ]);
   };
 
   const handleRemoveContact = (index: number) => {
-    setContacts(contacts.filter((_, i) => i !== index));
+    setNewContacts(newContacts.filter((_, i) => i !== index));
   };
+
+  const handleDeleteExistingContact = (contact: Contact) => {
+    if (!accountId) return;
+    
+    deleteContact({ 
+      id: contact.id, 
+      accountId 
+    });
+  };
+
+  const isLoading = loadingContacts || isCreating || isDeleting || isUpdating;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
@@ -70,9 +89,11 @@ export const AccountStep: React.FC<AccountStepProps> = ({
       
       <AccountSelector
         selectedAccounts={selectedAccounts}
-        onChange={(accounts) => {
+        onChange={(accounts: Account[]) => {
           setSelectedAccounts(accounts);
           setShowAddAccount(accounts.length === 0);
+          // Reset new contacts when account selection changes
+          setNewContacts([]);
         }}
       />
 
@@ -90,7 +111,9 @@ export const AccountStep: React.FC<AccountStepProps> = ({
             value={selectedAccounts.length === 1 ? selectedAccounts[0].name : ''}
             onChange={(e) => setSelectedAccounts([{ 
               account_id: 'new', 
-              name: e.target.value
+              name: e.target.value,
+              type: 'customer',
+              status: 'active'
             }])}
             fullWidth
             size="small"
@@ -109,12 +132,14 @@ export const AccountStep: React.FC<AccountStepProps> = ({
               onClick={handleAddContact}
               variant="outlined"
               size="small"
+              disabled={isLoading}
             >
               Add Contact
             </Button>
           </Box>
 
-          {contacts.map((contact, index) => (
+          {/* Existing Contacts */}
+          {existingContacts.map((contact: Contact) => (
             <Box
               key={contact.id}
               sx={{
@@ -133,43 +158,72 @@ export const AccountStep: React.FC<AccountStepProps> = ({
                 <TextField
                   label="Name"
                   value={contact.name}
-                  onChange={(e) => handleContactChange(index, 'name', e.target.value)}
+                  onChange={(e) => updateContact({ 
+                    id: contact.id, 
+                    data: { 
+                      name: e.target.value,
+                      account_id: accountId 
+                    } 
+                  })}
                   fullWidth
                   size="small"
                   required
+                  disabled={isLoading}
                 />
                 <TextField
                   label="Email"
                   value={contact.email}
-                  onChange={(e) => handleContactChange(index, 'email', e.target.value)}
+                  onChange={(e) => updateContact({ 
+                    id: contact.id, 
+                    data: { 
+                      email: e.target.value,
+                      account_id: accountId 
+                    } 
+                  })}
                   fullWidth
                   size="small"
                   required
                   type="email"
+                  disabled={isLoading}
                 />
               </Box>
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <TextField
                   label="Phone"
                   value={contact.phone}
-                  onChange={(e) => handleContactChange(index, 'phone', e.target.value)}
+                  onChange={(e) => updateContact({ 
+                    id: contact.id, 
+                    data: { 
+                      phone: e.target.value,
+                      account_id: accountId 
+                    } 
+                  })}
                   fullWidth
                   size="small"
                   required
+                  disabled={isLoading}
                 />
                 <TextField
                   label="Role"
                   value={contact.role}
-                  onChange={(e) => handleContactChange(index, 'role', e.target.value)}
+                  onChange={(e) => updateContact({ 
+                    id: contact.id, 
+                    data: { 
+                      role: e.target.value,
+                      account_id: accountId 
+                    } 
+                  })}
                   fullWidth
                   size="small"
+                  disabled={isLoading}
                 />
               </Box>
-              {contacts.length > 1 && !contact.isPrimary && (
+              {!contact.isPrimary && (
                 <IconButton
                   size="small"
-                  onClick={() => handleRemoveContact(index)}
+                  onClick={() => handleDeleteExistingContact(contact)}
                   sx={{ position: 'absolute', top: 8, right: 8 }}
+                  disabled={isLoading}
                 >
                   <DeleteIcon />
                 </IconButton>
@@ -182,10 +236,88 @@ export const AccountStep: React.FC<AccountStepProps> = ({
             </Box>
           ))}
 
-          {contacts.length === 0 && (
+          {/* New Contacts */}
+          {newContacts.map((contact, index) => (
+            <Box
+              key={index}
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+                p: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
+                position: 'relative',
+                mb: 2,
+              }}
+            >
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <TextField
+                  label="Name"
+                  value={contact.name || ''}
+                  onChange={(e) => handleContactChange(index, 'name', e.target.value)}
+                  fullWidth
+                  size="small"
+                  required
+                  disabled={isLoading}
+                />
+                <TextField
+                  label="Email"
+                  value={contact.email || ''}
+                  onChange={(e) => handleContactChange(index, 'email', e.target.value)}
+                  fullWidth
+                  size="small"
+                  required
+                  type="email"
+                  disabled={isLoading}
+                />
+              </Box>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <TextField
+                  label="Phone"
+                  value={contact.phone || ''}
+                  onChange={(e) => handleContactChange(index, 'phone', e.target.value)}
+                  fullWidth
+                  size="small"
+                  required
+                  disabled={isLoading}
+                />
+                <TextField
+                  label="Role"
+                  value={contact.role || ''}
+                  onChange={(e) => handleContactChange(index, 'role', e.target.value)}
+                  fullWidth
+                  size="small"
+                  disabled={isLoading}
+                />
+              </Box>
+              <IconButton
+                size="small"
+                onClick={() => handleRemoveContact(index)}
+                sx={{ position: 'absolute', top: 8, right: 8 }}
+                disabled={isLoading}
+              >
+                <DeleteIcon />
+              </IconButton>
+              {index === 0 && existingContacts.length === 0 && (
+                <Alert severity="info" sx={{ mt: 1 }}>
+                  Primary Contact
+                </Alert>
+              )}
+            </Box>
+          ))}
+
+          {existingContacts.length === 0 && newContacts.length === 0 && (
             <Typography color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
               No contacts added. Click "Add Contact" to add an account contact.
             </Typography>
+          )}
+
+          {isLoading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <CircularProgress size={24} />
+            </Box>
           )}
         </Box>
       </Collapse>

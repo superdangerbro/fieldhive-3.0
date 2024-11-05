@@ -5,8 +5,7 @@ import { getJobStatuses, updateJobStatuses } from './jobs/statuses/handler';
 import { getJobTypes, updateJobTypes } from './jobs/types/handler';
 import { getEquipmentStatuses, updateEquipmentStatuses } from './equipment/statuses/handler';
 import { getEquipmentTypes, updateEquipmentTypes } from './equipment/types/handler';
-import { getPropertyStatuses, updatePropertyStatuses } from './properties/statuses/handler';
-import { getPropertyTypes, updatePropertyTypes } from './properties/types/handler';
+import propertiesRouter from './properties';
 
 const router = Router();
 
@@ -29,9 +28,6 @@ router.get('/equipment/types', getEquipmentTypes);
 router.put('/equipment/types', updateEquipmentTypes);
 
 // Property routes
-router.get('/properties/statuses', getPropertyStatuses);
-router.put('/properties/statuses', updatePropertyStatuses);
-router.get('/properties/types', getPropertyTypes);
-router.put('/properties/types', updatePropertyTypes);
+router.use('/properties', propertiesRouter);
 
 export default router;

@@ -1,3 +1,20 @@
+@import url('https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* Base styles */
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #0f172a;
+  color: #f8fafc;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
 /* Reset Mapbox control styles */
 .mapboxgl-ctrl-group {
   background: none !important;
@@ -24,7 +41,7 @@
   margin: 0 !important;
   border: none !important;
   border-radius: 50% !important;
-  background-color: #0ea5e9 !important;
+  background-color: #6366f1 !important;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
   cursor: pointer !important;
 }
@@ -34,7 +51,7 @@
 .mapboxgl-ctrl-group > button.mapboxgl-ctrl-geolocate.mapboxgl-ctrl-geolocate-active,
 .mapboxgl-ctrl-group > button.mapboxgl-ctrl-geolocate.mapboxgl-ctrl-geolocate-background,
 .mapboxgl-ctrl-group > button.mapboxgl-ctrl-geolocate.mapboxgl-ctrl-geolocate-waiting {
-  background-color: #0284c7 !important;
+  background-color: #4f46e5 !important;
 }
 
 /* Icon base styles */
@@ -67,4 +84,63 @@
 .mapboxgl-ctrl button.mapboxgl-ctrl-geolocate.mapboxgl-ctrl-geolocate-active .mapboxgl-ctrl-icon,
 .mapboxgl-ctrl button.mapboxgl-ctrl-geolocate.mapboxgl-ctrl-geolocate-background .mapboxgl-ctrl-icon {
   background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg width='29' height='29' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg' fill='%23fff'%3E%3Cpath d='M10 4C9 4 9 5 9 5v.1A5 5 0 0 0 5.1 9H5s-1 0-1 1 1 1 1 1h.1A5 5 0 0 0 9 14.9v.1s0 1 1 1 1-1 1-1v-.1a5 5 0 0 0 3.9-3.9h.1s1 0 1-1-1-1-1-1h-.1A5 5 0 0 0 11 5.1V5s0-1-1-1zm0 2.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 1 1 0-7z'/%3E%3Ccircle id='dot' fill='%23fff' cx='10' cy='10' r='2'/%3E%3C/svg%3E") !important;
+}
+
+/* Hide Mapbox logo and attribution */
+.mapboxgl-ctrl-logo,
+.mapboxgl-ctrl-attrib-inner {
+  display: none !important;
+}
+
+/* Style navigation controls */
+.mapboxgl-ctrl-group button {
+  background-color: #1e293b !important;
+  border: 1px solid rgba(148, 163, 184, 0.1) !important;
+  margin: 2px !important;
+  color: #f8fafc !important;
+}
+
+.mapboxgl-ctrl-group button:hover {
+  background-color: #334155 !important;
+}
+
+/* Style map container */
+.mapboxgl-map {
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+/* Style popup */
+.mapboxgl-popup-content {
+  padding: 12px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(148, 163, 184, 0.1) !important;
+}
+
+.mapboxgl-popup-close-button {
+  padding: 4px 8px !important;
+  color: #94a3b8 !important;
+}
+
+.mapboxgl-popup-close-button:hover {
+  color: #f8fafc !important;
+  background-color: transparent !important;
+}
+
+/* Dark theme overrides for Mapbox */
+.mapboxgl-ctrl-attrib.mapboxgl-compact {
+  background-color: #1e293b !important;
+  color: #94a3b8 !important;
+}
+
+.mapboxgl-ctrl-attrib a {
+  color: #94a3b8 !important;
+}
+
+/* Ensure dark theme for map controls */
+.mapboxgl-ctrl button {
+  filter: invert(1) hue-rotate(180deg) !important;
 }

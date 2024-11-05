@@ -18,34 +18,20 @@ import {
     Checkbox,
     Divider
 } from '@mui/material';
-import { updateProperty } from '@/services/api';
-import type { Property, UpdatePropertyDto } from '@fieldhive/shared';
-import AccountSelector, { MinimalAccount } from './AccountSelector';
+import type { Property, UpdatePropertyDto } from '../../../globalTypes/property';
+import type { CreateAddressDto } from '../../../globalTypes/address';
+import type { Account } from '../../../globalTypes/account';
+import { useUpdateProperty } from '../hooks/useProperties';
+import { useCreateAddress, useUpdateAddress } from '../hooks/useAddresses';
+import AccountSelector from '../components/AccountSelector';
 
 export interface EditPropertyDialogProps {
     open: boolean;
     property: Property | null;
     onClose: () => void;
-    onSuccess: () => void;
 }
 
-type AddressFormData = {
-    address1: string;
-    address2: string;
-    city: string;
-    province: string;
-    postal_code: string;
-    country: string;
-};
-
-type PropertyFormData = {
-    name: string;
-    billing_address: AddressFormData;
-    service_address: AddressFormData;
-    accounts: MinimalAccount[];
-};
-
-const emptyAddress: AddressFormData = {
+const emptyAddress: CreateAddressDto = {
     address1: '',
     address2: '',
     city: '',
@@ -54,6 +40,13 @@ const emptyAddress: AddressFormData = {
     country: 'Canada'
 };
 
+interface PropertyFormData {
+    name: string;
+    billing_address: CreateAddressDto;
+    service_address: CreateAddressDto;
+    accounts: Account[];
+}
+
 const initialFormData: PropertyFormData = {
     name: '',
     billing_address: { ...emptyAddress },
@@ -61,16 +54,23 @@ const initialFormData: PropertyFormData = {
     accounts: []
 };
 
-export default function EditPropertyDialog({ open, property, onClose, onSuccess }: EditPropertyDialogProps) {
+export default function EditPropertyDialog({ open, property, onClose }: EditPropertyDialogProps) {
     const [formData, setFormData] = useState<PropertyFormData>(initialFormData);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const [sameAsService, setSameAsService] = useState(false);
+    const [showError, setShowError] = useState(false);
+
+    // React Query mutations
+    const { mutate: updateProperty, isPending: isUpdatingProperty, error: propertyError } = useUpdateProperty();
+    const { mutate: createAddress, isPending: isCreatingAddress } = useCreateAddress();
+    const { mutate: updateAddress, isPending: isUpdatingAddress } = useUpdateAddress();
+
+    const loading = isUpdatingProperty || isCreatingAddress || isUpdatingAddress;
+    const error = propertyError;
 
     useEffect(() => {
         if (property) {
-            const billingAddress = property.billing_address || { ...emptyAddress };
-            const serviceAddress = property.service_address || { ...emptyAddress };
+            const billingAddress = property.billingAddress || { ...emptyAddress };
+            const serviceAddress = property.serviceAddress || { ...emptyAddress };
 
             setFormData({
                 name: property.name,
@@ -90,20 +90,17 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
                     postal_code: serviceAddress.postal_code || '',
                     country: serviceAddress.country || 'Canada'
                 },
-                accounts: property.accounts?.map(a => ({
-                    account_id: a.account_id,
-                    name: a.name
-                })) || []
+                accounts: property.accounts || []
             });
 
             // Check if billing address is same as service address
-            if (property.billing_address && property.service_address) {
+            if (property.billingAddress && property.serviceAddress) {
                 const isSameAddress = 
-                    property.billing_address.address1 === property.service_address.address1 &&
-                    property.billing_address.address2 === property.service_address.address2 &&
-                    property.billing_address.city === property.service_address.city &&
-                    property.billing_address.province === property.service_address.province &&
-                    property.billing_address.postal_code === property.service_address.postal_code;
+                    property.billingAddress.address1 === property.serviceAddress.address1 &&
+                    property.billingAddress.address2 === property.serviceAddress.address2 &&
+                    property.billingAddress.city === property.serviceAddress.city &&
+                    property.billingAddress.province === property.serviceAddress.province &&
+                    property.billingAddress.postal_code === property.serviceAddress.postal_code;
                 setSameAsService(isSameAddress);
             }
         } else {
@@ -115,7 +112,7 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         if (name.startsWith('billing_address.')) {
-            const field = name.replace('billing_address.', '');
+            const field = name.replace('billing_address.', '') as keyof CreateAddressDto;
             setFormData(prev => ({
                 ...prev,
                 billing_address: {
@@ -124,7 +121,7 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
                 }
             }));
         } else if (name.startsWith('service_address.')) {
-            const field = name.replace('service_address.', '');
+            const field = name.replace('service_address.', '') as keyof CreateAddressDto;
             const newServiceAddress = {
                 ...formData.service_address,
                 [field]: value
@@ -152,7 +149,7 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
         }
     };
 
-    const handleAccountsChange = (accounts: MinimalAccount[]) => {
+    const handleAccountsChange = (accounts: Account[]) => {
         setFormData(prev => ({
             ...prev,
             accounts
@@ -163,33 +160,91 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
         e.preventDefault();
         if (!property) return;
 
-        setLoading(true);
-        setError(null);
-        
-        try {
-            const propertyData: UpdatePropertyDto = {
-                name: formData.name,
-                service_address: formData.service_address,
-                billing_address: sameAsService ? formData.service_address : formData.billing_address,
-                accounts: formData.accounts.map(a => ({
-                    account_id: a.account_id
-                }))
-            };
-
-            await updateProperty(property.property_id, propertyData);
-            onSuccess();
-            handleClose();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to update property');
-        } finally {
-            setLoading(false);
+        // Create or update service address
+        if (property.serviceAddress?.address_id) {
+            updateAddress({
+                id: property.serviceAddress.address_id,
+                data: formData.service_address
+            }, {
+                onSuccess: (updatedServiceAddress) => {
+                    // Create or update billing address if different
+                    if (!sameAsService) {
+                        if (property.billingAddress?.address_id) {
+                            updateAddress({
+                                id: property.billingAddress.address_id,
+                                data: formData.billing_address
+                            }, {
+                                onSuccess: (updatedBillingAddress) => {
+                                    // Update property with both addresses
+                                    updatePropertyWithAddresses(
+                                        updatedServiceAddress.address_id,
+                                        updatedBillingAddress.address_id
+                                    );
+                                }
+                            });
+                        } else {
+                            createAddress(formData.billing_address, {
+                                onSuccess: (newBillingAddress) => {
+                                    // Update property with both addresses
+                                    updatePropertyWithAddresses(
+                                        updatedServiceAddress.address_id,
+                                        newBillingAddress.address_id
+                                    );
+                                }
+                            });
+                        }
+                    } else {
+                        // Update property with only service address
+                        updatePropertyWithAddresses(updatedServiceAddress.address_id);
+                    }
+                }
+            });
+        } else {
+            createAddress(formData.service_address, {
+                onSuccess: (newServiceAddress) => {
+                    if (!sameAsService) {
+                        createAddress(formData.billing_address, {
+                            onSuccess: (newBillingAddress) => {
+                                // Update property with both new addresses
+                                updatePropertyWithAddresses(
+                                    newServiceAddress.address_id,
+                                    newBillingAddress.address_id
+                                );
+                            }
+                        });
+                    } else {
+                        // Update property with only new service address
+                        updatePropertyWithAddresses(newServiceAddress.address_id);
+                    }
+                }
+            });
         }
     };
 
+    const updatePropertyWithAddresses = (serviceAddressId: string, billingAddressId?: string) => {
+        const propertyData: UpdatePropertyDto = {
+            name: formData.name,
+            service_address_id: serviceAddressId,
+            billing_address_id: sameAsService ? serviceAddressId : billingAddressId
+        };
+
+        updateProperty(
+            { id: property!.property_id, data: propertyData },
+            { 
+                onSuccess: () => {
+                    handleClose();
+                },
+                onError: () => {
+                    setShowError(true);
+                }
+            }
+        );
+    };
+
     const handleClose = () => {
-        setError(null);
         setFormData(initialFormData);
         setSameAsService(false);
+        setShowError(false);
         onClose();
     };
 
@@ -377,13 +432,13 @@ export default function EditPropertyDialog({ open, property, onClose, onSuccess 
                 </form>
             </Dialog>
             <Snackbar 
-                open={!!error} 
+                open={showError && !!error} 
                 autoHideDuration={6000} 
-                onClose={() => setError(null)}
+                onClose={() => setShowError(false)}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             >
-                <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
-                    {error}
+                <Alert onClose={() => setShowError(false)} severity="error" sx={{ width: '100%' }}>
+                    {error instanceof Error ? error.message : 'Failed to update property'}
                 </Alert>
             </Snackbar>
         </>

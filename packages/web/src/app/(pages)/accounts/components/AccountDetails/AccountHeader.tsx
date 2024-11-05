@@ -8,7 +8,8 @@ import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import ContactsIcon from '@mui/icons-material/Contacts';
-import type { Account, Address, User } from '@/app/globaltypes';
+import type { Account } from '@/app/globaltypes/account';
+import type { Address, User } from '@/app/globaltypes';
 import { useAccountStore } from '../../store';
 
 interface AccountHeaderProps {
@@ -182,7 +183,7 @@ export function AccountHeader({ account, onUpdate, onDeleteClick }: AccountHeade
         <Card sx={{ flex: 1 }}>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <LocationOnIcon sx={{ mr: 1 }} />
+              <LocationOnIcon sx={{ mr: 1, color: 'primary.main' }} />
               <Typography variant="h6">
                 Billing Address
               </Typography>
@@ -269,7 +270,7 @@ export function AccountHeader({ account, onUpdate, onDeleteClick }: AccountHeade
         <Card sx={{ flex: 1 }}>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <ContactsIcon sx={{ mr: 1 }} />
+              <ContactsIcon sx={{ mr: 1, color: 'primary.main' }} />
               <Typography variant="h6">
                 Contacts
               </Typography>
@@ -288,7 +289,7 @@ export function AccountHeader({ account, onUpdate, onDeleteClick }: AccountHeade
                   options={account.users || []}
                   value={editedContacts}
                   onChange={(_, newValue) => setEditedContacts(newValue)}
-                  getOptionLabel={(option) => `${option.first_name} ${option.last_name}`}
+                  getOptionLabel={(option: User) => `${option.first_name} ${option.last_name}`}
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -298,7 +299,7 @@ export function AccountHeader({ account, onUpdate, onDeleteClick }: AccountHeade
                     />
                   )}
                   renderTags={(value, getTagProps) =>
-                    value.map((option, index) => (
+                    value.map((option: User, index) => (
                       <Chip
                         label={`${option.first_name} ${option.last_name}`}
                         size="small"
@@ -324,7 +325,7 @@ export function AccountHeader({ account, onUpdate, onDeleteClick }: AccountHeade
               </Box>
             ) : (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {account.users?.filter(user => user.is_contact).map((user) => (
+                {account.users?.filter(user => user.is_contact).map((user: User) => (
                   <Chip
                     key={user.user_id}
                     size="small"
@@ -362,7 +363,7 @@ export function AccountHeader({ account, onUpdate, onDeleteClick }: AccountHeade
                       </Box>
                     </MenuItem>
                   ) : (
-                    accountStatuses.map(status => (
+                    accountStatuses.map((status: any) => (
                       <MenuItem key={status.value} value={status.value}>
                         <Chip 
                           label={status.label || status.value}
@@ -393,7 +394,7 @@ export function AccountHeader({ account, onUpdate, onDeleteClick }: AccountHeade
                       </Box>
                     </MenuItem>
                   ) : (
-                    accountTypes.map(type => (
+                    accountTypes.map((type: any) => (
                       <MenuItem key={type.value} value={type.value}>
                         <Chip 
                           label={type.label || type.value}

@@ -7,92 +7,43 @@ import {
     Chip,
     CircularProgress
 } from '@mui/material';
-import { getAccounts } from '@/services/api';
-
-export interface MinimalAccount {
-    account_id: string;
-    name: string;
-}
+import { useAccounts } from '../hooks/useAccounts';
+import type { Account } from '../../../globalTypes/account';
 
 interface AccountSelectorProps {
-    selectedAccounts: MinimalAccount[];
-    onChange: (accounts: MinimalAccount[]) => void;
+    selectedAccounts: Account[];
+    onChange: (accounts: Account[]) => void;
     disabled?: boolean;
 }
 
 export default function AccountSelector({ selectedAccounts, onChange, disabled }: AccountSelectorProps) {
     const [inputValue, setInputValue] = useState('');
-    const [options, setOptions] = useState<MinimalAccount[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    
+    // Use React Query for accounts data
+    const { 
+        data: accounts = [], 
+        isLoading: loading,
+        error: queryError,
+        refetch
+    } = useAccounts({ 
+        search: inputValue || undefined,
+        limit: 100
+    });
 
-    // Load initial accounts
+    // Debounced search
     useEffect(() => {
-        let active = true;
+        if (!inputValue) return;
 
-        const loadAccounts = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const response = await getAccounts({ 
-                    limit: 100
-                });
-                if (active) {
-                    setOptions(response.accounts);
-                }
-            } catch (error) {
-                console.error('Failed to fetch accounts:', error);
-                setError('Failed to load accounts');
-            } finally {
-                if (active) {
-                    setLoading(false);
-                }
-            }
-        };
-
-        loadAccounts();
+        const debounceTimer = setTimeout(() => {
+            refetch();
+        }, 300);
 
         return () => {
-            active = false;
-        };
-    }, []);
-
-    // Handle search
-    useEffect(() => {
-        let active = true;
-
-        if (inputValue === '') {
-            return;
-        }
-
-        const searchAccounts = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const response = await getAccounts({ 
-                    search: inputValue,
-                    limit: 100
-                });
-                if (active) {
-                    setOptions(response.accounts);
-                }
-            } catch (error) {
-                console.error('Failed to search accounts:', error);
-                setError('Failed to search accounts');
-            } finally {
-                if (active) {
-                    setLoading(false);
-                }
-            }
-        };
-
-        const debounceTimer = setTimeout(searchAccounts, 300);
-
-        return () => {
-            active = false;
             clearTimeout(debounceTimer);
         };
-    }, [inputValue]);
+    }, [inputValue, refetch]);
+
+    const error = queryError instanceof Error ? queryError.message : null;
 
     return (
         <Autocomplete
@@ -101,7 +52,7 @@ export default function AccountSelector({ selectedAccounts, onChange, disabled }
             onChange={(_, newValue) => onChange(newValue)}
             inputValue={inputValue}
             onInputChange={(_, newInputValue) => setInputValue(newInputValue)}
-            options={options}
+            options={accounts}
             getOptionLabel={(option) => option.name}
             isOptionEqualToValue={(option, value) => option.account_id === value.account_id}
             loading={loading}
@@ -132,12 +83,9 @@ export default function AccountSelector({ selectedAccounts, onChange, disabled }
                     />
                 ))
             }
-            filterOptions={(options, { inputValue }) => {
-                // Custom filter to match on name
-                const filtered = options.filter(option =>
-                    option.name.toLowerCase().includes(inputValue.toLowerCase())
-                );
-                return filtered;
+            filterOptions={(options) => {
+                // No need for client-side filtering since we're using server-side search
+                return options;
             }}
         />
     );

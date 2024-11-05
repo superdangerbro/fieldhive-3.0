@@ -1,13 +1,45 @@
 import { useState, useCallback } from 'react';
-import { PropertyFormData, Account, Contact } from '../types';
+import { useAccounts } from './useAccounts';
+import type { Account } from '../../../globalTypes/account';
+
+interface Address {
+  address1: string;
+  address2?: string;
+  city: string;
+  province: string;
+  postalCode: string;
+  country: string;
+}
+
+interface Location {
+  type: 'Point';
+  coordinates: [number, number];
+}
+
+interface Boundary {
+  type: 'Polygon';
+  coordinates: [number, number][][];
+}
+
+export interface PropertyFormData {
+  useCustomName: boolean;
+  customName: string;
+  serviceAddress: Address;
+  useDifferentBillingAddress: boolean;
+  billingAddress: Address;
+  boundary: Boundary | null;
+  location: Location | null;
+  type: string;
+}
 
 export const usePropertyForm = () => {
   const [activeStep, setActiveStep] = useState(0);
-  const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccounts, setSelectedAccounts] = useState<Account[]>([]);
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  
+  // Use React Query for accounts data
+  const { data: accounts = [] } = useAccounts({ limit: 100 });
   
   const [propertyData, setPropertyData] = useState<PropertyFormData>({
     useCustomName: false,
@@ -145,11 +177,9 @@ export const usePropertyForm = () => {
 
   const reset = useCallback(() => {
     setActiveStep(0);
-    setAccounts([]);
     setSelectedAccounts([]);
     setShowAddAccount(false);
     setFormErrors({});
-    setContacts([]);
     setPropertyData({
       useCustomName: false,
       customName: '',
@@ -180,15 +210,12 @@ export const usePropertyForm = () => {
     activeStep,
     setActiveStep,
     accounts,
-    setAccounts,
     selectedAccounts,
     setSelectedAccounts,
     showAddAccount,
     setShowAddAccount,
     formErrors,
     setFormErrors,
-    contacts,
-    setContacts,
     propertyData,
     setPropertyData,
     validateAddressForm,

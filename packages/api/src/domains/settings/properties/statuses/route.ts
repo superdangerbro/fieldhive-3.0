@@ -3,7 +3,7 @@ import { getPropertyStatuses, updatePropertyStatuses } from './handler';
 
 const router = Router();
 
-router.get('/properties/statuses', getPropertyStatuses);
-router.put('/properties/statuses', updatePropertyStatuses);
+router.get('/', getPropertyStatuses);
+router.put('/', updatePropertyStatuses);
 
 export default router;

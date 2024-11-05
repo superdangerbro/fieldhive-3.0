@@ -2,24 +2,35 @@
 
 import React from 'react';
 import { Box, Typography, IconButton, Paper, Stack } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import type { Property } from '@fieldhive/shared';
+import InlinePropertyName from './InlinePropertyName';
 
 interface PropertyHeaderProps {
   property: Property;
   onEdit: (property: Property) => void;
   onDelete: () => void;
   linkedAccounts: Array<{ account_id: string; name: string }>;
+  onUpdate?: () => void;
 }
 
-export default function PropertyHeader({ property, onEdit, onDelete, linkedAccounts }: PropertyHeaderProps) {
+export default function PropertyHeader({ 
+  property, 
+  onEdit, 
+  onDelete, 
+  linkedAccounts,
+  onUpdate 
+}: PropertyHeaderProps) {
   return (
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
       <Box>
-        <Typography variant="h5" component="div" sx={{ mb: 1 }}>
-          {property.name}
-        </Typography>
+        <Box sx={{ mb: 1 }}>
+          <InlinePropertyName
+            propertyId={property.property_id}
+            initialName={property.name}
+            onUpdate={onUpdate}
+          />
+        </Box>
         <Typography variant="subtitle1" gutterBottom>Parent Accounts</Typography>
         {linkedAccounts.length > 0 ? (
           <Stack spacing={1}>
@@ -38,9 +49,6 @@ export default function PropertyHeader({ property, onEdit, onDelete, linkedAccou
         )}
       </Box>
       <Box>
-        <IconButton onClick={() => onEdit(property)} color="primary">
-          <EditIcon />
-        </IconButton>
         <IconButton 
           color="error"
           onClick={onDelete}

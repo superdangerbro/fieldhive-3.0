@@ -3,7 +3,7 @@ import { getPropertyTypes, updatePropertyTypes } from './handler';
 
 const router = Router();
 
-router.get('/properties/types', getPropertyTypes);
-router.put('/properties/types', updatePropertyTypes);
+router.get('/', getPropertyTypes);
+router.put('/', updatePropertyTypes);
 
 export default router;
