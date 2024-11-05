@@ -1,46 +1,42 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Property } from '@/app/globaltypes';
-import { usePropertyStore } from '../store';
+import { create } from 'zustand';
+import { Property } from '@/app/globalTypes/property';
+import { usePropertyStore } from '../store/propertyStore';
 
-export function usePersistedProperty() {
-    const { properties, fetchProperties } = usePropertyStore();
-    const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+interface PersistedPropertyStore {
+    // State
+    selectedProperty: Property | null;
 
-    useEffect(() => {
-        const loadPersistedProperty = async () => {
-            const savedPropertyId = localStorage.getItem('selectedProperty');
-            if (savedPropertyId) {
-                try {
-                    await fetchProperties();
-                    const property = properties.find(p => p.property_id === savedPropertyId);
-                    if (property) {
-                        setSelectedProperty(property);
-                    }
-                } catch (error) {
-                    console.error('Failed to load persisted property:', error);
-                }
-            }
-            setIsLoading(false);
-        };
+    // Actions
+    setSelectedProperty: (property: Property | null) => void;
+}
 
-        loadPersistedProperty();
-    }, [fetchProperties, properties]);
+export const usePersistedProperty = create<PersistedPropertyStore>()(
+    (set) => ({
+        selectedProperty: null,
+        setSelectedProperty: (property) => set({ selectedProperty: property }),
+    })
+);
 
-    const persistProperty = (property: Property | null) => {
-        if (property) {
-            localStorage.setItem('selectedProperty', property.property_id);
-        } else {
-            localStorage.removeItem('selectedProperty');
+// Hook to sync selected property with URL
+export function useSyncSelectedProperty() {
+    const { selectedProperty, setSelectedProperty } = usePersistedProperty();
+    const { properties } = usePropertyStore();
+
+    // Function to sync property from URL param
+    const syncFromParam = (propertyId: string | null) => {
+        if (!propertyId) {
+            setSelectedProperty(null);
+            return;
         }
-        setSelectedProperty(property);
+
+        // Find property in store
+        const property = properties.find((p: Property) => p.property_id === propertyId);
+        if (property && (!selectedProperty || selectedProperty.property_id !== propertyId)) {
+            setSelectedProperty(property);
+        }
     };
 
-    return {
-        selectedProperty,
-        setSelectedProperty: persistProperty,
-        isLoading
-    };
+    return { syncFromParam };
 }

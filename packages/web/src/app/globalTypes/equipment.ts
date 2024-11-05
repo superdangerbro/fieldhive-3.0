@@ -1,14 +1,3 @@
-export interface EquipmentStatus {
-    value: string;
-    label: string;
-    color: string;
-}
-
-export interface EquipmentType {
-    name: string;
-    fields: any[]; // TODO: Define field types when needed
-}
-
 export interface Equipment {
     equipment_id: string;
     name: string;
@@ -16,6 +5,18 @@ export interface Equipment {
     status: string;
     created_at?: Date;
     updated_at?: Date;
+}
+
+export interface EquipmentType {
+    value: string;
+    label: string;
+    color: string;
+}
+
+export interface EquipmentStatus {
+    value: string;
+    label: string;
+    color: string;
 }
 
 export interface CreateEquipmentDto {

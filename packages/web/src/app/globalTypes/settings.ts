@@ -1,29 +1,23 @@
 export interface Setting {
-    id: string;
+    setting_id: string;
     key: string;
-    value: any;
-    created_at: Date;
-    updated_at: Date;
+    value: string;
+    type: string;
+    category: string;
+    created_at?: Date;
+    updated_at?: Date;
 }
 
 export interface CreateSettingDto {
     key: string;
-    value: any;
+    value: string;
+    type: string;
+    category: string;
 }
 
 export interface UpdateSettingDto {
     key?: string;
-    value?: any;
-}
-
-export interface SettingResponse {
-    id: string;
-    key: string;
-    value: any;
-    created_at: Date;
-    updated_at: Date;
-}
-
-export interface SettingFilters {
-    key?: string;
+    value?: string;
+    type?: string;
+    category?: string;
 }

@@ -1,72 +1,38 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import { AccountDetails, AccountSearch, AccountsTable } from './components';
 import { AddAccountDialog } from './dialogs';
-import type { Account } from '@/app/globaltypes';
-import { useAccountStore } from './store';
+import type { Account } from '@/app/globalTypes/account';
+import { useAccounts, useAccountSettings } from './hooks/useAccounts';
 
 export default function AccountsPage() {
-    const { 
-        selectedAccount, 
-        setSelectedAccount,
-        accounts,
-        refreshAccounts,
-        fetchAccountSettings,
-        fetchAccounts,
-        settingsLoaded,
-        isLoading
-    } = useAccountStore();
-    
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const { data: accounts = [], isLoading: isLoadingAccounts } = useAccounts();
+    const { data: settings, isLoading: isLoadingSettings } = useAccountSettings();
+    const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-
-    // Load initial data
-    useEffect(() => {
-        const loadData = async () => {
-            try {
-                // Load settings first
-                if (!settingsLoaded) {
-                    await fetchAccountSettings();
-                }
-                // Then load accounts
-                await fetchAccounts();
-            } catch (error) {
-                console.error('Failed to load initial data:', error);
-            }
-        };
-
-        loadData();
-    }, []); // Only run once on mount
 
     const handleAccountSelect = (account: Account | null) => {
         // If we already have the account in our accounts list, use that data
         if (account) {
-            const existingAccount = accounts.find(a => a.account_id === account.account_id);
+            const existingAccount = accounts.find((a: Account) => a.account_id === account.account_id);
             setSelectedAccount(existingAccount || account);
         } else {
             setSelectedAccount(null);
         }
     };
 
-    const handleRefresh = async () => {
-        setRefreshTrigger(prev => prev + 1);
-        if (selectedAccount) {
-            await refreshAccounts();
-        }
-    };
-
     const handleAccountsLoad = (loadedAccounts: Account[]) => {
         if (selectedAccount) {
-            const updatedAccount = loadedAccounts.find(a => a.account_id === selectedAccount.account_id);
+            const updatedAccount = loadedAccounts.find((a: Account) => a.account_id === selectedAccount.account_id);
             if (updatedAccount && JSON.stringify(updatedAccount) !== JSON.stringify(selectedAccount)) {
                 setSelectedAccount(updatedAccount);
             }
         }
     };
 
-    if (!settingsLoaded) {
+    if (isLoadingSettings) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
                 <CircularProgress />
@@ -79,7 +45,9 @@ export default function AccountsPage() {
             {selectedAccount && (
                 <AccountDetails
                     account={selectedAccount}
-                    onUpdate={handleRefresh}
+                    onUpdate={() => {
+                        // The table will automatically refresh due to React Query's cache invalidation
+                    }}
                 />
             )}
             <Box sx={{ display: 'flex', gap: 3 }}>
@@ -92,7 +60,6 @@ export default function AccountsPage() {
                     />
 
                     <AccountsTable
-                        refreshTrigger={refreshTrigger}
                         onAccountSelect={handleAccountSelect}
                         selectedAccount={selectedAccount}
                         onAccountsLoad={handleAccountsLoad}
@@ -103,7 +70,10 @@ export default function AccountsPage() {
             <AddAccountDialog
                 open={isAddDialogOpen}
                 onClose={() => setIsAddDialogOpen(false)}
-                onAccountAdded={handleRefresh}
+                onAccountAdded={() => {
+                    // The table will automatically refresh due to React Query's cache invalidation
+                    setIsAddDialogOpen(false);
+                }}
             />
         </Box>
     );

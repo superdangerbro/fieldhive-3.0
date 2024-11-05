@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import { Job, CreateJobDto, UpdateJobDto, JobResponse } from '@/app/globaltypes';
+import { Job, CreateJobDto, UpdateJobDto, JobResponse } from '@/app/globalTypes/job';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 const JOBS_ENDPOINT = '/jobs';

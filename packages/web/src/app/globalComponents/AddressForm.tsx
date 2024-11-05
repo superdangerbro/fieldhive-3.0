@@ -1,160 +1,72 @@
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import { Box, TextField, Button, Grid } from '@mui/material';
-import type { Address, CreateAddressDto } from '@/app/globaltypes';
+import React from 'react';
+import { Box, TextField, Grid } from '@mui/material';
+import type { Address, CreateAddressDto } from '@/app/globalTypes/address';
 
 interface AddressFormProps {
-  initialAddress?: Address | CreateAddressDto | null;
-  onSubmit: (address: CreateAddressDto) => void;
-  onCancel: () => void;
-  hideButtons?: boolean;
-  disabled?: boolean;
+    address?: Partial<Address>;
+    onChange: (address: Partial<CreateAddressDto>) => void;
 }
 
-export function AddressForm({ 
-  initialAddress, 
-  onSubmit, 
-  onCancel, 
-  hideButtons = false,
-  disabled = false 
-}: AddressFormProps) {
-  const [formData, setFormData] = useState<CreateAddressDto>({
-    address1: '',
-    address2: '',
-    city: '',
-    province: '',
-    postal_code: '',
-    country: 'Canada'
-  });
-
-  useEffect(() => {
-    if (initialAddress) {
-      setFormData({
-        address1: initialAddress.address1 || '',
-        address2: initialAddress.address2 || '',
-        city: initialAddress.city || '',
-        province: initialAddress.province || '',
-        postal_code: initialAddress.postal_code || '',
-        country: initialAddress.country || 'Canada'
-      });
-    }
-  }, [initialAddress]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const updatedData = {
-      ...formData,
-      [name]: value
+export function AddressForm({ address = {}, onChange }: AddressFormProps) {
+    const handleChange = (field: keyof CreateAddressDto) => (event: React.ChangeEvent<HTMLInputElement>) => {
+        onChange({
+            ...address,
+            [field]: event.target.value
+        });
     };
-    setFormData(updatedData);
-    // Only call onSubmit if we're hiding buttons (inline mode)
-    if (hideButtons) {
-      onSubmit(updatedData);
-    }
-  };
 
-  const handleSubmit = () => {
-    // Validate required fields before submitting
-    if (!formData.address1 || !formData.city || !formData.province || !formData.postal_code) {
-      return;
-    }
-    onSubmit(formData);
-  };
-
-  return (
-    <Box sx={{ mt: 2 }}>
-      <Grid container spacing={2}>
-        <Grid item xs={12}>
-          <TextField
-            required
-            fullWidth
-            label="Address Line 1"
-            name="address1"
-            value={formData.address1}
-            onChange={handleChange}
-            disabled={disabled}
-            error={!formData.address1}
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField
-            fullWidth
-            label="Address Line 2"
-            name="address2"
-            value={formData.address2}
-            onChange={handleChange}
-            disabled={disabled}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            required
-            fullWidth
-            label="City"
-            name="city"
-            value={formData.city}
-            onChange={handleChange}
-            disabled={disabled}
-            error={!formData.city}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            required
-            fullWidth
-            label="Province"
-            name="province"
-            value={formData.province}
-            onChange={handleChange}
-            disabled={disabled}
-            error={!formData.province}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            required
-            fullWidth
-            label="Postal Code"
-            name="postal_code"
-            value={formData.postal_code}
-            onChange={handleChange}
-            disabled={disabled}
-            error={!formData.postal_code}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            required
-            fullWidth
-            label="Country"
-            name="country"
-            value={formData.country}
-            onChange={handleChange}
-            disabled={disabled}
-          />
-        </Grid>
-      </Grid>
-      {!hideButtons && (
-        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-          <Button onClick={onCancel} disabled={disabled}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSubmit}
-            variant="contained"
-            disabled={disabled || !formData.address1 || !formData.city || !formData.province || !formData.postal_code}
-            sx={{
-              backgroundImage: 'linear-gradient(to right, #6366f1, #4f46e5)',
-              '&:hover': {
-                backgroundImage: 'linear-gradient(to right, #4f46e5, #4338ca)',
-              }
-            }}
-          >
-            Save Address
-          </Button>
+    return (
+        <Box>
+            <Grid container spacing={2}>
+                <Grid item xs={12}>
+                    <TextField
+                        fullWidth
+                        label="Address Line 1"
+                        value={address.address1 || ''}
+                        onChange={handleChange('address1')}
+                    />
+                </Grid>
+                <Grid item xs={12}>
+                    <TextField
+                        fullWidth
+                        label="Address Line 2"
+                        value={address.address2 || ''}
+                        onChange={handleChange('address2')}
+                    />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                    <TextField
+                        fullWidth
+                        label="City"
+                        value={address.city || ''}
+                        onChange={handleChange('city')}
+                    />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                    <TextField
+                        fullWidth
+                        label="Province"
+                        value={address.province || ''}
+                        onChange={handleChange('province')}
+                    />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                    <TextField
+                        fullWidth
+                        label="Postal Code"
+                        value={address.postal_code || ''}
+                        onChange={handleChange('postal_code')}
+                    />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                    <TextField
+                        fullWidth
+                        label="Country"
+                        value={address.country || ''}
+                        onChange={handleChange('country')}
+                    />
+                </Grid>
+            </Grid>
         </Box>
-      )}
-    </Box>
-  );
+    );
 }

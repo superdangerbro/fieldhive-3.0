@@ -4,13 +4,11 @@ import {
     getProperty, 
     createProperty, 
     updateProperty, 
-    updatePropertyMetadata,
-    archiveProperty,
+    deleteProperty,
+    bulkDeleteProperties,
     getPropertyLocation,
     updatePropertyLocation,
-    updatePropertyBoundary,
-    updateServiceAddress,
-    updateBillingAddress
+    updatePropertyBoundary
 } from './handler';
 
 const router = Router();
@@ -27,25 +25,17 @@ router.post('/', createProperty);
 // Update property
 router.put('/:id', updateProperty);
 
-// Update property metadata
-router.patch('/:id/metadata', updatePropertyMetadata);
+// Delete property
+router.delete('/:id', deleteProperty);
 
-// Get property location
+// Bulk delete properties
+router.post('/bulk-delete', bulkDeleteProperties);
+
+// Property location endpoints
 router.get('/:id/location', getPropertyLocation);
-
-// Update property location
 router.put('/:id/location', updatePropertyLocation);
 
-// Update property boundary
+// Property boundary endpoint
 router.put('/:id/boundary', updatePropertyBoundary);
-
-// Update service address
-router.put('/:id/address/service', updateServiceAddress);
-
-// Update billing address
-router.put('/:id/address/billing', updateBillingAddress);
-
-// Archive property
-router.post('/:id/archive', archiveProperty);
 
 export default router;

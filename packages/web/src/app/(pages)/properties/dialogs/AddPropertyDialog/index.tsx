@@ -16,8 +16,8 @@ import {
 } from '@mui/material';
 import { usePropertyForm } from '../../hooks/usePropertyForm';
 import { StepContent } from './StepContent';
-import { useCreateProperty } from '../../hooks/useProperties';
-import type { CreatePropertyDto } from '@/app/globalTypes/property';
+import { useCreateProperty, useProperties } from '../../hooks/useProperties';
+import type { CreatePropertyDto } from '@/app/globalTypes';
 import { usePropertyStore } from '../../store/propertyStore';
 
 interface AddPropertyDialogProps {
@@ -35,6 +35,7 @@ const steps = [
 export default function AddPropertyDialog({ open, onClose }: AddPropertyDialogProps) {
   const { mutate: createProperty, isPending: loading, error } = useCreateProperty();
   const { setSelectedProperty } = usePropertyStore();
+  const { data: existingProperties = [] } = useProperties();
   
   const {
     activeStep,
@@ -78,6 +79,21 @@ export default function AddPropertyDialog({ open, onClose }: AddPropertyDialogPr
       return;
     }
 
+    // Check for duplicate property name
+    const propertyName = propertyData.useCustomName ? propertyData.customName : propertyData.serviceAddress.address1;
+    const isDuplicate = existingProperties.some(
+      p => p.name.toLowerCase() === propertyName.toLowerCase() && 
+          p.account_id === selectedAccounts[0].account_id
+    );
+
+    if (isDuplicate) {
+      setFormErrors(prev => ({ 
+        ...prev, 
+        name: `A property with the name "${propertyName}" already exists for this account`
+      }));
+      return;
+    }
+
     // Convert service address to the format expected by the API
     const service_address = {
       address1: propertyData.serviceAddress.address1,
@@ -96,7 +112,7 @@ export default function AddPropertyDialog({ open, onClose }: AddPropertyDialogPr
       province: propertyData.billingAddress.province,
       postal_code: propertyData.billingAddress.postalCode,
       country: propertyData.billingAddress.country || 'Canada',
-    } : service_address;  // Use service address as billing address if not different
+    } : service_address;
 
     // Prepare boundary data ensuring it matches the expected format
     const boundaryCoordinates = propertyData.boundary?.coordinates[0] || [];
@@ -104,7 +120,7 @@ export default function AddPropertyDialog({ open, onClose }: AddPropertyDialogPr
       [...boundaryCoordinates, boundaryCoordinates[0]] : [];
 
     const createPropertyData: CreatePropertyDto = {
-      name: propertyData.useCustomName ? propertyData.customName : propertyData.serviceAddress.address1,
+      name: propertyName,
       type: propertyData.type,
       location: {
         type: 'Point',
@@ -121,7 +137,7 @@ export default function AddPropertyDialog({ open, onClose }: AddPropertyDialogPr
 
     createProperty(createPropertyData, {
       onSuccess: (newProperty) => {
-        setSelectedProperty(newProperty);  // Select the newly created property
+        setSelectedProperty(newProperty);
         handleClose();
       }
     });

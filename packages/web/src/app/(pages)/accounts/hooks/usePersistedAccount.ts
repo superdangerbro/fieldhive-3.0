@@ -1,48 +1,42 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import type { Account } from '@/app/globaltypes';
-import { useAccountStore } from '../store';
+import { create } from 'zustand';
+import type { Account } from '@/app/globalTypes/account';
+import { useAccounts } from './useAccounts';
 
-export function usePersistedAccount() {
-  const { fetchAccounts, accounts } = useAccountStore();
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+interface PersistedAccountStore {
+    // State
+    selectedAccount: Account | null;
 
-  // Load persisted account on mount
-  useEffect(() => {
-    const loadPersistedAccount = async () => {
-      const savedAccountId = localStorage.getItem('selectedAccountId');
-      if (savedAccountId) {
-        try {
-          await fetchAccounts();
-          const account = accounts.find((a: Account) => a.account_id === savedAccountId);
-          if (account) {
-            setSelectedAccount(account);
-          }
-        } catch (error) {
-          console.error('Failed to load persisted account:', error);
+    // Actions
+    setSelectedAccount: (account: Account | null) => void;
+}
+
+export const usePersistedAccount = create<PersistedAccountStore>()(
+    (set) => ({
+        selectedAccount: null,
+        setSelectedAccount: (account) => set({ selectedAccount: account }),
+    })
+);
+
+// Hook to sync selected account with URL
+export function useSyncSelectedAccount() {
+    const { selectedAccount, setSelectedAccount } = usePersistedAccount();
+    const { data: accounts = [] } = useAccounts();
+
+    // Function to sync account from URL param
+    const syncFromParam = (accountId: string | null) => {
+        if (!accountId) {
+            setSelectedAccount(null);
+            return;
         }
-      }
-      setIsLoading(false);
+
+        // Find account in store
+        const account = accounts.find((a: Account) => a.account_id === accountId);
+        if (account && (!selectedAccount || selectedAccount.account_id !== accountId)) {
+            setSelectedAccount(account);
+        }
     };
 
-    loadPersistedAccount();
-  }, [fetchAccounts, accounts]);
-
-  // Persist account selection
-  const persistAccount = (account: Account | null) => {
-    if (account) {
-      localStorage.setItem('selectedAccountId', account.account_id);
-    } else {
-      localStorage.removeItem('selectedAccountId');
-    }
-    setSelectedAccount(account);
-  };
-
-  return {
-    selectedAccount,
-    setSelectedAccount: persistAccount,
-    isLoading
-  };
+    return { syncFromParam };
 }

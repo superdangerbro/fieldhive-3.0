@@ -17,8 +17,10 @@ import {
     CircularProgress,
     Alert
 } from '@mui/material';
-import { CreateAddressDto } from '@/app/globaltypes';
+import { CreateAddressDto } from '@/app/globalTypes/address';
+import { AccountType } from '@/app/globalTypes/account';
 import { useAccountStore } from '../store';
+import { useAccountSettings, useCreateAccount } from '../hooks/useAccounts';
 import { AddressForm } from '@/app/globalComponents/AddressForm';
 
 interface AddAccountDialogProps {
@@ -34,7 +36,8 @@ interface FormData {
 }
 
 export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDialogProps) {
-    const { createAccount, fetchAccountSettings, accountTypes, isLoading, error: storeError } = useAccountStore();
+    const { data: settings, isLoading: isLoadingSettings, error: settingsError } = useAccountSettings();
+    const createAccountMutation = useCreateAccount();
     const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState<FormData>({
         name: '',
@@ -49,14 +52,9 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
         },
     });
 
+    // Reset form data when dialog opens
     useEffect(() => {
         if (open) {
-            fetchAccountSettings().catch((error: Error) => {
-                console.error('Failed to load account settings:', error);
-                setError('Unable to load account settings. Please try again or contact support.');
-            });
-
-            // Reset form data when dialog opens
             setFormData({
                 name: '',
                 type: '',
@@ -71,17 +69,18 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
             });
             setError(null);
         }
-    }, [open, fetchAccountSettings]);
+    }, [open]);
 
     // Set initial type when account types are loaded
     useEffect(() => {
-        if (accountTypes.length > 0 && !formData.type) {
+        const accountTypes = settings?.types;
+        if (accountTypes && accountTypes.length > 0 && !formData.type) {
             setFormData(prev => ({
                 ...prev,
                 type: accountTypes[0].value.toLowerCase() // Ensure lowercase value
             }));
         }
-    }, [accountTypes, formData.type]);
+    }, [settings?.types, formData.type]);
 
     const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -95,10 +94,13 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
         }));
     };
 
-    const handleAddressChange = (address: CreateAddressDto) => {
+    const handleAddressChange = (addressUpdate: Partial<CreateAddressDto>) => {
         setFormData(prev => ({
             ...prev,
-            address
+            address: {
+                ...prev.address,
+                ...addressUpdate
+            }
         }));
     };
 
@@ -127,7 +129,7 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (accountTypes.length === 0) {
+        if (!settings?.types?.length) {
             setError('Account types are not available. Please try again later.');
             return;
         }
@@ -138,10 +140,10 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
             // Validate form
             validateForm();
 
-            await createAccount({
+            await createAccountMutation.mutateAsync({
                 name: formData.name.trim(),
-                type: formData.type.toLowerCase(), // Ensure lowercase value
-                address: {
+                type: formData.type.toLowerCase(),
+                billingAddress: {
                     address1: formData.address.address1?.trim() || '',
                     address2: formData.address.address2?.trim(),
                     city: formData.address.city?.trim() || '',
@@ -168,6 +170,10 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
         }
     };
 
+    const isLoading = isLoadingSettings || createAccountMutation.isPending;
+    const displayError = error || settingsError?.message || createAccountMutation.error?.message;
+    const accountTypes = settings?.types || [];
+
     return (
         <Dialog 
             open={open} 
@@ -181,9 +187,9 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
         >
             <DialogTitle>Add New Account</DialogTitle>
             <DialogContent>
-                {(error || storeError) && (
+                {displayError && (
                     <Alert severity="error" sx={{ mb: 2 }}>
-                        {error || storeError}
+                        {displayError}
                     </Alert>
                 )}
                 
@@ -211,7 +217,7 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
                         label="Account Type"
                         disabled={isLoading || accountTypes.length === 0}
                     >
-                        {accountTypes.map(type => (
+                        {accountTypes.map((type: AccountType) => (
                             <MenuItem 
                                 key={type.value} 
                                 value={type.value.toLowerCase()} // Ensure lowercase value
@@ -232,11 +238,8 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
                 </Typography>
                 
                 <AddressForm
-                    initialAddress={formData.address}
-                    onSubmit={handleAddressChange}
-                    onCancel={() => {}}
-                    hideButtons={true}
-                    disabled={isLoading}
+                    address={formData.address}
+                    onChange={handleAddressChange}
                 />
             </DialogContent>
             <DialogActions>

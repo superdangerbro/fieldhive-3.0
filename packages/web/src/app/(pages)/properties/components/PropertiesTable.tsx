@@ -1,15 +1,35 @@
 'use client';
 
 import React, { useCallback } from 'react';
-import { Box, Card, CardContent, IconButton, Tooltip, Menu, MenuItem, Checkbox, FormControlLabel, Stack, Typography, TextField, Button, Alert } from '@mui/material';
-import { DataGrid, GridRowParams } from '@mui/x-data-grid';
+import { 
+  Box, 
+  Card, 
+  CardContent, 
+  IconButton, 
+  Tooltip, 
+  Menu, 
+  MenuItem, 
+  Checkbox, 
+  FormControlLabel, 
+  Stack, 
+  Typography, 
+  TextField, 
+  Button, 
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
+} from '@mui/material';
+import { DataGrid, GridRowParams, GridSelectionModel } from '@mui/x-data-grid';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePropertyUIStore } from '../store/uiStore';
-import { useProperties, useDeleteProperty, prefetchProperty } from '../hooks/useProperties';
-import type { Property } from '../../../globalTypes/property';
+import { useProperties, useDeleteProperty, useBulkDeleteProperties, prefetchProperty } from '../hooks/useProperties';
+import type { Property } from '@/app/globalTypes';
 import { StatusChip, formatStatus } from './PropertyStatus';
 
 interface PropertiesTableProps {
@@ -22,6 +42,8 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
   const [pageSize, setPageSize] = React.useState(25);
   const [page, setPage] = React.useState(0);
   const [columnMenuAnchor, setColumnMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [selectedRows, setSelectedRows] = React.useState<GridSelectionModel>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
 
   // UI state from Zustand
   const {
@@ -39,13 +61,11 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
     isLoading,
     error,
     refetch 
-  } = useProperties({
-    limit: pageSize,
-    offset: page * pageSize
-  });
+  } = useProperties();
 
-  // Delete mutation
+  // Delete mutations
   const { mutate: deleteProperty, isPending: isDeleting } = useDeleteProperty();
+  const bulkDeleteMutation = useBulkDeleteProperties();
 
   const handleColumnMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setColumnMenuAnchor(event.currentTarget);
@@ -68,7 +88,19 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
       width: 150,
       valueGetter: (params: any) => {
         const type = params.value as string;
-        return type.charAt(0).toUpperCase() + type.slice(1);
+        return type ? type.charAt(0).toUpperCase() + type.slice(1) : 'N/A';
+      }
+    },
+    {
+      field: 'accounts',
+      headerName: 'Parent Accounts',
+      width: 250,
+      valueGetter: (params: any) => {
+        const property = params.row;
+        if (!property.accounts || property.accounts.length === 0) {
+          return 'No Accounts';
+        }
+        return property.accounts.map((account: any) => account.name).join(', ');
       }
     },
     {
@@ -82,10 +114,8 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
     }
   ];
 
-  const columns = defaultColumns.map(col => ({
-    ...col,
-    hide: !visibleColumns.includes(col.field)
-  }));
+  // Only show columns that are in visibleColumns
+  const columns = defaultColumns.filter(col => visibleColumns.includes(col.field));
 
   const filteredProperties = React.useMemo(() => {
     if (!filterText) return properties;
@@ -93,7 +123,8 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
     const searchText = filterText.toLowerCase();
     return properties.filter((property: Property) => 
       property.name.toLowerCase().includes(searchText) ||
-      property.type.toLowerCase().includes(searchText) ||
+      property.type?.toLowerCase().includes(searchText) ||
+      property.accounts?.some(account => account.name.toLowerCase().includes(searchText)) ||
       (property.status && property.status.toLowerCase().includes(searchText))
     );
   }, [properties, filterText]);
@@ -101,6 +132,31 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
   const handlePropertySelect = (property: Property) => {
     setSelectedProperty(property);
     onPropertySelect(property);
+  };
+
+  const handleSelectionChange = (newSelection: GridSelectionModel) => {
+    setSelectedRows(newSelection);
+    if (newSelection.length === 1) {
+      const property = properties.find((p: Property) => p.property_id === newSelection[0]);
+      if (property) {
+        handlePropertySelect(property);
+      }
+    } else {
+      setSelectedProperty(null);
+      onPropertySelect(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await bulkDeleteMutation.mutateAsync(selectedRows as string[]);
+      setSelectedRows([]);
+      setSelectedProperty(null);
+      onPropertySelect(null);
+      setDeleteDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to delete properties:', error);
+    }
   };
 
   if (error) {
@@ -118,6 +174,8 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
       </Alert>
     );
   }
+
+  const isLoaderActive = isLoading || isDeleting || bulkDeleteMutation.isPending;
 
   return (
     <Box sx={{ height: 600, width: '100%' }}>
@@ -142,12 +200,23 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
             <Typography variant="body2" color="text.secondary">
               {filteredProperties.length} properties found
             </Typography>
+            {selectedRows.length > 0 && (
+              <Button
+                variant="contained"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={() => setDeleteDialogOpen(true)}
+                disabled={isLoaderActive}
+              >
+                Delete Selected ({selectedRows.length})
+              </Button>
+            )}
             <Button
               variant="contained"
               color="primary"
               startIcon={<AddIcon />}
               onClick={onAddClick}
-              disabled={isLoading || isDeleting}
+              disabled={isLoaderActive}
             >
               Add Property
             </Button>
@@ -192,17 +261,19 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
         columns={columns}
         getRowId={(row) => row.property_id}
         rowCount={filteredProperties.length}
-        loading={isLoading || isDeleting}
+        loading={isLoaderActive}
         paginationMode="server"
         page={page}
         pageSize={pageSize}
         rowsPerPageOptions={[25, 50, 100]}
         onPageChange={(newPage) => setPage(newPage)}
         onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
+        checkboxSelection
         disableSelectionOnClick
         disableColumnMenu
         onRowClick={(params: GridRowParams<Property>) => handlePropertySelect(params.row)}
-        selectionModel={selectedProperty ? [selectedProperty.property_id] : []}
+        selectionModel={selectedRows}
+        onSelectionModelChange={handleSelectionChange}
         componentsProps={{
           row: {
             onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => {
@@ -219,6 +290,37 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
           }
         }}
       />
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Confirm Bulk Delete</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            Are you sure you want to delete {selectedRows.length} selected properties? This action cannot be undone.
+          </Alert>
+          <Typography variant="body2" sx={{ mt: 2 }}>
+            All associated data, including addresses, will be permanently deleted.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleBulkDelete}
+            variant="contained" 
+            color="error"
+            disabled={bulkDeleteMutation.isPending}
+          >
+            {bulkDeleteMutation.isPending ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

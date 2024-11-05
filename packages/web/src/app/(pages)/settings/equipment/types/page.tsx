@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { Box, Typography, Button, CircularProgress } from '@mui/material';
-import { useAccountTypes, useUpdateAccountTypes } from '../hooks/useAccounts';
-import { useAccountTypeStore } from './store';
+import { Box, Typography, Button, CircularProgress, Card, CardContent } from '@mui/material';
+import { useEquipmentTypes, useUpdateEquipmentTypes } from '../hooks/useEquipment';
+import { useEquipmentTypeStore } from './store';
 import { StatusColorPicker } from '@/app/globalComponents/StatusColorPicker';
 
-export function AccountTypeSection() {
-    const { data: types = [], isLoading } = useAccountTypes();
-    const updateMutation = useUpdateAccountTypes();
+export default function EquipmentTypesPage() {
+    const { data: types = [], isLoading } = useEquipmentTypes();
+    const updateMutation = useUpdateEquipmentTypes();
     const { 
         editedTypes, 
         isEditing,
@@ -16,7 +16,7 @@ export function AccountTypeSection() {
         updateType,
         startEditing,
         stopEditing 
-    } = useAccountTypeStore();
+    } = useEquipmentTypeStore();
 
     // Initialize edited types when data is loaded
     useEffect(() => {
@@ -30,7 +30,7 @@ export function AccountTypeSection() {
             await updateMutation.mutateAsync(editedTypes);
             stopEditing();
         } catch (error) {
-            console.error('Failed to update account types:', error);
+            console.error('Failed to update equipment types:', error);
         }
     };
 
@@ -53,9 +53,9 @@ export function AccountTypeSection() {
     }
 
     return (
-        <Box>
+        <Box sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                <Typography variant="h6">Account Types</Typography>
+                <Typography variant="h5">Equipment Types</Typography>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                     {isEditing && (
                         <Button 
@@ -75,27 +75,31 @@ export function AccountTypeSection() {
                 </Box>
             </Box>
 
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {editedTypes.map((type, index) => (
-                    <Box 
-                        key={type.value} 
-                        sx={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: 2,
-                            p: 2,
-                            borderRadius: 1,
-                            bgcolor: 'background.paper'
-                        }}
-                    >
-                        <Typography sx={{ flex: 1 }}>{type.label || type.value}</Typography>
-                        <StatusColorPicker
-                            color={type.color}
-                            onChange={(color) => handleColorChange(index, color)}
-                        />
+            <Card>
+                <CardContent>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {editedTypes.map((type, index) => (
+                            <Box 
+                                key={type.value} 
+                                sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 2,
+                                    p: 2,
+                                    borderRadius: 1,
+                                    bgcolor: 'background.paper'
+                                }}
+                            >
+                                <Typography sx={{ flex: 1 }}>{type.label || type.value}</Typography>
+                                <StatusColorPicker
+                                    color={type.color}
+                                    onChange={(color) => handleColorChange(index, color)}
+                                />
+                            </Box>
+                        ))}
                     </Box>
-                ))}
-            </Box>
+                </CardContent>
+            </Card>
         </Box>
     );
 }

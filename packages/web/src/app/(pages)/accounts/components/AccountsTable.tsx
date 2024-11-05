@@ -1,12 +1,34 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Box, Card, CardContent, TextField, IconButton, Tooltip, Menu, MenuItem, Checkbox, FormControlLabel, Stack, Typography, Chip } from '@mui/material';
-import { DataGrid, GridColDef, GridRowParams } from '@mui/x-data-grid';
+import { 
+  Box, 
+  Card, 
+  CardContent, 
+  TextField, 
+  IconButton, 
+  Tooltip, 
+  Menu, 
+  MenuItem, 
+  Checkbox, 
+  FormControlLabel, 
+  Stack, 
+  Typography, 
+  Chip,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert
+} from '@mui/material';
+import { DataGrid, GridColDef, GridRowParams, GridSelectionModel } from '@mui/x-data-grid';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { useAccountStore } from '../store';
-import type { Account } from 'app/globaltypes';
+import { useAccounts, useBulkDeleteAccounts } from '../hooks/useAccounts';
+import type { Account } from '@/app/globalTypes/account';
 
 interface AccountsTableProps {
   refreshTrigger?: number;
@@ -22,19 +44,26 @@ export function AccountsTable({
   onAccountsLoad
 }: AccountsTableProps) {
   const { 
-    accounts, 
-    isLoading, 
-    fetchAccounts, 
     getTypeColor, 
     getStatusColor,
     settingsLoaded 
   } = useAccountStore();
+
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(0);
-  const [totalRows, setTotalRows] = useState(0);
   const [filterText, setFilterText] = useState('');
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
+  const [selectedRows, setSelectedRows] = useState<GridSelectionModel>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const { data: accounts = [], isLoading } = useAccounts({
+    limit: pageSize,
+    offset: page * pageSize,
+    search: filterText
+  });
+
+  const bulkDeleteMutation = useBulkDeleteAccounts();
 
   const defaultColumns: GridColDef[] = [
     {
@@ -61,7 +90,7 @@ export function AccountsTable({
       minWidth: 200,
       valueGetter: (params) => {
         const properties = params.value || [];
-        return properties.length ? properties.map((p: any) => p.name).join(', ') : 'No properties';
+        return properties.length ? properties.map((p: { name: string }) => p.name).join(', ') : 'No properties';
       }
     },
     {
@@ -112,6 +141,12 @@ export function AccountsTable({
     setVisibleColumns(defaultColumns.map(col => col.field));
   }, []);
 
+  useEffect(() => {
+    if (accounts) {
+      onAccountsLoad(accounts);
+    }
+  }, [accounts, onAccountsLoad]);
+
   const handleColumnMenuOpen = useCallback((event: React.MouseEvent<HTMLElement>) => {
     setColumnMenuAnchor(event.currentTarget);
   }, []);
@@ -139,29 +174,36 @@ export function AccountsTable({
       }))
   , [visibleColumns]);
 
-  useEffect(() => {
-    fetchAccounts().catch(error => {
-      console.error('Failed to fetch accounts:', error);
-    });
-  }, [page, pageSize, refreshTrigger, filterText, fetchAccounts]);
-
-  useEffect(() => {
-    if (accounts) {
-      setTotalRows(accounts.length);
-      onAccountsLoad(accounts);
-    }
-  }, [accounts, onAccountsLoad]);
-
   const handleRowClick = useCallback((params: GridRowParams) => {
-    const account = accounts.find(a => a.account_id === params.id);
+    const account = accounts.find((a: Account) => a.account_id === params.id);
     if (account && account.account_id !== selectedAccount?.account_id) {
       onAccountSelect(account);
     }
   }, [accounts, onAccountSelect, selectedAccount]);
 
-  const selectionModel = useMemo(() => 
-    selectedAccount?.account_id ? [selectedAccount.account_id] : []
-  , [selectedAccount?.account_id]);
+  const handleSelectionChange = (newSelection: GridSelectionModel) => {
+    setSelectedRows(newSelection);
+    // If only one row is selected, update the selected account
+    if (newSelection.length === 1) {
+      const account = accounts.find((a: Account) => a.account_id === newSelection[0]);
+      if (account) {
+        onAccountSelect(account);
+      }
+    } else {
+      onAccountSelect(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await bulkDeleteMutation.mutateAsync(selectedRows as string[]);
+      setSelectedRows([]);
+      onAccountSelect(null);
+      setDeleteDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to delete accounts:', error);
+    }
+  };
 
   return (
     <Box sx={{ height: 600, width: '100%' }}>
@@ -174,9 +216,21 @@ export function AccountsTable({
             justifyContent="flex-end"
           >
             <Box sx={{ flexGrow: 1 }}>
-              <Typography variant="body2" color="text.secondary">
-                {totalRows} accounts found
-              </Typography>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Typography variant="body2" color="text.secondary">
+                  {accounts.length} accounts found
+                </Typography>
+                {selectedRows.length > 0 && (
+                  <Button
+                    variant="contained"
+                    color="error"
+                    startIcon={<DeleteIcon />}
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    Delete Selected ({selectedRows.length})
+                  </Button>
+                )}
+              </Stack>
             </Box>
             <TextField
               label="Filter Records"
@@ -232,7 +286,7 @@ export function AccountsTable({
         rows={accounts}
         columns={columns}
         getRowId={(row) => row.account_id}
-        rowCount={totalRows}
+        rowCount={accounts.length}
         loading={isLoading}
         paginationMode="server"
         page={page}
@@ -240,18 +294,49 @@ export function AccountsTable({
         rowsPerPageOptions={[25, 50, 100]}
         onPageChange={(newPage) => setPage(newPage)}
         onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
+        onRowClick={handleRowClick}
+        checkboxSelection
         disableSelectionOnClick
         disableColumnMenu
-        onRowClick={handleRowClick}
-        selectionModel={selectionModel}
-        isRowSelectable={() => true}
-        keepNonExistentRowsSelected={false}
+        selectionModel={selectedRows}
+        onSelectionModelChange={handleSelectionChange}
         sx={{
           '& .MuiDataGrid-row': {
             cursor: 'pointer'
           }
         }}
       />
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Confirm Bulk Delete</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            Are you sure you want to delete {selectedRows.length} selected accounts? This action cannot be undone.
+          </Alert>
+          <Typography variant="body2" sx={{ mt: 2 }}>
+            All associated data, including billing addresses, will be permanently deleted.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleBulkDelete}
+            variant="contained" 
+            color="error"
+            disabled={bulkDeleteMutation.isPending}
+          >
+            {bulkDeleteMutation.isPending ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

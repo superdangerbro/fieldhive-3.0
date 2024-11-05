@@ -4,8 +4,10 @@ import type { Property } from '@/app/globalTypes/property';
 import { ENV_CONFIG } from '@/config/environment';
 
 interface PropertyStore {
+  properties: Property[];
   selectedProperty: Property | null;
   setSelectedProperty: (property: Property | null) => void;
+  setProperties: (properties: Property[]) => void;
   refreshProperty: (propertyId: string) => Promise<void>;
   updatePropertyInStore: (updatedProperty: Property) => void;
 }
@@ -13,8 +15,10 @@ interface PropertyStore {
 export const usePropertyStore = create<PropertyStore>()(
   persist(
     (set, get) => ({
+      properties: [],
       selectedProperty: null,
       setSelectedProperty: (property) => set({ selectedProperty: property }),
+      setProperties: (properties) => set({ properties }),
       
       refreshProperty: async (propertyId: string) => {
         try {
@@ -28,10 +32,14 @@ export const usePropertyStore = create<PropertyStore>()(
 
           const property = await response.json();
           
-          // Only update if this is the currently selected property
-          if (get().selectedProperty?.property_id === propertyId) {
-            set({ selectedProperty: property });
-          }
+          // Update in both arrays and selected
+          set(state => ({
+            properties: state.properties.map(p => 
+              p.property_id === propertyId ? property : p
+            ),
+            selectedProperty: state.selectedProperty?.property_id === propertyId ? 
+              property : state.selectedProperty
+          }));
         } catch (error) {
           console.error('Failed to refresh property:', error);
           throw error;
@@ -39,35 +47,53 @@ export const usePropertyStore = create<PropertyStore>()(
       },
 
       updatePropertyInStore: (updatedProperty: Property) => {
-        const currentProperty = get().selectedProperty;
-        if (currentProperty?.property_id === updatedProperty.property_id) {
-          set({ selectedProperty: updatedProperty });
-        }
+        set(state => ({
+          properties: state.properties.map(p => 
+            p.property_id === updatedProperty.property_id ? updatedProperty : p
+          ),
+          selectedProperty: state.selectedProperty?.property_id === updatedProperty.property_id ? 
+            updatedProperty : state.selectedProperty
+        }));
       }
     }),
     {
       name: 'property-store',
-      // Only persist the property ID
+      // Only persist the property IDs
       partialize: (state) => ({ 
+        properties: state.properties.map(p => ({ property_id: p.property_id })),
         selectedProperty: state.selectedProperty ? { 
           property_id: state.selectedProperty.property_id 
         } : null 
       }),
       // Rehydrate by fetching fresh data
       onRehydrateStorage: () => async (state) => {
-        if (state?.selectedProperty?.property_id) {
+        if (state) {
           try {
-            const response = await fetch(
-              `${ENV_CONFIG.api.baseUrl}/properties/${state.selectedProperty.property_id}`,
+            // Fetch all properties
+            const propertiesResponse = await fetch(
+              `${ENV_CONFIG.api.baseUrl}/properties`,
               { headers: { 'Content-Type': 'application/json' } }
             );
 
-            if (response.ok) {
-              const property = await response.json();
-              state.setSelectedProperty(property);
+            if (propertiesResponse.ok) {
+              const { properties } = await propertiesResponse.json();
+              state.setProperties(properties);
+            }
+
+            // Fetch selected property if exists
+            if (state.selectedProperty?.property_id) {
+              const response = await fetch(
+                `${ENV_CONFIG.api.baseUrl}/properties/${state.selectedProperty.property_id}`,
+                { headers: { 'Content-Type': 'application/json' } }
+              );
+
+              if (response.ok) {
+                const property = await response.json();
+                state.setSelectedProperty(property);
+              }
             }
           } catch (error) {
-            console.error('Failed to rehydrate property:', error);
+            console.error('Failed to rehydrate properties:', error);
           }
         }
       }

@@ -1,71 +1,30 @@
 'use client';
 
 import { create } from 'zustand';
-import { ENV_CONFIG } from '@/config/environment';
+import type { PropertyType } from '@/app/globalTypes/property';
 
 interface PropertyTypeStore {
-    // Data
-    types: string[];
-    isLoading: boolean;
-    error: string | null;
+    // UI State
+    editedTypes: PropertyType[];
+    isEditing: boolean;
 
-    // Actions
-    fetch: () => Promise<void>;
-    update: (types: string[]) => Promise<void>;
+    // UI Actions
+    setEditedTypes: (types: PropertyType[]) => void;
+    updateType: (index: number, updates: Partial<PropertyType>) => void;
+    startEditing: () => void;
+    stopEditing: () => void;
 }
 
-export const usePropertyTypes = create<PropertyTypeStore>((set) => ({
-    types: [],
-    isLoading: false,
-    error: null,
+export const usePropertyTypeStore = create<PropertyTypeStore>((set) => ({
+    editedTypes: [],
+    isEditing: false,
 
-    fetch: async () => {
-        try {
-            set({ isLoading: true, error: null });
-            const response = await fetch(`${ENV_CONFIG.api.baseUrl}/settings/properties/types`, {
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout)
-            });
-            
-            if (!response.ok) {
-                throw new Error('Failed to fetch property types');
-            }
-
-            const data = await response.json();
-            set({ types: data });
-        } catch (error) {
-            console.error('Failed to fetch property types:', error);
-            set({ error: 'Failed to load property types' });
-        } finally {
-            set({ isLoading: false });
-        }
-    },
-
-    update: async (types) => {
-        try {
-            set({ isLoading: true, error: null });
-            const response = await fetch(`${ENV_CONFIG.api.baseUrl}/settings/properties/types`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ types }),
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout)
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to update property types');
-            }
-
-            const data = await response.json();
-            set({ types: data });
-        } catch (error) {
-            console.error('Failed to update property types:', error);
-            set({ error: 'Failed to save property types' });
-            // Re-fetch to ensure store matches backend
-            const store = usePropertyTypes.getState();
-            await store.fetch();
-        } finally {
-            set({ isLoading: false });
-        }
-    }
+    setEditedTypes: (types) => set({ editedTypes: types }),
+    updateType: (index, updates) => set(state => ({
+        editedTypes: state.editedTypes.map((type, i) => 
+            i === index ? { ...type, ...updates } : type
+        )
+    })),
+    startEditing: () => set({ isEditing: true }),
+    stopEditing: () => set({ isEditing: false })
 }));

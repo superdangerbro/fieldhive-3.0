@@ -1,5 +1,5 @@
-import { Property } from './property';
-import { Account } from './account';
+import { Property } from '@/app/globalTypes/property';
+import { Account } from '@/app/globalTypes/account';
 
 export interface JobStatus {
     value: string;
@@ -8,7 +8,9 @@ export interface JobStatus {
 }
 
 export interface JobType {
-    name: string;
+    value: string;
+    label: string;
+    color: string;
     fields: any[]; // TODO: Define field types when needed
 }
 
@@ -37,4 +39,9 @@ export interface UpdateJobDto {
     status?: string;
     property_id?: string;
     account_id?: string;
+}
+
+export interface JobResponse {
+    jobs: Job[];
+    total?: number;
 }

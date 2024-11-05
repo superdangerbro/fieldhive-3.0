@@ -5,7 +5,7 @@ export interface Address {
     city: string;
     province: string;
     postal_code: string;
-    country: string;
+    country?: string;
     label?: string;
     created_at?: Date;
     updated_at?: Date;
@@ -17,6 +17,6 @@ export interface CreateAddressDto {
     city: string;
     province: string;
     postal_code: string;
-    country: string;
+    country?: string;
     label?: string;
 }

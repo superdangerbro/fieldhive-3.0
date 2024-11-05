@@ -1,162 +1,101 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import {
-    Box,
-    Typography,
-    TextField,
-    Button,
-    List,
-    ListItem,
-    ListItemText,
-    IconButton,
-    CircularProgress
-} from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import { usePropertyTypes } from './store';
+import React, { useEffect } from 'react';
+import { Box, Typography, Button, CircularProgress } from '@mui/material';
+import { usePropertyTypes, useUpdatePropertyTypes } from '../hooks/useProperties';
+import { usePropertyTypeStore } from './store';
+import { StatusColorPicker } from '@/app/globalComponents/StatusColorPicker';
 
 export function PropertyTypeSection() {
-    const { types, isLoading, error, fetch, update } = usePropertyTypes();
-    const [newType, setNewType] = useState('');
-    const [editingIndex, setEditingIndex] = useState<number | null>(null);
-    const [editValue, setEditValue] = useState('');
+    const { data: types = [], isLoading } = usePropertyTypes();
+    const updateMutation = useUpdatePropertyTypes();
+    const { 
+        editedTypes, 
+        isEditing,
+        setEditedTypes, 
+        updateType,
+        startEditing,
+        stopEditing 
+    } = usePropertyTypeStore();
 
+    // Initialize edited types when data is loaded
     useEffect(() => {
-        fetch();
-    }, [fetch]);
+        if (types && types.length > 0 && !isEditing) {
+            setEditedTypes(types);
+        }
+    }, [types, isEditing, setEditedTypes]);
 
-    const handleAddType = async () => {
-        if (newType.trim()) {
-            await update([...types, newType.trim()]);
-            setNewType('');
+    const handleSave = async () => {
+        try {
+            await updateMutation.mutateAsync(editedTypes);
+            stopEditing();
+        } catch (error) {
+            console.error('Failed to update property types:', error);
         }
     };
 
-    const handleDeleteType = async (index: number) => {
-        const updatedTypes = types.filter((_: string, i: number) => i !== index);
-        await update(updatedTypes);
+    const handleColorChange = (index: number, color: string) => {
+        if (!isEditing) startEditing();
+        updateType(index, { color });
     };
 
-    const handleEditType = async () => {
-        if (editingIndex !== null && editValue.trim()) {
-            const updatedTypes = types.map((type: string, index: number) => 
-                index === editingIndex ? editValue.trim() : type
-            );
-            await update(updatedTypes);
-            setEditingIndex(null);
-            setEditValue('');
-        }
+    const handleCancel = () => {
+        stopEditing();
+        setEditedTypes(types);
     };
 
     if (isLoading) {
         return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                 <CircularProgress />
-            </Box>
-        );
-    }
-
-    if (error) {
-        return (
-            <Box sx={{ p: 2, color: 'error.main' }}>
-                <Typography>{error}</Typography>
-                <Button 
-                    variant="outlined" 
-                    size="small" 
-                    onClick={fetch}
-                    sx={{ mt: 1 }}
-                >
-                    Retry
-                </Button>
             </Box>
         );
     }
 
     return (
         <Box>
-            <Typography variant="h6" gutterBottom>
-                Property Types
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
-                Configure the available property types that can be assigned to properties
-            </Typography>
-
-            <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
-                <TextField
-                    placeholder="New Property Type"
-                    value={newType}
-                    onChange={(e) => setNewType(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddType()}
-                    sx={{
-                        flex: 1,
-                        '& .MuiOutlinedInput-root': {
-                            backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                        }
-                    }}
-                />
-                <Button 
-                    variant="contained" 
-                    onClick={handleAddType}
-                    disabled={!newType.trim()}
-                    sx={{ 
-                        bgcolor: 'primary.main',
-                        '&:hover': {
-                            bgcolor: 'primary.dark',
-                        }
-                    }}
-                >
-                    Add Type
-                </Button>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                <Typography variant="h6">Property Types</Typography>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    {isEditing && (
+                        <Button 
+                            variant="outlined"
+                            onClick={handleCancel}
+                        >
+                            Cancel
+                        </Button>
+                    )}
+                    <Button 
+                        variant="contained" 
+                        onClick={handleSave}
+                        disabled={updateMutation.isPending || !isEditing}
+                    >
+                        {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                </Box>
             </Box>
 
-            <List>
-                {types.map((type: string, index: number) => (
-                    <ListItem 
-                        key={index}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {editedTypes.map((type, index) => (
+                    <Box 
+                        key={type.value} 
                         sx={{ 
-                            p: 1,
-                            '&:hover': {
-                                bgcolor: 'rgba(255, 255, 255, 0.05)'
-                            }
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 2,
+                            p: 2,
+                            borderRadius: 1,
+                            bgcolor: 'background.paper'
                         }}
                     >
-                        {editingIndex === index ? (
-                            <Box sx={{ display: 'flex', gap: 2, flex: 1 }}>
-                                <TextField
-                                    fullWidth
-                                    value={editValue}
-                                    onChange={(e) => setEditValue(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && handleEditType()}
-                                    sx={{
-                                        '& .MuiOutlinedInput-root': {
-                                            backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                                        }
-                                    }}
-                                />
-                                <Button onClick={handleEditType}>Save</Button>
-                                <Button onClick={() => {
-                                    setEditingIndex(null);
-                                    setEditValue('');
-                                }}>Cancel</Button>
-                            </Box>
-                        ) : (
-                            <>
-                                <ListItemText primary={type} />
-                                <IconButton onClick={() => {
-                                    setEditingIndex(index);
-                                    setEditValue(type);
-                                }}>
-                                    <EditIcon />
-                                </IconButton>
-                                <IconButton onClick={() => handleDeleteType(index)}>
-                                    <DeleteIcon />
-                                </IconButton>
-                            </>
-                        )}
-                    </ListItem>
+                        <Typography sx={{ flex: 1 }}>{type.label || type.value}</Typography>
+                        <StatusColorPicker
+                            color={type.color}
+                            onChange={(color) => handleColorChange(index, color)}
+                        />
+                    </Box>
                 ))}
-            </List>
+            </Box>
         </Box>
     );
 }

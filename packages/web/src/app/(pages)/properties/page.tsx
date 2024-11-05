@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { Box } from '@mui/material';
-import type { Property } from '../../globalTypes/property';
-import { usePropertyStore } from './store/propertyStore';
+import type { Property } from '@/app/globalTypes';
+import { useProperties } from './hooks/useProperties';
+import { usePropertyUIStore } from './store/uiStore';
+import { useSearchParams } from 'next/navigation';
 
 // Import all components from their new locations
 import PropertyDetails from './components/PropertyDetails';
@@ -15,12 +17,33 @@ export default function PropertiesPage() {
   // Dialog state
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editProperty, setEditProperty] = useState<Property | null>(null);
+  const searchParams = useSearchParams();
 
-  // Get state from Zustand store
-  const { selectedProperty, setSelectedProperty } = usePropertyStore();
+  // Get properties data from React Query
+  const { data: properties = [], isLoading } = useProperties();
+
+  // Use UI store for selected property state
+  const { selectedProperty, setSelectedProperty } = usePropertyUIStore();
+
+  // Handle URL-based property selection
+  useEffect(() => {
+    const propertyId = searchParams.get('property_id');
+    if (propertyId && properties.length > 0 && !selectedProperty) {
+      const property = properties.find((p: Property) => p.property_id === propertyId);
+      if (property) {
+        handlePropertySelect(property);
+      }
+    }
+  }, [searchParams, properties, selectedProperty]);
 
   const handlePropertySelect = (property: Property | null) => {
-    setSelectedProperty(property);
+    if (property) {
+      // If we already have the property in our list, use that data
+      const existingProperty = properties.find((p: Property) => p.property_id === property.property_id);
+      setSelectedProperty(existingProperty || property);
+    } else {
+      setSelectedProperty(null);
+    }
   };
 
   return (
@@ -36,21 +59,20 @@ export default function PropertiesPage() {
       <PropertiesTable 
         onPropertySelect={handlePropertySelect}
         onAddClick={() => setIsAddDialogOpen(true)}
-        selectedProperty={selectedProperty}
       />
 
       <AddPropertyDialog
         open={isAddDialogOpen}
         onClose={() => setIsAddDialogOpen(false)}
-        onPropertyAdded={handlePropertySelect}
       />
 
-      <EditPropertyDialog
-        open={!!editProperty}
-        property={editProperty}
-        onClose={() => setEditProperty(null)}
-        onPropertyUpdated={handlePropertySelect}
-      />
+      {editProperty && (
+        <EditPropertyDialog
+          open={true}
+          property={editProperty}
+          onClose={() => setEditProperty(null)}
+        />
+      )}
     </Box>
   );
 }

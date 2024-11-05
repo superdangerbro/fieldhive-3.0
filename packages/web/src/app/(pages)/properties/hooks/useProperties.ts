@@ -1,15 +1,15 @@
-import { useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient, UseQueryResult } from '@tanstack/react-query';
+'use client';
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Property, CreatePropertyDto, UpdatePropertyDto } from '@/app/globalTypes/property';
 import { ENV_CONFIG } from '@/config/environment';
 
-// API endpoints
 const ENDPOINTS = {
-  properties: '/properties',
-  propertyDetails: (id: string) => `/properties/${id}`,
-  propertyLocation: (id: string) => `/properties/${id}/location`,
-  propertyMetadata: (id: string) => `/properties/${id}/metadata`,
-  propertyAddress: (id: string, type: 'service' | 'billing') => `/properties/${id}/address/${type}`,
+    properties: '/properties',
+    propertyDetails: (id: string) => `/properties/${id}`,
+    bulkDelete: '/properties/bulk-delete',
+    propertyLocation: (id: string) => `/properties/${id}/location`,
+    propertyBoundary: (id: string) => `/properties/${id}/boundary`
 } as const;
 
 // Helper function to build full API URL
@@ -17,52 +17,17 @@ const buildUrl = (endpoint: string) => `${ENV_CONFIG.api.baseUrl}${endpoint}`;
 
 // Helper function to handle API errors consistently
 const handleApiError = async (response: Response) => {
-  const error = await response.json();
-  throw new Error(error.message || 'An error occurred');
+    const error = await response.json();
+    throw new Error(error.message || 'An error occurred');
 };
 
-// Helper function to convert API response to Property type
-const convertToProperty = (data: any): Property => ({
-    ...data,
-    created_at: data.created_at ? new Date(data.created_at) : undefined,
-    updated_at: data.updated_at ? new Date(data.updated_at) : undefined,
-    accounts: data.accounts || [],
-    serviceAddress: data.serviceAddress || null,
-    billingAddress: data.billingAddress || null,
-});
-
-interface UsePropertiesOptions {
-  search?: string;
-  limit?: number;
-  offset?: number;
-  accountId?: string;
-}
-
-interface DeleteMutationContext {
-    previousProperties?: Property[];
-}
-
-interface UpdateMutationContext {
-    previousProperty?: Property;
-    previousProperties?: Property[];
-}
-
-// Helper to get properties query key
-const getPropertiesKey = (options?: UsePropertiesOptions) => ['properties', options];
-
-// Helper to get property query key
-const getPropertyKey = (id: string) => ['property', id];
-
-// Create property mutation
-export const useCreateProperty = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation<Property, Error, CreatePropertyDto>({
-        mutationFn: async (data) => {
+// Properties List Hook
+export const useProperties = () => {
+    return useQuery({
+        queryKey: ['properties'],
+        queryFn: async () => {
             const response = await fetch(buildUrl(ENDPOINTS.properties), {
-                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
                 signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
             });
 
@@ -70,127 +35,44 @@ export const useCreateProperty = () => {
                 await handleApiError(response);
             }
 
-            const newProperty = await response.json();
-            return convertToProperty(newProperty);
-        },
-        onSuccess: (newProperty) => {
-            // Invalidate and refetch properties list
-            queryClient.invalidateQueries({ queryKey: ['properties'] });
-            // Add new property to cache
-            queryClient.setQueryData(getPropertyKey(newProperty.property_id), newProperty);
-        },
-    });
-};
-
-// Fetch properties with optional params
-export const useProperties = (options?: UsePropertiesOptions): UseQueryResult<Property[], Error> => {
-    const queryClient = useQueryClient();
-
-    const query = useQuery({
-        queryKey: getPropertiesKey(options),
-        queryFn: async () => {
-            const searchParams = new URLSearchParams();
-            if (options) {
-                Object.entries(options).forEach(([key, value]) => {
-                    if (value !== undefined) {
-                        searchParams.append(key, String(value));
-                    }
-                });
-            }
-            
-            const response = await fetch(
-                `${buildUrl(ENDPOINTS.properties)}?${searchParams}`,
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-                }
-            );
-
-            if (!response.ok) {
-                await handleApiError(response);
-            }
-
             const data = await response.json();
-            return data.properties.map(convertToProperty);
+            return data.properties;
         },
         staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
         gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
     });
-
-    // Prefetch next page
-    useEffect(() => {
-        if (options?.offset !== undefined && options?.limit !== undefined) {
-            const nextPageOffset = options.offset + options.limit;
-            queryClient.prefetchQuery({
-                queryKey: getPropertiesKey({ ...options, offset: nextPageOffset }),
-                queryFn: async () => {
-                    const searchParams = new URLSearchParams();
-                    Object.entries({ ...options, offset: nextPageOffset }).forEach(([key, value]) => {
-                        if (value !== undefined) {
-                            searchParams.append(key, String(value));
-                        }
-                    });
-                    
-                    const response = await fetch(
-                        `${buildUrl(ENDPOINTS.properties)}?${searchParams}`,
-                        {
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-                        }
-                    );
-
-                    if (!response.ok) {
-                        await handleApiError(response);
-                    }
-
-                    const data = await response.json();
-                    return data.properties.map(convertToProperty);
-                }
-            });
-        }
-    }, [options?.offset, options?.limit, queryClient]);
-
-    return query;
 };
 
-// Get a single property
-export const useProperty = (id: string) => {
+// Single Property Hook
+export const useProperty = (propertyId: string | null) => {
     return useQuery({
-        queryKey: getPropertyKey(id),
+        queryKey: ['property', propertyId],
         queryFn: async () => {
-            const response = await fetch(
-                buildUrl(ENDPOINTS.propertyDetails(id)),
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-                }
-            );
+            if (!propertyId) return null;
+
+            const response = await fetch(buildUrl(ENDPOINTS.propertyDetails(propertyId)), {
+                headers: { 'Content-Type': 'application/json' },
+                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+            });
 
             if (!response.ok) {
                 await handleApiError(response);
             }
 
-            const data = await response.json();
-            return convertToProperty(data);
+            return response.json();
         },
-        enabled: !!id,
+        enabled: !!propertyId,
         staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
         gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
     });
 };
 
-// Update property mutation
+// Update Property Hook
 export const useUpdateProperty = () => {
     const queryClient = useQueryClient();
 
-    return useMutation<Property, Error, { id: string; data: UpdatePropertyDto }, UpdateMutationContext>({
-        mutationFn: async ({ id, data }) => {
+    return useMutation({
+        mutationFn: async ({ id, data }: { id: string; data: UpdatePropertyDto }) => {
             const response = await fetch(buildUrl(ENDPOINTS.propertyDetails(id)), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -202,52 +84,46 @@ export const useUpdateProperty = () => {
                 await handleApiError(response);
             }
 
-            const updatedProperty = await response.json();
-            return convertToProperty(updatedProperty);
+            return response.json();
         },
-        onMutate: async ({ id, data }) => {
-            await queryClient.cancelQueries({ queryKey: getPropertyKey(id) });
-            await queryClient.cancelQueries({ queryKey: ['properties'] });
-
-            const previousProperty = queryClient.getQueryData<Property>(getPropertyKey(id));
-            const previousProperties = queryClient.getQueryData<Property[]>(['properties']);
-
-            // Optimistically update
-            if (previousProperty) {
-                const updatedProperty = { ...previousProperty, ...data };
-                queryClient.setQueryData(getPropertyKey(id), updatedProperty);
-                
-                if (previousProperties) {
-                    queryClient.setQueryData<Property[]>(['properties'], 
-                        previousProperties.map(p => p.property_id === id ? updatedProperty : p)
-                    );
-                }
-            }
-
-            return { previousProperty, previousProperties };
-        },
-        onError: (_, __, context) => {
-            if (context?.previousProperty && context?.previousProperties) {
-                queryClient.setQueryData(['properties'], context.previousProperties);
-                queryClient.setQueryData(
-                    getPropertyKey(context.previousProperty.property_id),
-                    context.previousProperty
-                );
-            }
-        },
-        onSettled: (_, __, { id }) => {
-            queryClient.invalidateQueries({ queryKey: getPropertyKey(id) });
+        onSuccess: (data, { id }) => {
+            queryClient.setQueryData(['property', id], data);
             queryClient.invalidateQueries({ queryKey: ['properties'] });
         },
     });
 };
 
-// Delete property mutation
+// Create Property Hook
+export const useCreateProperty = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (data: CreatePropertyDto) => {
+            const response = await fetch(buildUrl(ENDPOINTS.properties), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+            });
+
+            if (!response.ok) {
+                await handleApiError(response);
+            }
+
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['properties'] });
+        },
+    });
+};
+
+// Delete Property Hook
 export const useDeleteProperty = () => {
     const queryClient = useQueryClient();
 
-    return useMutation<void, Error, string, DeleteMutationContext>({
-        mutationFn: async (id) => {
+    return useMutation({
+        mutationFn: async (id: string) => {
             const response = await fetch(buildUrl(ENDPOINTS.propertyDetails(id)), {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
@@ -257,35 +133,48 @@ export const useDeleteProperty = () => {
             if (!response.ok) {
                 await handleApiError(response);
             }
-        },
-        onMutate: async (deletedId) => {
-            await queryClient.cancelQueries({ queryKey: ['properties'] });
 
-            const previousProperties = queryClient.getQueryData<Property[]>(['properties']);
-
-            queryClient.setQueryData<Property[]>(['properties'], (old) => 
-                old?.filter(p => p.property_id !== deletedId) ?? []
-            );
-
-            return { previousProperties };
+            return response.json();
         },
-        onError: (_, __, context) => {
-            if (context?.previousProperties) {
-                queryClient.setQueryData(['properties'], context.previousProperties);
-            }
-        },
-        onSettled: () => {
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['properties'] });
         },
     });
 };
 
-// Prefetch a single property
-export const prefetchProperty = async (queryClient: any, id: string) => {
-    await queryClient.prefetchQuery({
-        queryKey: getPropertyKey(id),
+// Bulk Delete Properties Hook
+export const useBulkDeleteProperties = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (propertyIds: string[]) => {
+            const response = await fetch(buildUrl(ENDPOINTS.bulkDelete), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ propertyIds }),
+                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+            });
+
+            if (!response.ok) {
+                await handleApiError(response);
+            }
+
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['properties'] });
+        },
+    });
+};
+
+// Get Property Location Hook
+export const usePropertyLocation = (propertyId: string | null) => {
+    return useQuery({
+        queryKey: ['propertyLocation', propertyId],
         queryFn: async () => {
-            const response = await fetch(buildUrl(ENDPOINTS.propertyDetails(id)), {
+            if (!propertyId) return null;
+
+            const response = await fetch(buildUrl(ENDPOINTS.propertyLocation(propertyId)), {
                 headers: { 'Content-Type': 'application/json' },
                 signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
             });
@@ -294,18 +183,83 @@ export const prefetchProperty = async (queryClient: any, id: string) => {
                 await handleApiError(response);
             }
 
-            const data = await response.json();
-            return convertToProperty(data);
-        }
+            return response.json();
+        },
+        enabled: !!propertyId,
+        staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
+        gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
     });
 };
 
-// Export everything
-export {
-    ENDPOINTS,
-    buildUrl,
-    handleApiError,
-    convertToProperty,
-    getPropertiesKey,
-    getPropertyKey,
+// Update Property Location Hook
+export const useUpdatePropertyLocation = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, coordinates }: { id: string; coordinates: [number, number] }) => {
+            const response = await fetch(buildUrl(ENDPOINTS.propertyLocation(id)), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ coordinates }),
+                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+            });
+
+            if (!response.ok) {
+                await handleApiError(response);
+            }
+
+            return response.json();
+        },
+        onSuccess: (data, { id }) => {
+            queryClient.setQueryData(['propertyLocation', id], data);
+            queryClient.invalidateQueries({ queryKey: ['properties'] });
+        },
+    });
+};
+
+// Update Property Boundary Hook
+export const useUpdatePropertyBoundary = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, coordinates }: { id: string; coordinates: [number, number][] }) => {
+            const response = await fetch(buildUrl(ENDPOINTS.propertyBoundary(id)), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ coordinates }),
+                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+            });
+
+            if (!response.ok) {
+                await handleApiError(response);
+            }
+
+            return response.json();
+        },
+        onSuccess: (data, { id }) => {
+            queryClient.setQueryData(['propertyLocation', id], data);
+            queryClient.invalidateQueries({ queryKey: ['properties'] });
+        },
+    });
+};
+
+// Prefetch Property
+export const prefetchProperty = async (queryClient: any, propertyId: string) => {
+    await queryClient.prefetchQuery({
+        queryKey: ['property', propertyId],
+        queryFn: async () => {
+            const response = await fetch(buildUrl(ENDPOINTS.propertyDetails(propertyId)), {
+                headers: { 'Content-Type': 'application/json' },
+                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+            });
+
+            if (!response.ok) {
+                await handleApiError(response);
+            }
+
+            return response.json();
+        },
+        staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
+        gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
+    });
 };

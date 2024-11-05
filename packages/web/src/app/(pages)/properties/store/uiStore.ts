@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import type { Property } from '../../../globalTypes/property';
+import type { Property } from '@/app/globalTypes';
 
 interface PropertyUIState {
     // UI State
@@ -17,7 +17,8 @@ interface PropertyUIState {
     resetUI: () => void;
 }
 
-const defaultColumns = ['name', 'property_type', 'service_address', 'status'];
+// Update default columns to include accounts
+const defaultColumns = ['name', 'type', 'accounts', 'status'];
 
 export const usePropertyUIStore = create<PropertyUIState>((set) => ({
     // Initial state

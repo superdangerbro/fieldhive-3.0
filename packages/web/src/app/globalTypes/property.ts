@@ -1,6 +1,18 @@
 import { Address } from './address';
 import { Account } from './account';
 
+export interface PropertyType {
+    value: string;
+    label: string;
+    color: string;
+}
+
+export interface PropertyStatus {
+    value: string;
+    label: string;
+    color: string;
+}
+
 export interface Property {
     property_id: string;
     name: string;

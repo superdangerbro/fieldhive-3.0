@@ -1,6 +1,7 @@
 import { Address } from './address';
 import { Property } from './property';
 import { User } from './user';
+import { Job } from './job';
 
 export interface Account {
     account_id: string;
@@ -13,6 +14,7 @@ export interface Account {
     billing_address_id?: string;
     billingAddress?: Address;
     properties?: Property[];
+    jobs?: Job[];
     users?: User[];
     created_at?: Date;
     updated_at?: Date;

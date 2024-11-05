@@ -7,7 +7,6 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import UndoIcon from '@mui/icons-material/Undo';
 import RedoIcon from '@mui/icons-material/Redo';
 import type { LngLat } from 'mapbox-gl';
-import '../styles/mapbox.css';
 
 interface MapDialogProps {
   open: boolean;
@@ -35,11 +34,7 @@ function areCoordinatesEqual(coord1: [number, number], coord2: [number, number])
 
 // Helper function to validate coordinates in display format [lat, lng]
 function validateCoordinates(lat: number, lng: number): boolean {
-  // Add debug logging
-  console.log('Validating coordinates:', { lat, lng });
-  const isValid = !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
-  console.log('Coordinates valid:', isValid);
-  return isValid;
+  return !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
 }
 
 // Helper function to validate coordinates in GeoJSON format [lng, lat]
@@ -50,10 +45,7 @@ function validateGeoJsonCoordinates(lng: number, lat: number): boolean {
 // Helper function to safely convert GeoJSON coordinates to display coordinates
 function safeGeoJsonToDisplay(coord: [number, number]): [number, number] | null {
   try {
-    // GeoJSON coordinates are [longitude, latitude]
     const [lng, lat] = coord;
-    
-    // Validate coordinates in GeoJSON order
     if (validateGeoJsonCoordinates(lng, lat)) {
       return [lat, lng];  // Return as [latitude, longitude]
     }
@@ -78,7 +70,7 @@ export default function MapDialog({
   onBoundarySelect,
   title = 'Edit Location',
   initialBoundary
-}: MapDialogProps) {
+}: MapDialogProps): JSX.Element {
   const [selectedLocation, setSelectedLocation] = useState<[number, number]>(initialLocation);
   const [polygonPoints, setPolygonPoints] = useState<Array<[number, number]>>([]);
   const [history, setHistory] = useState<Array<Array<[number, number]>>>([]);
@@ -94,35 +86,32 @@ export default function MapDialog({
       try {
         console.log('Raw boundary data:', initialBoundary);
         
-        // Convert and validate each coordinate
-        const points = initialBoundary.coordinates[0];
-        const validPoints: [number, number][] = [];
-        
-        for (const coord of points) {
+        // Convert GeoJSON coordinates to display format
+        const points = initialBoundary.coordinates[0].map(coord => {
           const displayCoord = safeGeoJsonToDisplay(coord as [number, number]);
-          if (displayCoord) {
-            validPoints.push(displayCoord);
+          if (!displayCoord) {
+            throw new Error('Invalid coordinate in boundary data');
           }
-        }
+          return displayCoord;
+        });
         
-        console.log('Converted points:', validPoints);
+        console.log('Converted display coordinates:', points);
         
-        if (validPoints.length < 3) {
+        if (points.length < 3) {
           throw new Error('Not enough valid points to form a polygon');
         }
         
         // Remove closing point if polygon is closed
         const uniquePoints = areCoordinatesEqual(
-          validPoints[0], 
-          validPoints[validPoints.length - 1]
-        ) ? validPoints.slice(0, -1) : validPoints;
-        
-        console.log('Final points:', uniquePoints);
+          points[0], 
+          points[points.length - 1]
+        ) ? points.slice(0, -1) : points;
         
         setPolygonPoints(uniquePoints);
         setHistory([uniquePoints]);
         setHistoryIndex(0);
         setDrawingInstructions(false);
+        setError(null);
       } catch (err) {
         console.error('Error initializing polygon:', err);
         setError('Failed to initialize polygon boundary');
@@ -167,8 +156,7 @@ export default function MapDialog({
     if (isDragging) return;
     
     const { lng, lat } = event.lngLat;
-    console.log('Click coordinates:', { lat, lng });
-
+    
     // Validate coordinates
     if (!validateCoordinates(lat, lng)) {
       setError('Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.');
@@ -178,7 +166,6 @@ export default function MapDialog({
     const displayCoords: [number, number] = [lat, lng];  // Store as [latitude, longitude]
     
     if (mode === 'marker') {
-      console.log('Map clicked (marker):', { lat, lng });
       setSelectedLocation(displayCoords);
     } else if (mode === 'polygon') {
       if (polygonPoints.length < 2) {
@@ -251,22 +238,19 @@ export default function MapDialog({
 
   const handleDragEnd = (index: number, event: MarkerDragEvent) => {
     const { lng, lat } = event.lngLat;
-    console.log('Drag end coordinates:', { lat, lng });
-
+    
     // Validate coordinates
     if (!validateCoordinates(lat, lng)) {
       setError('Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.');
       return;
     }
 
-    // Keep coordinates in [latitude, longitude] format consistently
     const displayCoords: [number, number] = [lat, lng];
     const newPoints = [...polygonPoints];
     newPoints[index] = displayCoords;
     setPolygonPoints(newPoints);
     addToHistory(newPoints);
     
-    // Set a timeout before allowing clicks again
     dragTimeout.current = setTimeout(() => {
       setIsDragging(false);
     }, 200);
@@ -275,17 +259,15 @@ export default function MapDialog({
   const handleSave = () => {
     try {
       if (mode === 'marker' && onLocationSelect) {
-        console.log('Saving location:', selectedLocation);
         onLocationSelect(selectedLocation);  // Already in [latitude, longitude] format
       } else if (mode === 'polygon' && onBoundarySelect && polygonPoints.length >= 3) {
         // Convert to GeoJSON format and ensure polygon is closed
-        const geoJsonPoints = polygonPoints.map(displayToGeoJson);  // Convert to [lng, lat]
+        const geoJsonPoints = polygonPoints.map(displayToGeoJson);
         const closedPoints = [...geoJsonPoints];
         if (!areCoordinatesEqual(closedPoints[0], closedPoints[closedPoints.length - 1])) {
           closedPoints.push([...closedPoints[0]]);
         }
         
-        console.log('Saving polygon:', closedPoints);
         onBoundarySelect({
           type: 'Polygon',
           coordinates: [closedPoints]  // GeoJSON format [longitude, latitude]
@@ -397,8 +379,8 @@ export default function MapDialog({
         <Box sx={{ height: 500, position: 'relative' }}>
           <Map
             initialViewState={{
-              longitude: initialLocation[1],  // Use longitude for x-coordinate
-              latitude: initialLocation[0],   // Use latitude for y-coordinate
+              longitude: initialLocation[1],
+              latitude: initialLocation[0],
               zoom: 17
             }}
             style={{ width: '100%', height: '100%' }}
@@ -409,13 +391,12 @@ export default function MapDialog({
           >
             {mode === 'marker' && (
               <Marker
-                longitude={selectedLocation[1]}  // Use longitude for x-coordinate
-                latitude={selectedLocation[0]}   // Use latitude for y-coordinate
+                longitude={selectedLocation[1]}
+                latitude={selectedLocation[0]}
                 draggable
                 onDragEnd={(event) => {
                   const { lat, lng } = event.lngLat;
                   if (validateCoordinates(lat, lng)) {
-                    console.log('Marker dragged to:', { lat, lng });
                     setSelectedLocation([lat, lng]);
                   } else {
                     setError('Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.');
@@ -457,8 +438,8 @@ export default function MapDialog({
                 {polygonPoints.map((point, index) => (
                   <Marker
                     key={index}
-                    longitude={point[1]}  // Use longitude for x-coordinate
-                    latitude={point[0]}   // Use latitude for y-coordinate
+                    longitude={point[1]}
+                    latitude={point[0]}
                     draggable
                     onDragStart={handleDragStart}
                     onDragEnd={(event) => handleDragEnd(index, event)}

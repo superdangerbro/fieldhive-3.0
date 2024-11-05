@@ -8,9 +8,10 @@ import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import ContactsIcon from '@mui/icons-material/Contacts';
-import type { Account } from '@/app/globaltypes/account';
-import type { Address, User } from '@/app/globaltypes';
+import type { Account } from '@/app/globalTypes/account';
+import type { Address, User } from '@/app/globalTypes';
 import { useAccountStore } from '../../store';
+import { useUpdateAccount, useAccountSettings } from '../../hooks/useAccounts';
 
 interface AccountHeaderProps {
   account: Account;
@@ -20,12 +21,14 @@ interface AccountHeaderProps {
 
 export function AccountHeader({ account, onUpdate, onDeleteClick }: AccountHeaderProps) {
   const { 
-    updateAccount, 
-    accountTypes = [],
-    accountStatuses = [],
-    settingsLoaded,
-    isLoading: storeLoading
+    accountTypes,
+    accountStatuses,
+    settingsLoaded
   } = useAccountStore();
+
+  const updateAccountMutation = useUpdateAccount();
+  const { isLoading: isSettingsLoading } = useAccountSettings();
+
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(account.name);
   const [isEditingAddress, setIsEditingAddress] = useState(false);
@@ -34,7 +37,6 @@ export function AccountHeader({ account, onUpdate, onDeleteClick }: AccountHeade
   const [editedContacts, setEditedContacts] = useState<User[]>(
     account.users?.filter(user => user.is_contact) || []
   );
-  const [localLoading, setLocalLoading] = useState(false);
 
   const handleNameSave = async () => {
     if (editedName === account.name) {
@@ -43,82 +45,96 @@ export function AccountHeader({ account, onUpdate, onDeleteClick }: AccountHeade
     }
 
     try {
-      setLocalLoading(true);
-      await updateAccount(account.account_id, { name: editedName });
-      onUpdate();
-      setIsEditingName(false);
+      await updateAccountMutation.mutateAsync({ 
+        id: account.account_id, 
+        data: { name: editedName }
+      }, {
+        onSuccess: () => {
+          setIsEditingName(false);
+          onUpdate();
+        },
+        onError: () => {
+          setEditedName(account.name);
+        }
+      });
     } catch (error) {
       console.error('Failed to update name:', error);
       setEditedName(account.name);
-    } finally {
-      setLocalLoading(false);
     }
   };
 
   const handleAddressSave = async () => {
     try {
-      setLocalLoading(true);
-      await updateAccount(account.account_id, { 
-        billingAddress: editedAddress as Address 
+      await updateAccountMutation.mutateAsync({ 
+        id: account.account_id, 
+        data: { billingAddress: editedAddress as Address }
+      }, {
+        onSuccess: () => {
+          setIsEditingAddress(false);
+          onUpdate();
+        },
+        onError: () => {
+          setEditedAddress(account.billingAddress || {});
+        }
       });
-      onUpdate();
-      setIsEditingAddress(false);
     } catch (error) {
       console.error('Failed to update address:', error);
       setEditedAddress(account.billingAddress || {});
-    } finally {
-      setLocalLoading(false);
     }
   };
 
   const handleContactsSave = async () => {
     try {
-      setLocalLoading(true);
-      // Update the users array, marking selected users as contacts
       const updatedUsers = account.users?.map(user => ({
         ...user,
         is_contact: editedContacts.some(contact => contact.user_id === user.user_id)
       })) || [];
-      await updateAccount(account.account_id, { users: updatedUsers });
-      onUpdate();
-      setIsEditingContacts(false);
+
+      await updateAccountMutation.mutateAsync({ 
+        id: account.account_id, 
+        data: { users: updatedUsers }
+      }, {
+        onSuccess: () => {
+          setIsEditingContacts(false);
+          onUpdate();
+        },
+        onError: () => {
+          setEditedContacts(account.users?.filter(user => user.is_contact) || []);
+        }
+      });
     } catch (error) {
       console.error('Failed to update contacts:', error);
       setEditedContacts(account.users?.filter(user => user.is_contact) || []);
-    } finally {
-      setLocalLoading(false);
     }
   };
 
   const handleStatusChange = async (event: SelectChangeEvent<string>) => {
     try {
-      setLocalLoading(true);
-      await updateAccount(account.account_id, {
-        status: event.target.value
+      await updateAccountMutation.mutateAsync({ 
+        id: account.account_id, 
+        data: { status: event.target.value }
+      }, {
+        onSuccess: onUpdate
       });
-      onUpdate();
     } catch (error) {
       console.error('Failed to update status:', error);
-    } finally {
-      setLocalLoading(false);
     }
   };
 
   const handleTypeChange = async (event: SelectChangeEvent<string>) => {
     try {
-      setLocalLoading(true);
-      await updateAccount(account.account_id, {
-        type: event.target.value
+      await updateAccountMutation.mutateAsync({ 
+        id: account.account_id, 
+        data: { type: event.target.value }
+      }, {
+        onSuccess: onUpdate
       });
-      onUpdate();
     } catch (error) {
       console.error('Failed to update type:', error);
-    } finally {
-      setLocalLoading(false);
     }
   };
 
-  const isLoading = !settingsLoaded || storeLoading || localLoading;
+  const isLoading = !settingsLoaded || isSettingsLoading || updateAccountMutation.isPending;
   const hasStatuses = Array.isArray(accountStatuses) && accountStatuses.length > 0;
   const hasTypes = Array.isArray(accountTypes) && accountTypes.length > 0;
 

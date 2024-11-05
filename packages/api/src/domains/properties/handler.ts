@@ -4,6 +4,7 @@ import { Property } from './entities/Property';
 import { Account } from '../accounts/entities/Account';
 import { Address } from '../addresses/entities/Address';
 import { logger } from '../../utils/logger';
+import { In } from 'typeorm';
 
 const propertyRepository = AppDataSource.getRepository(Property);
 const accountRepository = AppDataSource.getRepository(Account);
@@ -253,12 +254,11 @@ export async function updateProperty(req: Request, res: Response) {
     }
 }
 
-// Update property metadata
-export async function updatePropertyMetadata(req: Request, res: Response) {
+// Delete property
+export async function deleteProperty(req: Request, res: Response) {
     try {
         const { id } = req.params;
-        const { type, status } = req.body;
-        logger.info(`Updating property metadata ${id}:`, { type, status });
+        logger.info(`Deleting property: ${id}`);
 
         const property = await propertyRepository.findOne({
             where: { property_id: id },
@@ -273,22 +273,140 @@ export async function updatePropertyMetadata(req: Request, res: Response) {
             });
         }
 
-        // Update only metadata fields
-        if (type !== undefined) {
-            property.type = type;
-        }
-        if (status !== undefined) {
-            property.status = status;
-        }
+        // Start a transaction
+        const queryRunner = AppDataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
 
-        const updatedProperty = await propertyRepository.save(property);
-        logger.info('Property metadata updated:', updatedProperty);
-        res.json(updatedProperty);
+        try {
+            // Store addresses for deletion
+            const serviceAddress = property.serviceAddress;
+            const billingAddress = property.billingAddress;
+
+            // Remove relationships first
+            property.accounts = [];
+            property.serviceAddress = null;
+            property.billingAddress = null;
+            await queryRunner.manager.save(property);
+
+            // Delete the property
+            await queryRunner.manager.remove(property);
+
+            // Delete the addresses if they exist
+            if (serviceAddress) {
+                await queryRunner.manager.remove(serviceAddress);
+            }
+            if (billingAddress && billingAddress.address_id !== serviceAddress?.address_id) {
+                await queryRunner.manager.remove(billingAddress);
+            }
+
+            // Commit transaction
+            await queryRunner.commitTransaction();
+
+            logger.info('Property and associated addresses deleted successfully');
+            res.json({
+                success: true,
+                message: 'Property deleted successfully'
+            });
+        } catch (error) {
+            // Rollback transaction on error
+            await queryRunner.rollbackTransaction();
+            throw error;
+        } finally {
+            // Release query runner
+            await queryRunner.release();
+        }
     } catch (error) {
-        logger.error('Error updating property metadata:', error);
+        logger.error('Error deleting property:', error);
         res.status(500).json({
             error: 'Internal server error',
-            message: 'Failed to update property metadata',
+            message: 'Failed to delete property',
+            details: error instanceof Error ? error.message : String(error)
+        });
+    }
+}
+
+// Bulk delete properties
+export async function bulkDeleteProperties(req: Request, res: Response) {
+    try {
+        const { propertyIds } = req.body;
+
+        if (!Array.isArray(propertyIds) || propertyIds.length === 0) {
+            return res.status(400).json({
+                error: 'Validation failed',
+                message: 'Property IDs array is required and must not be empty'
+            });
+        }
+
+        logger.info(`Bulk deleting properties:`, propertyIds);
+
+        // Fetch all properties with their addresses
+        const properties = await propertyRepository.find({
+            where: { property_id: In(propertyIds) },
+            relations: ['serviceAddress', 'billingAddress', 'accounts']
+        });
+
+        if (properties.length === 0) {
+            return res.status(404).json({
+                error: 'Not found',
+                message: 'No properties found with the provided IDs'
+            });
+        }
+
+        // Start a transaction
+        const queryRunner = AppDataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+
+        try {
+            // Collect all addresses for deletion
+            const addressesToDelete = new Set<Address>();
+            for (const property of properties) {
+                if (property.serviceAddress) {
+                    addressesToDelete.add(property.serviceAddress);
+                }
+                if (property.billingAddress && property.billingAddress.address_id !== property.serviceAddress?.address_id) {
+                    addressesToDelete.add(property.billingAddress);
+                }
+
+                // Remove relationships
+                property.accounts = [];
+                property.serviceAddress = null;
+                property.billingAddress = null;
+            }
+
+            // Save properties with cleared relationships
+            await queryRunner.manager.save(properties);
+
+            // Delete all properties
+            await queryRunner.manager.remove(properties);
+
+            // Delete all associated addresses
+            if (addressesToDelete.size > 0) {
+                await queryRunner.manager.remove(Array.from(addressesToDelete));
+            }
+
+            // Commit transaction
+            await queryRunner.commitTransaction();
+
+            logger.info(`Successfully deleted ${properties.length} properties and their associated addresses`);
+            res.json({
+                success: true,
+                message: `Successfully deleted ${properties.length} properties`
+            });
+        } catch (error) {
+            // Rollback transaction on error
+            await queryRunner.rollbackTransaction();
+            throw error;
+        } finally {
+            // Release query runner
+            await queryRunner.release();
+        }
+    } catch (error) {
+        logger.error('Error bulk deleting properties:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: 'Failed to delete properties',
             details: error instanceof Error ? error.message : String(error)
         });
     }
@@ -320,21 +438,11 @@ export async function getPropertyLocation(req: Request, res: Response) {
 
         const property = result[0];
 
-        const data = {
-            location: property.location ? {
-                type: 'Feature',
-                geometry: property.location,
-                properties: {}
-            } : null,
-            boundary: property.boundary ? {
-                type: 'Feature',
-                geometry: property.boundary,
-                properties: {}
-            } : null
-        };
-
-        logger.info('Property location data:', data);
-        res.json({ data });
+        // Return raw GeoJSON from database
+        res.json({
+            location: property.location,
+            boundary: property.boundary
+        });
     } catch (error) {
         logger.error('Error fetching property location:', error);
         res.status(500).json({
@@ -386,21 +494,11 @@ export async function updatePropertyLocation(req: Request, res: Response) {
 
         const property = result[0];
 
-        const data = {
-            location: property.location ? {
-                type: 'Feature',
-                geometry: property.location,
-                properties: {}
-            } : null,
-            boundary: property.boundary ? {
-                type: 'Feature',
-                geometry: property.boundary,
-                properties: {}
-            } : null
-        };
-
-        logger.info('Property location updated:', data);
-        res.json({ data });
+        // Return raw GeoJSON from database
+        res.json({
+            location: property.location,
+            boundary: property.boundary
+        });
     } catch (error) {
         logger.error('Error updating property location:', error);
         res.status(500).json({
@@ -463,203 +561,16 @@ export async function updatePropertyBoundary(req: Request, res: Response) {
 
         const property = result[0];
 
-        const data = {
-            location: property.location ? {
-                type: 'Feature',
-                geometry: property.location,
-                properties: {}
-            } : null,
-            boundary: property.boundary ? {
-                type: 'Feature',
-                geometry: property.boundary,
-                properties: {}
-            } : null
-        };
-
-        logger.info('Property boundary updated:', data);
-        res.json({ data });
+        // Return raw GeoJSON from database
+        res.json({
+            location: property.location,
+            boundary: property.boundary
+        });
     } catch (error) {
         logger.error('Error updating property boundary:', error);
         res.status(500).json({
             error: 'Internal server error',
             message: 'Failed to update property boundary',
-            details: error instanceof Error ? error.message : String(error)
-        });
-    }
-}
-
-// Archive property
-export async function archiveProperty(req: Request, res: Response) {
-    try {
-        const { id } = req.params;
-        logger.info(`Archiving property: ${id}`);
-
-        const property = await propertyRepository.findOne({
-            where: { property_id: id }
-        });
-
-        if (!property) {
-            logger.warn(`Property not found with ID: ${id}`);
-            return res.status(404).json({
-                error: 'Not found',
-                message: 'Property not found'
-            });
-        }
-
-        property.status = 'Archived';
-        const archivedProperty = await propertyRepository.save(property);
-
-        logger.info('Property archived:', archivedProperty);
-        res.json(archivedProperty);
-    } catch (error) {
-        logger.error('Error archiving property:', error);
-        res.status(500).json({
-            error: 'Internal server error',
-            message: 'Failed to archive property',
-            details: error instanceof Error ? error.message : String(error)
-        });
-    }
-}
-
-// Update service address
-export async function updateServiceAddress(req: Request, res: Response) {
-    try {
-        const { id } = req.params;
-        const addressData = req.body;
-        logger.info(`Updating service address for property ${id}:`, addressData);
-
-        const property = await propertyRepository.findOne({
-            where: { property_id: id },
-            relations: ['serviceAddress', 'billingAddress', 'accounts']
-        });
-
-        if (!property) {
-            logger.warn(`Property not found with ID: ${id}`);
-            return res.status(404).json({
-                error: 'Not found',
-                message: 'Property not found'
-            });
-        }
-
-        // Start a transaction
-        const queryRunner = AppDataSource.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
-
-        try {
-            // Create or update service address
-            let serviceAddress;
-            if (property.serviceAddress) {
-                await queryRunner.manager.update(
-                    Address,
-                    property.serviceAddress.address_id,
-                    addressData
-                );
-                serviceAddress = await queryRunner.manager.findOne(Address, {
-                    where: { address_id: property.serviceAddress.address_id }
-                });
-            } else {
-                serviceAddress = await queryRunner.manager.save(Address, addressData);
-                property.service_address_id = serviceAddress.address_id;
-                await queryRunner.manager.save(property);
-            }
-
-            // Commit transaction
-            await queryRunner.commitTransaction();
-
-            // Fetch updated property with all relations
-            const updatedProperty = await propertyRepository.findOne({
-                where: { property_id: id },
-                relations: ['serviceAddress', 'billingAddress', 'accounts']
-            });
-
-            logger.info('Service address updated:', updatedProperty);
-            res.json(updatedProperty);
-        } catch (error) {
-            // Rollback transaction on error
-            await queryRunner.rollbackTransaction();
-            throw error;
-        } finally {
-            // Release query runner
-            await queryRunner.release();
-        }
-    } catch (error) {
-        logger.error('Error updating service address:', error);
-        res.status(500).json({
-            error: 'Internal server error',
-            message: 'Failed to update service address',
-            details: error instanceof Error ? error.message : String(error)
-        });
-    }
-}
-
-// Update billing address
-export async function updateBillingAddress(req: Request, res: Response) {
-    try {
-        const { id } = req.params;
-        const addressData = req.body;
-        logger.info(`Updating billing address for property ${id}:`, addressData);
-
-        const property = await propertyRepository.findOne({
-            where: { property_id: id },
-            relations: ['serviceAddress', 'billingAddress', 'accounts']
-        });
-
-        if (!property) {
-            logger.warn(`Property not found with ID: ${id}`);
-            return res.status(404).json({
-                error: 'Not found',
-                message: 'Property not found'
-            });
-        }
-
-        // Start a transaction
-        const queryRunner = AppDataSource.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
-
-        try {
-            // Create or update billing address
-            let billingAddress;
-            if (property.billingAddress) {
-                await queryRunner.manager.update(
-                    Address,
-                    property.billingAddress.address_id,
-                    addressData
-                );
-                billingAddress = await queryRunner.manager.findOne(Address, {
-                    where: { address_id: property.billingAddress.address_id }
-                });
-            } else {
-                billingAddress = await queryRunner.manager.save(Address, addressData);
-                property.billing_address_id = billingAddress.address_id;
-                await queryRunner.manager.save(property);
-            }
-
-            // Commit transaction
-            await queryRunner.commitTransaction();
-
-            // Fetch updated property with all relations
-            const updatedProperty = await propertyRepository.findOne({
-                where: { property_id: id },
-                relations: ['serviceAddress', 'billingAddress', 'accounts']
-            });
-
-            logger.info('Billing address updated:', updatedProperty);
-            res.json(updatedProperty);
-        } catch (error) {
-            // Rollback transaction on error
-            await queryRunner.rollbackTransaction();
-            throw error;
-        } finally {
-            // Release query runner
-            await queryRunner.release();
-        }
-    } catch (error) {
-        logger.error('Error updating billing address:', error);
-        res.status(500).json({
-            error: 'Internal server error',
-            message: 'Failed to update billing address',
             details: error instanceof Error ? error.message : String(error)
         });
     }

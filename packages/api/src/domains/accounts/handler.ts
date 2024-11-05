@@ -2,9 +2,11 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../../config/database';
 import { Account } from './entities/Account';
 import { logger } from '../../utils/logger';
-import { Repository } from 'typeorm';
+import { Repository, In, ILike, Not } from 'typeorm';
+import { Address } from '../addresses/entities/Address';
 
 const accountRepository: Repository<Account> = AppDataSource.getRepository(Account);
+const addressRepository: Repository<Address> = AppDataSource.getRepository(Address);
 
 // Get accounts with filters
 export async function getAccounts(req: Request, res: Response) {
@@ -105,18 +107,33 @@ export async function createAccount(req: Request, res: Response) {
             });
         }
 
+        // Check for existing account with the same name (case insensitive)
+        const existingAccount = await accountRepository.findOne({
+            where: { name: ILike(name.trim()) }
+        });
+
+        if (existingAccount) {
+            return res.status(400).json({
+                error: 'Validation failed',
+                message: 'An account with this name already exists'
+            });
+        }
+
         // Create account with timestamps
         const now = new Date();
         const newAccount = accountRepository.create({
             ...req.body,
+            name: name.trim(), // Ensure trimmed name is saved
             status: 'Active',
             created_at: now,
             updated_at: now
         });
 
-        const savedAccount = await accountRepository.save(newAccount);
+        // Save the account
+        const result = await accountRepository.save(newAccount);
+        const savedAccount = Array.isArray(result) ? result[0] : result;
 
-        // Return account with relations
+        // Fetch the saved account with relations
         const accountWithRelations = await accountRepository.findOne({
             where: { account_id: savedAccount.account_id },
             relations: ['billingAddress', 'properties', 'users']
@@ -155,12 +172,32 @@ export async function updateAccount(req: Request, res: Response) {
 
         // Validate fields if they're being updated
         const { name, type } = req.body;
-        if (name !== undefined && !name.trim()) {
-            return res.status(400).json({
-                error: 'Validation failed',
-                message: 'Account name cannot be empty'
+        if (name !== undefined) {
+            if (!name.trim()) {
+                return res.status(400).json({
+                    error: 'Validation failed',
+                    message: 'Account name cannot be empty'
+                });
+            }
+
+            // Check for existing account with the same name (excluding current account)
+            const existingAccount = await accountRepository.findOne({
+                where: [
+                    { 
+                        name: ILike(name.trim()),
+                        account_id: Not(id)
+                    }
+                ]
             });
+
+            if (existingAccount) {
+                return res.status(400).json({
+                    error: 'Validation failed',
+                    message: 'An account with this name already exists'
+                });
+            }
         }
+        
         if (type !== undefined && !type) {
             return res.status(400).json({
                 error: 'Validation failed',
@@ -171,9 +208,11 @@ export async function updateAccount(req: Request, res: Response) {
         // Update account with new timestamp
         accountRepository.merge(account, {
             ...req.body,
+            name: name?.trim() || account.name, // Ensure trimmed name is saved
             updated_at: new Date()
         });
-        const updatedAccount = await accountRepository.save(account);
+        const result = await accountRepository.save(account);
+        const updatedAccount = Array.isArray(result) ? result[0] : result;
 
         res.json(updatedAccount);
     } catch (error) {
@@ -202,13 +241,22 @@ export async function deleteAccount(req: Request, res: Response) {
             });
         }
 
+        // Store billing address for deletion if it exists
+        const billingAddress = account.billingAddress;
+
         // Remove relationships first
         account.properties = [];
         account.users = [];
+        account.billingAddress = null;
         await accountRepository.save(account);
 
-        // Then delete the account
+        // Delete the account
         await accountRepository.remove(account);
+
+        // Delete the billing address if it exists
+        if (billingAddress) {
+            await addressRepository.remove(billingAddress);
+        }
 
         // Send a simple success response
         res.json({
@@ -220,6 +268,66 @@ export async function deleteAccount(req: Request, res: Response) {
         res.status(500).json({
             error: 'Internal server error',
             message: 'Failed to delete account',
+            details: error instanceof Error ? error.message : String(error)
+        });
+    }
+}
+
+// Bulk delete accounts
+export async function bulkDeleteAccounts(req: Request, res: Response) {
+    try {
+        const { accountIds } = req.body;
+
+        if (!Array.isArray(accountIds) || accountIds.length === 0) {
+            return res.status(400).json({
+                error: 'Validation failed',
+                message: 'Account IDs array is required and must not be empty'
+            });
+        }
+
+        // Fetch all accounts with their billing addresses
+        const accounts = await accountRepository.find({
+            where: { account_id: In(accountIds) },
+            relations: ['billingAddress', 'properties', 'users']
+        });
+
+        if (accounts.length === 0) {
+            return res.status(404).json({
+                error: 'Not found',
+                message: 'No accounts found with the provided IDs'
+            });
+        }
+
+        // Store billing addresses for deletion
+        const billingAddresses = accounts
+            .map(account => account.billingAddress)
+            .filter((address): address is Address => address !== null);
+
+        // Remove relationships for all accounts
+        for (const account of accounts) {
+            account.properties = [];
+            account.users = [];
+            account.billingAddress = null;
+        }
+        await accountRepository.save(accounts);
+
+        // Delete all accounts
+        await accountRepository.remove(accounts);
+
+        // Delete all associated billing addresses
+        if (billingAddresses.length > 0) {
+            await addressRepository.remove(billingAddresses);
+        }
+
+        res.json({
+            success: true,
+            message: `Successfully deleted ${accounts.length} accounts`
+        });
+    } catch (error) {
+        logger.error('Error bulk deleting accounts:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            message: 'Failed to delete accounts',
             details: error instanceof Error ? error.message : String(error)
         });
     }
@@ -242,7 +350,8 @@ export async function archiveAccount(req: Request, res: Response) {
 
         account.status = 'Archived';
         account.updated_at = new Date();
-        const archivedAccount = await accountRepository.save(account);
+        const result = await accountRepository.save(account);
+        const archivedAccount = Array.isArray(result) ? result[0] : result;
 
         res.json(archivedAccount);
     } catch (error) {
