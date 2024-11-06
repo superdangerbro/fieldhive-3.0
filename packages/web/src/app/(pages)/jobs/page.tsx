@@ -2,58 +2,51 @@
 
 import { useState } from 'react';
 import { Box, Alert, Snackbar } from '@mui/material';
-import { JobSearch, JobDetails, JobsTable, JobsHeader, AddJobDialog, EditJobDialog } from './components';
-import type { Job } from '@fieldhive/shared';
-import { useJobs } from '@/stores/jobStore';
-import { createJob, getJobs } from '@/services/api';
+import { JobSearch, JobDetails, JobsTable, JobsHeader } from './components';
+import { AddJobDialog, EditJobDialog } from './dialogs';
+import type { Job } from '@/app/globalTypes';
+import { useJobs, useCreateJob, useUpdateJob } from './hooks/useJobs';
 
 export default function JobsPage() {
-  const { selectedJob, setSelectedJob } = useJobs();
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editJob, setEditJob] = useState<Job | null>(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Use React Query hooks
+  const { data = { jobs: [], total: 0 }, refetch } = useJobs();
+  const { mutate: createJob, error: createError } = useCreateJob();
+  const { mutate: updateJob, error: updateError } = useUpdateJob();
+
+  const error = createError || updateError;
 
   const showSuccess = (message: string) => {
     setSuccessMessage(message);
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
-  const handleAddJob = async (data: any) => {
-    try {
-      setError(null);
-      await createJob(data);
-      setRefreshTrigger(prev => prev + 1);
-      setIsAddDialogOpen(false);
-      showSuccess('Job created successfully');
-    } catch (error) {
-      console.error('Failed to create job:', error);
-      setError(error instanceof Error ? error.message : 'Failed to create job');
-    }
+  const handleAddJob = (data: any) => {
+    createJob(data, {
+      onSuccess: () => {
+        setIsAddDialogOpen(false);
+        showSuccess('Job created successfully');
+      }
+    });
   };
 
-  const handleEditSuccess = async () => {
-    try {
-      // Refresh the jobs list
-      setRefreshTrigger(prev => prev + 1);
-      
-      // If we were editing the currently selected job, refresh it
-      if (selectedJob && editJob && selectedJob.job_id === editJob.job_id) {
-        const response = await getJobs(1, 10); // Get first page to find the updated job
-        const updatedJob = response.jobs.find(job => job.job_id === selectedJob.job_id);
-        if (updatedJob) {
-          setSelectedJob(updatedJob);
-        }
+  const handleEditSuccess = () => {
+    refetch();
+    
+    // If we were editing the currently selected job, refresh it
+    if (selectedJob && editJob && selectedJob.jobId === editJob.jobId) {
+      const updatedJob = data.jobs.find(job => job.jobId === selectedJob.jobId);
+      if (updatedJob) {
+        setSelectedJob(updatedJob);
       }
-      
-      setEditJob(null);
-      showSuccess('Job updated successfully');
-    } catch (error) {
-      console.error('Failed to refresh job:', error);
-      setError(error instanceof Error ? error.message : 'Failed to refresh job');
     }
+    
+    setEditJob(null);
+    showSuccess('Job updated successfully');
   };
 
   const handleJobSelect = (job: Job | null) => {
@@ -64,24 +57,20 @@ export default function JobsPage() {
     setEditJob(job);
   };
 
-  const handleJobsLoad = (loadedJobs: Job[]) => {
-    setJobs(loadedJobs);
-  };
-
   const handleUpdate = () => {
-    setRefreshTrigger(prev => prev + 1);
+    refetch();
     showSuccess('Job updated successfully');
   };
 
   const handleCloseError = () => {
-    setError(null);
+    // Error state is managed by React Query
   };
 
   return (
     <Box p={3}>
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={handleCloseError}>
-          {error}
+          {error instanceof Error ? error.message : 'An error occurred'}
         </Alert>
       )}
 
@@ -104,16 +93,15 @@ export default function JobsPage() {
       />
       <JobsHeader />
       <JobSearch
-        jobs={jobs}
+        jobs={data.jobs}
         selectedJob={selectedJob}
         onJobSelect={handleJobSelect}
         onAddClick={() => setIsAddDialogOpen(true)}
       />
       <JobsTable 
-        refreshTrigger={refreshTrigger}
         onJobSelect={handleJobSelect}
         selectedJob={selectedJob}
-        onJobsLoad={handleJobsLoad}
+        onJobsLoad={() => {}} // No longer needed with React Query
       />
       <AddJobDialog
         open={isAddDialogOpen}

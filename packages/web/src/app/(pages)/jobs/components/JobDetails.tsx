@@ -1,9 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Box, Card, CardContent, Typography, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, Divider } from '@mui/material';
-import type { Job } from '@fieldhive/shared';
-import { deleteJob } from '@/services/api';
+import { 
+  Box, 
+  Card, 
+  CardContent, 
+  Typography, 
+  Dialog, 
+  DialogTitle, 
+  DialogContent, 
+  DialogContentText, 
+  DialogActions, 
+  Button, 
+  Divider,
+  CircularProgress
+} from '@mui/material';
+import type { Job } from '@/app/globalTypes';
+import { useDeleteJob } from '../hooks/useJobs';
 import { JobHeader } from './JobHeader';
 import { JobMetadata } from './JobMetadata';
 import { JobTabs } from './JobTabs';
@@ -17,22 +30,28 @@ interface JobDetailsProps {
 
 export function JobDetails({ job, onEdit, onUpdate, onJobSelect }: JobDetailsProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
 
-  const handleConfirmDelete = async () => {
+  // Use React Query mutation for delete
+  const { 
+    mutate: deleteJob, 
+    isPending: isDeleting,
+    error: deleteError,
+    reset: resetDeleteError
+  } = useDeleteJob();
+
+  const handleConfirmDelete = () => {
     if (!job) return;
 
-    try {
-      await deleteJob(job.job_id);
-      setDeleteDialogOpen(false);
-      onJobSelect(null);
-      if (onUpdate) {
-        onUpdate();
+    deleteJob(job.job_id, {
+      onSuccess: () => {
+        setDeleteDialogOpen(false);
+        onJobSelect(null);
+        if (onUpdate) {
+          onUpdate();
+        }
       }
-    } catch (error: any) {
-      setDeleteError(error.message);
-    }
+    });
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -80,7 +99,10 @@ export function JobDetails({ job, onEdit, onUpdate, onJobSelect }: JobDetailsPro
 
       <Dialog
         open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          resetDeleteError();
+        }}
         maxWidth="sm"
         fullWidth
       >
@@ -88,7 +110,7 @@ export function JobDetails({ job, onEdit, onUpdate, onJobSelect }: JobDetailsPro
         <DialogContent>
           {deleteError ? (
             <DialogContentText color="error">
-              {deleteError}
+              {deleteError instanceof Error ? deleteError.message : 'Failed to delete job'}
             </DialogContentText>
           ) : (
             <DialogContentText>
@@ -97,12 +119,23 @@ export function JobDetails({ job, onEdit, onUpdate, onJobSelect }: JobDetailsPro
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>
+          <Button 
+            onClick={() => {
+              setDeleteDialogOpen(false);
+              resetDeleteError();
+            }}
+            disabled={isDeleting}
+          >
             Cancel
           </Button>
           {!deleteError && (
-            <Button onClick={handleConfirmDelete} color="error">
-              Delete Job
+            <Button 
+              onClick={handleConfirmDelete} 
+              color="error"
+              disabled={isDeleting}
+              startIcon={isDeleting ? <CircularProgress size={20} /> : null}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Job'}
             </Button>
           )}
         </DialogActions>

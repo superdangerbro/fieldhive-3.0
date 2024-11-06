@@ -1,44 +1,54 @@
-import { Property } from '@/app/globalTypes/property';
-import { Account } from '@/app/globalTypes/account';
+import type { Property } from './property';
+import type { Account } from './account';
+import type { Address } from './address';
 
 export interface JobStatus {
-    value: string;
-    label: string;
+    name: string;
     color: string;
 }
 
 export interface JobType {
-    value: string;
-    label: string;
-    color: string;
-    fields: any[]; // TODO: Define field types when needed
+    jobTypeId: string;
+    name: string;
+    color?: string;
+    fields?: any[]; // TODO: Define field types when needed
 }
 
 export interface Job {
-    job_id: string;
+    jobId: string;
     name: string;
     type: string;
-    status: string;
+    status: string | JobStatus;
     property?: Property;
     account?: Account;
-    created_at?: Date;
-    updated_at?: Date;
+    createdAt?: Date;
+    updatedAt?: Date;
+    jobType?: JobType;
+    useCustomAddresses?: boolean;
+    serviceAddress?: Address;
+    billingAddress?: Address;
 }
 
 export interface CreateJobDto {
     name: string;
     type: string;
     status?: string;
-    property_id?: string;
-    account_id?: string;
+    propertyId?: string;
+    accountId?: string;
+    useCustomAddresses?: boolean;
+    serviceAddress?: Address;
+    billingAddress?: Address;
 }
 
 export interface UpdateJobDto {
     name?: string;
     type?: string;
     status?: string;
-    property_id?: string;
-    account_id?: string;
+    propertyId?: string;
+    accountId?: string;
+    useCustomAddresses?: boolean;
+    serviceAddress?: Address;
+    billingAddress?: Address;
 }
 
 export interface JobResponse {

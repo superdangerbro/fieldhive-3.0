@@ -175,7 +175,7 @@ export default function EditPropertyDialog({ open, property, onClose }: EditProp
                                 data: formData.billing_address
                             }, {
                                 onSuccess: (updatedBillingAddress) => {
-                                    // Update property with both addresses
+                                    // Update property with both addresses and accounts
                                     updatePropertyWithAddresses(
                                         updatedServiceAddress.address_id,
                                         updatedBillingAddress.address_id
@@ -185,7 +185,7 @@ export default function EditPropertyDialog({ open, property, onClose }: EditProp
                         } else {
                             createAddress(formData.billing_address, {
                                 onSuccess: (newBillingAddress) => {
-                                    // Update property with both addresses
+                                    // Update property with both addresses and accounts
                                     updatePropertyWithAddresses(
                                         updatedServiceAddress.address_id,
                                         newBillingAddress.address_id
@@ -194,7 +194,7 @@ export default function EditPropertyDialog({ open, property, onClose }: EditProp
                             });
                         }
                     } else {
-                        // Update property with only service address
+                        // Update property with only service address and accounts
                         updatePropertyWithAddresses(updatedServiceAddress.address_id);
                     }
                 }
@@ -205,7 +205,7 @@ export default function EditPropertyDialog({ open, property, onClose }: EditProp
                     if (!sameAsService) {
                         createAddress(formData.billing_address, {
                             onSuccess: (newBillingAddress) => {
-                                // Update property with both new addresses
+                                // Update property with both new addresses and accounts
                                 updatePropertyWithAddresses(
                                     newServiceAddress.address_id,
                                     newBillingAddress.address_id
@@ -213,7 +213,7 @@ export default function EditPropertyDialog({ open, property, onClose }: EditProp
                             }
                         });
                     } else {
-                        // Update property with only new service address
+                        // Update property with only new service address and accounts
                         updatePropertyWithAddresses(newServiceAddress.address_id);
                     }
                 }
@@ -225,7 +225,8 @@ export default function EditPropertyDialog({ open, property, onClose }: EditProp
         const propertyData: UpdatePropertyDto = {
             name: formData.name,
             service_address_id: serviceAddressId,
-            billing_address_id: sameAsService ? serviceAddressId : billingAddressId
+            billing_address_id: sameAsService ? serviceAddressId : billingAddressId,
+            account_ids: formData.accounts.map(account => account.account_id)
         };
 
         updateProperty(

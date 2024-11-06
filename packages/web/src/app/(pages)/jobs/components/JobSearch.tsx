@@ -9,7 +9,7 @@ import {
     Typography
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import { Job } from '@fieldhive/shared';
+import type { Job } from '@/app/globalTypes';
 
 interface JobSearchProps {
     jobs: Job[];
@@ -26,8 +26,8 @@ export function JobSearch({ jobs, selectedJob, onJobSelect, onAddClick }: JobSea
                 options={jobs}
                 value={selectedJob}
                 onChange={(_, newValue) => onJobSelect(newValue)}
-                getOptionLabel={(option) => option.title}
-                isOptionEqualToValue={(option, value) => option.job_id === value.job_id}
+                getOptionLabel={(option) => option.name}
+                isOptionEqualToValue={(option, value) => option.jobId === value.jobId}
                 renderInput={(params) => (
                     <TextField
                         {...params}
@@ -38,9 +38,9 @@ export function JobSearch({ jobs, selectedJob, onJobSelect, onAddClick }: JobSea
                 renderOption={(props, option) => (
                     <li {...props}>
                         <Box>
-                            <Typography variant="body1">{option.title}</Typography>
+                            <Typography variant="body1">{option.name}</Typography>
                             <Typography variant="caption" color="text.secondary">
-                                {option.property?.name} - {option.status}
+                                {option.property?.name} - {typeof option.status === 'string' ? option.status : option.status.name}
                             </Typography>
                         </Box>
                     </li>

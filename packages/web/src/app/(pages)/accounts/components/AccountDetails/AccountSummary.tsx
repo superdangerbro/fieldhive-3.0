@@ -1,17 +1,20 @@
 'use client';
 
-import React from 'react';
-import { Box, Card, CardContent, Typography, Grid, Chip } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Card, CardContent, Typography, Grid, Chip, IconButton } from '@mui/material';
 import BusinessIcon from '@mui/icons-material/Business';
 import WorkIcon from '@mui/icons-material/Work';
 import InventoryIcon from '@mui/icons-material/Inventory';
+import EditIcon from '@mui/icons-material/Edit';
 import type { Account } from 'app/globaltypes';
+import { EditAccountPropertiesDialog } from '../../dialogs/EditAccountPropertiesDialog';
 
 interface AccountSummaryProps {
   account: Account;
 }
 
 export function AccountSummary({ account }: AccountSummaryProps) {
+  const [isEditingProperties, setIsEditingProperties] = useState(false);
   const propertyCount = account.properties?.length || 0;
   const jobCount = account.jobs?.length || 0;
   const equipmentCount = account.properties?.reduce((total: number, property: any) => 
@@ -26,6 +29,13 @@ export function AccountSummary({ account }: AccountSummaryProps) {
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <BusinessIcon sx={{ mr: 1, color: 'primary.main' }} />
                 <Typography variant="h6">Properties</Typography>
+                <IconButton 
+                  size="small" 
+                  onClick={() => setIsEditingProperties(true)}
+                  sx={{ ml: 'auto' }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
               </Box>
               <Typography variant="h4" component="div">
                 {propertyCount}
@@ -102,6 +112,16 @@ export function AccountSummary({ account }: AccountSummaryProps) {
           </Card>
         </Grid>
       </Grid>
+
+      <EditAccountPropertiesDialog
+        open={isEditingProperties}
+        account={account}
+        onClose={() => setIsEditingProperties(false)}
+        onSuccess={() => {
+          setIsEditingProperties(false);
+          // The parent component will handle the refresh through React Query
+        }}
+      />
     </Box>
   );
 }

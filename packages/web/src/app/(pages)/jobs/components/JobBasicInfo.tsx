@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
     TextField,
     Grid,
@@ -8,24 +8,17 @@ import {
     InputLabel,
     Select,
     MenuItem,
-    Typography,
-    CircularProgress,
-    Box
+    Box,
+    CircularProgress
 } from '@mui/material';
-import { getSetting } from '@/services/api';
-import type { JobType } from '../types';
-
-interface JobStatus {
-    name: string;
-    color: string;
-}
+import type { JobType, JobStatus } from '@/app/globalTypes';
+import { useSetting } from '../hooks/useSettings';
+import { useJobTypes } from '../hooks/useJobTypes';
 
 interface JobBasicInfoProps {
     title: string;
     status: JobStatus;
     jobTypeId: string | null;
-    jobTypes: JobType[];
-    loadingJobTypes: boolean;
     onTitleChange: (title: string) => void;
     onStatusChange: (status: JobStatus) => void;
     onJobTypeChange: (jobTypeId: string) => void;
@@ -35,33 +28,22 @@ export function JobBasicInfo({
     title,
     status,
     jobTypeId,
-    jobTypes,
-    loadingJobTypes,
     onTitleChange,
     onStatusChange,
     onJobTypeChange
 }: JobBasicInfoProps) {
-    const [statusOptions, setStatusOptions] = useState<JobStatus[]>([]);
-    const [loadingStatuses, setLoadingStatuses] = useState(true);
+    // Use React Query for job statuses and types
+    const { 
+        data: statusOptions = [], 
+        isLoading: loadingStatuses,
+        error: statusError 
+    } = useSetting<JobStatus[]>('job_statuses');
 
-    useEffect(() => {
-        const fetchStatuses = async () => {
-            try {
-                setLoadingStatuses(true);
-                const statuses = await getSetting('job_statuses');
-                if (Array.isArray(statuses)) {
-                    setStatusOptions(statuses);
-                }
-            } catch (error) {
-                console.error('Failed to fetch job statuses:', error);
-                setStatusOptions([]);
-            } finally {
-                setLoadingStatuses(false);
-            }
-        };
-
-        fetchStatuses();
-    }, []);
+    const {
+        data: jobTypes = [],
+        isLoading: loadingJobTypes,
+        error: jobTypesError
+    } = useJobTypes();
 
     return (
         <>
@@ -70,6 +52,7 @@ export function JobBasicInfo({
                 value={title}
                 onChange={(e) => onTitleChange(e.target.value)}
                 fullWidth
+                sx={{ mb: 2 }}
             />
 
             <Grid container spacing={2}>
@@ -120,7 +103,7 @@ export function JobBasicInfo({
                             value={jobTypeId || ''}
                             onChange={(e) => onJobTypeChange(e.target.value)}
                             label="Job Type"
-                            disabled={loadingJobTypes || jobTypes.length === 0}
+                            disabled={loadingJobTypes}
                             startAdornment={
                                 loadingJobTypes ? (
                                     <Box sx={{ display: 'flex', alignItems: 'center', pl: 1 }}>

@@ -1,19 +1,28 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Box, Grid, FormControl, InputLabel, Select, MenuItem, Chip, SelectChangeEvent, Alert, CircularProgress, Typography, Paper, Stack } from '@mui/material';
-import type { Job, Address } from '@fieldhive/shared';
-import { updateJob, getSetting } from '@/services/api';
+import { 
+  Box, 
+  Grid, 
+  FormControl, 
+  Select, 
+  MenuItem, 
+  Chip, 
+  SelectChangeEvent, 
+  Alert, 
+  CircularProgress, 
+  Typography, 
+  Paper, 
+  Stack 
+} from '@mui/material';
+import type { Job, Address, JobStatus, JobType } from '@/app/globalTypes';
+import { useSetting } from '../hooks/useSettings';
+import { useUpdateJob } from '../hooks/useJobs';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import BusinessIcon from '@mui/icons-material/Business';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import WorkIcon from '@mui/icons-material/Work';
-
-interface JobStatus {
-  name: string;
-  color: string;
-}
 
 interface JobMetadataProps {
   job: Job;
@@ -36,15 +45,25 @@ function formatAddress(address?: Address | null): string {
 }
 
 export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
-  const [statusLoading, setStatusLoading] = useState(false);
   const [currentStatus, setCurrentStatus] = useState<JobStatus>(
     typeof job.status === 'string' 
       ? { name: job.status, color: '#94a3b8' } 
       : job.status
   );
-  const [statusOptions, setStatusOptions] = useState<JobStatus[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+
+  // Use React Query hooks
+  const { 
+    data: statusOptions = [], 
+    isLoading: isLoadingSettings,
+    error: settingsError 
+  } = useSetting<JobStatus[]>('job_statuses');
+
+  const {
+    mutate: updateJob,
+    isPending: isUpdating,
+    error: updateError,
+    reset: resetUpdateError
+  } = useUpdateJob();
 
   useEffect(() => {
     setCurrentStatus(
@@ -54,50 +73,30 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
     );
   }, [job]);
 
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        setIsLoadingSettings(true);
-        const statuses = await getSetting('job_statuses');
-        if (Array.isArray(statuses)) {
-          setStatusOptions(statuses);
-        }
-      } catch (error) {
-        console.error('Failed to fetch job statuses:', error);
-        setStatusOptions([]);
-      } finally {
-        setIsLoadingSettings(false);
-      }
-    };
-
-    fetchSettings();
-  }, []);
-
-  const handleStatusChange = async (event: SelectChangeEvent<string>) => {
+  const handleStatusChange = (event: SelectChangeEvent<string>) => {
     const newStatusName = event.target.value;
     const newStatus = statusOptions.find(s => s.name === newStatusName);
     if (!newStatus) return;
 
-    setStatusLoading(true);
-    setError(null);
-    
     const previousStatus = currentStatus;
     setCurrentStatus(newStatus);
     
-    try {
-      await updateJob(job.job_id, {
-        status: newStatus.name // Send just the status name to the API
-      });
-      if (onUpdate) {
-        onUpdate();
+    updateJob(
+      { 
+        id: job.job_id, 
+        data: { status: newStatus.name }
+      },
+      {
+        onSuccess: () => {
+          if (onUpdate) {
+            onUpdate();
+          }
+        },
+        onError: () => {
+          setCurrentStatus(previousStatus);
+        }
       }
-    } catch (error) {
-      console.error('Failed to update status:', error);
-      setCurrentStatus(previousStatus);
-      setError('Failed to update job status. Please try again.');
-    } finally {
-      setStatusLoading(false);
-    }
+    );
   };
 
   const serviceAddress = job.use_custom_addresses ? job.service_address : job.property?.service_address;
@@ -105,9 +104,11 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {error && (
+      {(updateError || settingsError) && (
         <Alert severity="error">
-          {error}
+          {updateError instanceof Error ? updateError.message : 
+           settingsError instanceof Error ? settingsError.message : 
+           'An error occurred'}
         </Alert>
       )}
 
@@ -127,7 +128,7 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
                 <Select
                   value={currentStatus.name}
                   onChange={handleStatusChange}
-                  disabled={statusLoading || isLoadingSettings}
+                  disabled={isUpdating || isLoadingSettings}
                   startAdornment={
                     isLoadingSettings ? (
                       <CircularProgress size={20} sx={{ mr: 1 }} />

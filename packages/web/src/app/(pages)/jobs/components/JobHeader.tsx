@@ -4,7 +4,7 @@ import React from 'react';
 import { Box, Typography, IconButton } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import type { Job } from '@fieldhive/shared';
+import type { Job } from '@/app/globalTypes';
 
 interface JobHeaderProps {
   job: Job;
@@ -17,10 +17,10 @@ export function JobHeader({ job, onEdit, onDelete }: JobHeaderProps) {
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
       <Box sx={{ flex: 1 }}>
         <Typography variant="h5" component="div" gutterBottom>
-          {job.title}
+          {job.name}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Created {new Date(job.created_at).toLocaleDateString()}
+          Created {new Date(job.created_at || Date.now()).toLocaleDateString()}
         </Typography>
       </Box>
       <Box sx={{ display: 'flex', gap: 1 }}>

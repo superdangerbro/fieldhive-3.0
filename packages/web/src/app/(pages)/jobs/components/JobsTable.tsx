@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     Box,
     Card,
@@ -15,24 +15,24 @@ import {
     Stack,
     Typography,
     Chip,
-    Alert
+    Alert,
+    Button
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import { getJobs } from '@/services/api';
-import { Job, JobStatus, getStatusColor, getStatusDisplayName } from '@fieldhive/shared';
+import type { Job, JobStatus } from '../../../globalTypes';
+import { useJobs } from '../hooks/useJobs';
 
 interface JobsTableProps {
-    refreshTrigger: number;
     onJobSelect: (job: Job | null) => void;
     selectedJob: Job | null;
-    onJobsLoad: (jobs: Job[]) => void;
+    onJobsLoad?: (jobs: Job[]) => void;
 }
 
 const defaultColumns: GridColDef[] = [
     {
-        field: 'title',
+        field: 'name',
         headerName: 'Title',
         flex: 1,
         minWidth: 200
@@ -49,46 +49,54 @@ const defaultColumns: GridColDef[] = [
         headerName: 'Account',
         flex: 1,
         minWidth: 200,
-        valueGetter: (params) => params.value?.name || 'N/A'
+        valueGetter: (params) => params.row.property?.accounts?.[0]?.name || 'N/A'
     },
     {
-        field: 'job_type',
+        field: 'type',
         headerName: 'Type',
         width: 150,
-        valueGetter: (params) => params.value?.name || 'N/A'
+        valueGetter: (params) => params.row.jobType?.name || 'N/A'
     },
     {
         field: 'status',
         headerName: 'Status',
         width: 150,
-        renderCell: (params) => (
-            <Chip
-                label={getStatusDisplayName(params.value as JobStatus)}
-                size="small"
-                color={getStatusColor(params.value as JobStatus)}
-                sx={{ color: 'white' }}
-            />
-        )
+        renderCell: (params) => {
+            const status = params.value as JobStatus;
+            return (
+                <Chip
+                    label={typeof status === 'string' ? status : status.name}
+                    size="small"
+                    sx={{ 
+                        bgcolor: typeof status === 'string' ? 'primary.main' : status.color,
+                        color: 'white'
+                    }}
+                />
+            );
+        }
     },
     {
-        field: 'created_at',
+        field: 'createdAt',
         headerName: 'Created',
         width: 120,
         valueGetter: (params) => params.value ? new Date(params.value).toLocaleDateString() : 'N/A'
     }
 ];
 
-export function JobsTable({ refreshTrigger, onJobSelect, selectedJob, onJobsLoad }: JobsTableProps) {
-    const [jobs, setJobs] = useState<Job[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+export function JobsTable({ onJobSelect, selectedJob, onJobsLoad }: JobsTableProps) {
     const [page, setPage] = useState(0);
     const [pageSize, setPageSize] = useState(25);
-    const [totalRows, setTotalRows] = useState(0);
     const [filterText, setFilterText] = useState('');
     const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns.map(col => col.field));
     const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
-    const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+    // Use React Query for data fetching
+    const { 
+        data = { jobs: [], total: 0 }, 
+        isLoading,
+        error,
+        refetch
+    } = useJobs();
 
     const handleColumnMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
         setColumnMenuAnchor(event.currentTarget);
@@ -115,50 +123,31 @@ export function JobsTable({ refreshTrigger, onJobSelect, selectedJob, onJobsLoad
             filterable: true
         }));
 
-    const fetchJobs = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const response = await getJobs(page + 1, pageSize);
-            
-            if (!response || !Array.isArray(response.jobs)) {
-                throw new Error('Invalid response format from server');
-            }
-
-            setJobs(response.jobs);
-            setTotalRows(response.total || 0);
-            onJobsLoad(response.jobs);
-            
-            if (isInitialLoad) {
-                setIsInitialLoad(false);
-            }
-        } catch (error) {
-            console.error('Failed to fetch jobs:', error);
-            setError(error instanceof Error ? error.message : 'Failed to fetch jobs. Please try again later.');
-            setJobs([]);
-            setTotalRows(0);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     // Filter jobs based on search text
-    const filteredJobs = jobs.filter(job => {
-        if (!filterText) return true;
+    const filteredJobs = React.useMemo(() => {
+        if (!filterText) return data.jobs;
+        
         const searchText = filterText.toLowerCase();
-        const statusText = typeof job.status === 'object' ? job.status.name : job.status;
-        return (
-            job.title?.toLowerCase().includes(searchText) ||
-            job.property?.name?.toLowerCase().includes(searchText) ||
-            job.account?.name?.toLowerCase().includes(searchText) ||
-            job.job_type?.name?.toLowerCase().includes(searchText) ||
-            statusText.toLowerCase().includes(searchText)
-        );
-    });
+        return data.jobs.filter((job: Job) => {
+            const statusText = typeof job.status === 'object' ? job.status.name : job.status;
+            return (
+                job.name?.toLowerCase().includes(searchText) ||
+                job.property?.name?.toLowerCase().includes(searchText) ||
+                job.property?.accounts?.some(account => 
+                    account.name.toLowerCase().includes(searchText)
+                ) ||
+                job.jobType?.name?.toLowerCase().includes(searchText) ||
+                statusText.toLowerCase().includes(searchText)
+            );
+        });
+    }, [data.jobs, filterText]);
 
-    useEffect(() => {
-        fetchJobs();
-    }, [page, pageSize, refreshTrigger]);
+    // Call onJobsLoad when jobs are loaded
+    React.useEffect(() => {
+        if (onJobsLoad && data.jobs.length > 0) {
+            onJobsLoad(data.jobs);
+        }
+    }, [data.jobs, onJobsLoad]);
 
     return (
         <Box sx={{ height: 600, width: '100%' }}>
@@ -172,7 +161,7 @@ export function JobsTable({ refreshTrigger, onJobSelect, selectedJob, onJobsLoad
                     >
                         <Box sx={{ flexGrow: 1 }}>
                             <Typography variant="body2" color="text.secondary">
-                                {totalRows} jobs found
+                                {data.total} jobs found
                             </Typography>
                         </Box>
                         <TextField
@@ -226,27 +215,35 @@ export function JobsTable({ refreshTrigger, onJobSelect, selectedJob, onJobsLoad
             </Card>
 
             {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                    {error}
+                <Alert 
+                    severity="error" 
+                    sx={{ mb: 2 }}
+                    action={
+                        <Button color="inherit" size="small" onClick={() => refetch()}>
+                            Try Again
+                        </Button>
+                    }
+                >
+                    {error instanceof Error ? error.message : 'Failed to load jobs'}
                 </Alert>
             )}
 
             <DataGrid
-                rows={filterText ? filteredJobs : jobs}
+                rows={filterText ? filteredJobs : data.jobs}
                 columns={columns}
-                getRowId={(row) => row.job_id}
-                loading={loading}
+                getRowId={(row) => row.jobId}
+                loading={isLoading}
                 paginationMode="server"
                 page={page}
                 pageSize={pageSize}
-                rowCount={totalRows}
+                rowCount={data.total}
                 rowsPerPageOptions={[25, 50, 100]}
                 onPageChange={(newPage) => setPage(newPage)}
                 onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
                 disableSelectionOnClick
                 disableColumnMenu
                 onRowClick={(params) => onJobSelect(params.row as Job)}
-                selectionModel={selectedJob ? [selectedJob.job_id] : []}
+                selectionModel={selectedJob ? [selectedJob.jobId] : []}
                 sx={{
                     '& .MuiDataGrid-row': {
                         cursor: 'pointer'
@@ -256,7 +253,7 @@ export function JobsTable({ refreshTrigger, onJobSelect, selectedJob, onJobsLoad
                     NoRowsOverlay: () => (
                         <Stack height="100%" alignItems="center" justifyContent="center">
                             <Typography color="text.secondary">
-                                {loading ? 'Loading...' : isInitialLoad ? 'Loading jobs...' : 'No jobs found'}
+                                {isLoading ? 'Loading...' : 'No jobs found'}
                             </Typography>
                         </Stack>
                     )

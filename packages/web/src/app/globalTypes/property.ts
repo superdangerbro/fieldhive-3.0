@@ -49,7 +49,7 @@ export interface CreatePropertyDto {
         type: 'Polygon';
         coordinates: [number, number][][];
     };
-    account_id?: string;
+    account_id?: string; // Singular for create
 }
 
 export interface UpdatePropertyDto {
@@ -66,4 +66,5 @@ export interface UpdatePropertyDto {
         type: 'Polygon';
         coordinates: [number, number][][];
     };
+    account_ids?: string[]; // Plural for update
 }

@@ -34,7 +34,9 @@
     "src/app/**/*.tsx",
     "src/app/(pages)/**/*.ts",
     "src/app/(pages)/**/*.tsx",
-    "src/app/globalTypes/**/*.ts"
+    "src/app/globalTypes/**/*.ts",
+    "src/app/(pages)/jobs/**/*.ts",
+    "src/app/(pages)/jobs/**/*.tsx"
   ],
   "exclude": ["node_modules"]
 }

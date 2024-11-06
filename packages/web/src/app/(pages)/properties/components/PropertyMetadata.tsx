@@ -14,10 +14,10 @@ import {
     Paper,
     Stack
 } from '@mui/material';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import InfoIcon from '@mui/icons-material/Info';
 import type { Property } from '../../../globalTypes/property';
 import { StatusChip, formatStatus } from './PropertyStatus';
+import PropertyParentAccounts from './PropertyParentAccounts';
 
 interface PropertyMetadataProps {
   property: Property;
@@ -27,6 +27,7 @@ interface PropertyMetadataProps {
   statusLoading: boolean;
   onTypeChange: (event: SelectChangeEvent<string>) => void;
   onStatusChange: (event: SelectChangeEvent<string>) => void;
+  onUpdate: () => void;
 }
 
 export default function PropertyMetadata({ 
@@ -37,6 +38,7 @@ export default function PropertyMetadata({
   statusLoading,
   onTypeChange,
   onStatusChange,
+  onUpdate
 }: PropertyMetadataProps) {
   const formatValue = (value: string) => 
     value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
@@ -60,39 +62,19 @@ export default function PropertyMetadata({
 
   return (
     <Grid container spacing={3}>
-      {/* Left Column - Timestamps */}
-      <Grid item xs={12} md={6}>
-        <Paper sx={{ p: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <AccessTimeIcon sx={{ mr: 1, color: 'primary.main' }} />
-            <Typography variant="h6">
-              Timestamps
-            </Typography>
-          </Box>
-          <Stack spacing={2}>
-            <Box>
-              <Typography variant="body2" color="text.secondary">
-                Created At
-              </Typography>
-              <Typography variant="body1">
-                {property.created_at ? new Date(property.created_at).toLocaleString() : 'N/A'}
-              </Typography>
-            </Box>
-            <Box>
-              <Typography variant="body2" color="text.secondary">
-                Updated At
-              </Typography>
-              <Typography variant="body1">
-                {property.updated_at ? new Date(property.updated_at).toLocaleString() : 'N/A'}
-              </Typography>
-            </Box>
-          </Stack>
+      {/* Left Column - Parent Accounts */}
+      <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
+        <Paper sx={{ p: 2, width: '100%', height: '100%' }}>
+          <PropertyParentAccounts 
+            property={property}
+            onUpdate={onUpdate}
+          />
         </Paper>
       </Grid>
 
-      {/* Right Column - Status and Type */}
-      <Grid item xs={12} md={6}>
-        <Paper sx={{ p: 2 }}>
+      {/* Right Column - Property Details and Timestamps */}
+      <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
+        <Paper sx={{ p: 2, width: '100%', height: '100%' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <InfoIcon sx={{ mr: 1, color: 'primary.main' }} />
             <Typography variant="h6">
@@ -142,6 +124,23 @@ export default function PropertyMetadata({
                 ))}
               </Select>
             </FormControl>
+
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Created At
+              </Typography>
+              <Typography variant="body1">
+                {property.created_at ? new Date(property.created_at).toLocaleString() : 'N/A'}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="body2" color="text.secondary">
+                Updated At
+              </Typography>
+              <Typography variant="body1">
+                {property.updated_at ? new Date(property.updated_at).toLocaleString() : 'N/A'}
+              </Typography>
+            </Box>
           </Stack>
         </Paper>
       </Grid>
