@@ -4,8 +4,9 @@ import { Setting } from '../../entities/Setting';
 
 // Types that match the web side
 interface JobType {
-    name: string;
-    fields: any[]; // TODO: Define field types when needed
+    value: string;    // Used as identifier
+    label: string;    // Display name
+    fields: any[];    // Type-specific fields
 }
 
 const SETTING_KEY = 'job_types';
@@ -23,8 +24,15 @@ export async function getJobTypes(req: Request, res: Response) {
             return res.json([]);
         }
 
-        // Return array directly
-        return res.json(Array.isArray(setting.value) ? setting.value : []);
+        // Transform old format if needed
+        const types = Array.isArray(setting.value) ? setting.value : [];
+        const transformedTypes = types.map(type => ({
+            value: type.name?.toLowerCase() || type.value,
+            label: type.name || type.label,
+            fields: type.fields || []
+        }));
+
+        return res.json(transformedTypes);
     } catch (error) {
         return res.status(500).json({ 
             message: 'Failed to get job types',
@@ -50,9 +58,9 @@ export async function updateJobTypes(req: Request, res: Response) {
 
         // Validate each type
         for (const type of types) {
-            if (!type.name || !Array.isArray(type.fields)) {
+            if (!type.value || !type.label || !Array.isArray(type.fields)) {
                 return res.status(400).json({
-                    message: 'Each type must have name and fields properties'
+                    message: 'Each type must have value, label, and fields properties'
                 });
             }
         }

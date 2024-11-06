@@ -2,13 +2,90 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../../../../config/database';
 import { Setting } from '../../entities/Setting';
 
-// Types that match the web side
+// Field types
+type FieldType = 'text' | 'number' | 'select' | 'checkbox' | 'textarea';
+
+interface BaseField {
+    name: string;
+    type: FieldType;
+    required?: boolean;
+    description?: string;
+}
+
+interface NumberField extends BaseField {
+    type: 'number';
+    min?: number;
+    max?: number;
+    step?: number;
+}
+
+interface SelectField extends BaseField {
+    type: 'select';
+    options: string[];
+}
+
+interface TextField extends BaseField {
+    type: 'text' | 'textarea';
+}
+
+interface CheckboxField extends BaseField {
+    type: 'checkbox';
+}
+
+type Field = NumberField | SelectField | TextField | CheckboxField;
+
 interface EquipmentType {
     name: string;
-    fields: any[]; // TODO: Define field types when needed
+    fields: Field[];
 }
 
 const SETTING_KEY = 'equipment_types';
+
+function validateField(field: Record<string, any>): string[] {
+    const errors: string[] = [];
+
+    // Validate required properties
+    if (!field.name) {
+        errors.push('Field name is required');
+    }
+    if (!field.type) {
+        errors.push('Field type is required');
+    }
+
+    // Validate field type
+    const validTypes: FieldType[] = ['text', 'number', 'select', 'checkbox', 'textarea'];
+    if (!validTypes.includes(field.type)) {
+        errors.push(`Invalid field type: ${field.type}. Must be one of: ${validTypes.join(', ')}`);
+        return errors; // Return early since type-specific validation won't work
+    }
+
+    // Type-specific validation
+    if (field.type === 'number') {
+        if (field.min !== undefined && field.max !== undefined && field.min > field.max) {
+            errors.push('Minimum value cannot be greater than maximum value');
+        }
+        if (field.step !== undefined && field.step <= 0) {
+            errors.push('Step value must be greater than 0');
+        }
+    }
+
+    if (field.type === 'select') {
+        if (!Array.isArray(field.options)) {
+            errors.push('Select field must have an options array');
+        } else if (field.options.length === 0) {
+            errors.push('Select field must have at least one option');
+        } else {
+            // Validate each option is a string
+            field.options.forEach((option: any, index: number) => {
+                if (typeof option !== 'string') {
+                    errors.push(`Option ${index + 1} must be a string`);
+                }
+            });
+        }
+    }
+
+    return errors;
+}
 
 /**
  * Get equipment types from settings
@@ -49,12 +126,49 @@ export async function updateEquipmentTypes(req: Request, res: Response) {
         }
 
         // Validate each type
+        const errors: { type: string; errors: string[] }[] = [];
         for (const type of types) {
-            if (!type.name || !Array.isArray(type.fields)) {
-                return res.status(400).json({
-                    message: 'Each type must have name and fields properties'
+            const typeErrors: string[] = [];
+
+            if (!type.name) {
+                typeErrors.push('Type name is required');
+            }
+            if (!Array.isArray(type.fields)) {
+                typeErrors.push('Fields must be an array');
+            } else {
+                // Validate each field
+                type.fields.forEach((field: Record<string, any>, index: number) => {
+                    const fieldErrors = validateField(field);
+                    if (fieldErrors.length > 0) {
+                        typeErrors.push(`Field "${field.name || index}": ${fieldErrors.join(', ')}`);
+                    }
+                });
+
+                // Check for duplicate field names
+                const fieldNames = new Set<string>();
+                type.fields.forEach((field: Record<string, any>) => {
+                    if (field.name && fieldNames.has(field.name)) {
+                        typeErrors.push(`Duplicate field name: ${field.name}`);
+                    }
+                    if (field.name) {
+                        fieldNames.add(field.name);
+                    }
                 });
             }
+
+            if (typeErrors.length > 0) {
+                errors.push({
+                    type: type.name || 'Unknown type',
+                    errors: typeErrors
+                });
+            }
+        }
+
+        if (errors.length > 0) {
+            return res.status(400).json({
+                message: 'Validation failed',
+                errors
+            });
         }
 
         // Update or create the setting

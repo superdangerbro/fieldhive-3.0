@@ -10,13 +10,13 @@ export interface Equipment {
 export interface EquipmentType {
     value: string;
     label: string;
-    color: string;
+    fields?: any[]; // For rules and conditions
 }
 
 export interface EquipmentStatus {
-    value: string;
-    label: string;
-    color: string;
+    value: string;    // Used as identifier
+    label: string;    // Display name
+    color: string;    // Status color
 }
 
 export interface CreateEquipmentDto {

@@ -3,27 +3,40 @@ import type { Account } from './account';
 import type { Address } from './address';
 
 export interface JobStatus {
-    name: string;
-    color: string;
+    value: string;    // Used as identifier
+    label: string;    // Display name
+    color: string;    // Status color
 }
 
 export interface JobType {
-    jobTypeId: string;
-    name: string;
-    color?: string;
-    fields?: any[]; // TODO: Define field types when needed
+    value: string;    // Used as identifier
+    label: string;    // Display name
+    fields: any[];    // Type-specific fields
 }
 
 export interface Job {
-    jobId: string;
-    name: string;
-    type: string;
-    status: string | JobStatus;
+    // API response fields (snake_case)
+    job_id: string;
+    title: string;
+    description: string | null;
+    property_id: string;
+    job_type_id: string;
+    status: string;
+    use_custom_addresses: boolean;
+    service_address_id: string;
+    billing_address_id: string;
+    created_at: string;
+    updated_at: string;
+    
+    // Transformed fields (camelCase)
+    jobId?: string;
+    name?: string;
+    type?: string;
+    jobType?: JobType;
     property?: Property;
     account?: Account;
     createdAt?: Date;
     updatedAt?: Date;
-    jobType?: JobType;
     useCustomAddresses?: boolean;
     serviceAddress?: Address;
     billingAddress?: Address;

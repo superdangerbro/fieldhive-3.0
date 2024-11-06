@@ -1,8 +1,18 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { AccountType, AccountStatus } from '@/app/globalTypes/account';
 import { ENV_CONFIG } from '@/config/environment';
+
+interface AccountType {
+    value: string;
+    label: string;
+}
+
+interface AccountStatus {
+    value: string;
+    label: string;
+    color: string;
+}
 
 const ENDPOINTS = {
     types: '/settings/accounts/types',
@@ -10,7 +20,11 @@ const ENDPOINTS = {
 } as const;
 
 // Helper function to build full API URL
-const buildUrl = (endpoint: string) => `${ENV_CONFIG.api.baseUrl}${endpoint}`;
+const buildUrl = (endpoint: string) => {
+    const url = `${ENV_CONFIG.api.baseUrl}${endpoint}`;
+    console.log('API URL:', url);
+    return url;
+};
 
 // Helper function to handle API errors consistently
 const handleApiError = async (response: Response) => {
@@ -20,9 +34,10 @@ const handleApiError = async (response: Response) => {
 
 // Account Types Hooks
 export const useAccountTypes = () => {
-    return useQuery({
+    return useQuery<AccountType[]>({
         queryKey: ['accountTypes'],
         queryFn: async () => {
+            console.log('Fetching account types...');
             const response = await fetch(buildUrl(ENDPOINTS.types), {
                 headers: { 'Content-Type': 'application/json' },
                 signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
@@ -32,7 +47,9 @@ export const useAccountTypes = () => {
                 await handleApiError(response);
             }
 
-            return response.json();
+            const data = await response.json();
+            console.log('Account types response:', data);
+            return Array.isArray(data) ? data : [];
         },
         staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
         gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
@@ -44,6 +61,7 @@ export const useUpdateAccountTypes = () => {
 
     return useMutation<AccountType[], Error, AccountType[]>({
         mutationFn: async (types) => {
+            console.log('Updating account types:', types);
             const response = await fetch(buildUrl(ENDPOINTS.types), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -55,9 +73,12 @@ export const useUpdateAccountTypes = () => {
                 await handleApiError(response);
             }
 
-            return response.json();
+            const data = await response.json();
+            console.log('Account types update response:', data);
+            return Array.isArray(data) ? data : [];
         },
         onSuccess: (data) => {
+            console.log('Update successful, setting query data:', data);
             queryClient.setQueryData(['accountTypes'], data);
         },
     });
@@ -65,9 +86,10 @@ export const useUpdateAccountTypes = () => {
 
 // Account Statuses Hooks
 export const useAccountStatuses = () => {
-    return useQuery({
+    return useQuery<AccountStatus[]>({
         queryKey: ['accountStatuses'],
         queryFn: async () => {
+            console.log('Fetching account statuses...');
             const response = await fetch(buildUrl(ENDPOINTS.statuses), {
                 headers: { 'Content-Type': 'application/json' },
                 signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
@@ -77,7 +99,9 @@ export const useAccountStatuses = () => {
                 await handleApiError(response);
             }
 
-            return response.json();
+            const data = await response.json();
+            console.log('Account statuses response:', data);
+            return data.statuses || [];
         },
         staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
         gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
@@ -89,10 +113,11 @@ export const useUpdateAccountStatuses = () => {
 
     return useMutation<AccountStatus[], Error, AccountStatus[]>({
         mutationFn: async (statuses) => {
+            console.log('Updating account statuses:', statuses);
             const response = await fetch(buildUrl(ENDPOINTS.statuses), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(statuses),
+                body: JSON.stringify({ value: { statuses } }),
                 signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
             });
 
@@ -100,9 +125,12 @@ export const useUpdateAccountStatuses = () => {
                 await handleApiError(response);
             }
 
-            return response.json();
+            const data = await response.json();
+            console.log('Account statuses update response:', data);
+            return data.statuses || [];
         },
         onSuccess: (data) => {
+            console.log('Update successful, setting query data:', data);
             queryClient.setQueryData(['accountStatuses'], data);
         },
     });

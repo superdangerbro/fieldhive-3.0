@@ -1,124 +1,66 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
     Box,
     Typography,
     Button,
     List,
     ListItem,
-    ListItemText,
     IconButton,
     CircularProgress,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
     TextField
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import { useEquipmentStatuses, useUpdateEquipmentStatuses } from '../hooks/useEquipment';
+import { useCrudDialogs } from '@/app/globalHooks/useCrudDialogs';
+import { useActionNotifications } from '@/app/globalHooks/useActionNotifications';
+import { CrudFormDialog, CrudDeleteDialog } from '@/app/globalComponents/crud/CrudDialogs';
+import { ActionNotifications } from '@/app/globalComponents/crud/ActionNotifications';
 import { StatusColorPicker } from '@/app/globalComponents/StatusColorPicker';
-import { useEquipmentStatuses, EquipmentStatus } from './store';
-
-interface EditDialogProps {
-    open: boolean;
-    status: EquipmentStatus | null;
-    onClose: () => void;
-    onSave: (oldStatus: EquipmentStatus | null, newStatus: EquipmentStatus) => void;
-}
-
-function EditStatusDialog({ open, status, onClose, onSave }: EditDialogProps) {
-    const [name, setName] = useState(status?.label || '');
-    const [color, setColor] = useState(status?.color || '#94a3b8');
-
-    useEffect(() => {
-        if (status) {
-            setName(status.label);
-            setColor(status.color);
-        } else {
-            setName('');
-            setColor('#94a3b8');
-        }
-    }, [status]);
-
-    const handleSave = () => {
-        onSave(status, {
-            value: name.trim().toLowerCase(),
-            label: name.trim(),
-            color
-        });
-        onClose();
-    };
-
-    return (
-        <Dialog open={open} onClose={onClose}>
-            <DialogTitle>
-                {status ? 'Edit Status' : 'New Status'}
-            </DialogTitle>
-            <DialogContent>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 300, mt: 2 }}>
-                    <TextField
-                        label="Status Name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        fullWidth
-                    />
-                    
-                    <StatusColorPicker 
-                        color={color}
-                        onChange={setColor}
-                    />
-                </Box>
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose}>Cancel</Button>
-                <Button 
-                    onClick={handleSave}
-                    variant="contained"
-                    disabled={!name.trim()}
-                >
-                    Save
-                </Button>
-            </DialogActions>
-        </Dialog>
-    );
-}
+import type { EquipmentStatus } from '@/app/globalTypes/equipment';
 
 export function EquipmentStatusSection() {
-    const { statuses, isLoading, error, fetch, update } = useEquipmentStatuses();
-    const [editingStatus, setEditingStatus] = useState<EquipmentStatus | null>(null);
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    console.log('EquipmentStatusSection render');
+    const { data: statuses = [], isLoading, error: fetchError } = useEquipmentStatuses();
+    const updateMutation = useUpdateEquipmentStatuses();
+    const { dialogState, openCreateDialog, openEditDialog, openDeleteDialog, closeDialog } = useCrudDialogs();
+    const { notificationState, notifyAction, clearNotifications } = useActionNotifications();
+    const formRef = React.useRef<HTMLFormElement>(null);
 
-    useEffect(() => {
-        fetch();
-    }, [fetch]);
-
-    const handleAddStatus = () => {
-        setEditingStatus(null);
-        setIsDialogOpen(true);
+    const handleSave = async (data: EquipmentStatus) => {
+        console.log('Saving status:', { mode: dialogState.mode, data });
+        try {
+            const updatedStatuses = dialogState.mode === 'create'
+                ? [...statuses, data]
+                : statuses.map((status: EquipmentStatus) => 
+                    status.value === dialogState.data?.value ? data : status
+                );
+            
+            await updateMutation.mutateAsync(updatedStatuses);
+            notifyAction(dialogState.mode === 'create' ? 'created' : 'updated', 'Equipment status', true);
+            closeDialog();
+        } catch (error) {
+            console.error('Failed to save status:', error);
+            notifyAction(dialogState.mode === 'create' ? 'create' : 'update', 'Equipment status', false);
+        }
     };
 
-    const handleEditStatus = (status: EquipmentStatus) => {
-        setEditingStatus(status);
-        setIsDialogOpen(true);
+    const handleDelete = async (statusToDelete: EquipmentStatus) => {
+        console.log('Deleting status:', statusToDelete);
+        try {
+            const updatedStatuses = statuses.filter((status: EquipmentStatus) => status.value !== statusToDelete.value);
+            await updateMutation.mutateAsync(updatedStatuses);
+            notifyAction('delete', 'Equipment status', true);
+            closeDialog();
+        } catch (error) {
+            console.error('Failed to delete status:', error);
+            notifyAction('delete', 'Equipment status', false);
+        }
     };
 
-    const handleDeleteStatus = async (statusToDelete: EquipmentStatus) => {
-        const updatedStatuses = statuses.filter(status => status.value !== statusToDelete.value);
-        await update(updatedStatuses);
-    };
-
-    const handleSaveStatus = async (oldStatus: EquipmentStatus | null, newStatus: EquipmentStatus) => {
-        const updatedStatuses = oldStatus
-            ? statuses.map(status => status.value === oldStatus.value ? newStatus : status)
-            : [...statuses, newStatus];
-        
-        await update(updatedStatuses);
-        setIsDialogOpen(false);
-    };
-
-    if (isLoading) {
+    if (isLoading || updateMutation.isPending) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
                 <CircularProgress />
@@ -126,48 +68,45 @@ export function EquipmentStatusSection() {
         );
     }
 
-    if (error) {
+    if (fetchError || updateMutation.error) {
+        const error = fetchError || updateMutation.error;
         return (
             <Box sx={{ p: 2, color: 'error.main' }}>
-                <Typography>{error}</Typography>
-                <Button 
-                    variant="outlined" 
-                    size="small" 
-                    onClick={fetch}
-                    sx={{ mt: 1 }}
-                >
-                    Retry
-                </Button>
+                <Typography>{error instanceof Error ? error.message : 'An error occurred'}</Typography>
             </Box>
         );
     }
 
+    const isFormDialog = dialogState.isOpen && dialogState.mode !== 'delete';
+
     return (
         <Box>
-            <Typography variant="h6" gutterBottom>
-                Equipment Statuses
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
-                Configure the available equipment statuses that can be assigned to equipment
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6">
+                    Equipment Statuses
+                </Typography>
+                <Button 
+                    variant="contained"
+                    onClick={openCreateDialog}
+                >
+                    Add Status
+                </Button>
+            </Box>
 
-            <Button 
-                variant="contained" 
-                onClick={handleAddStatus}
-                sx={{ mb: 3 }}
-            >
-                Add Status
-            </Button>
+            <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+                Configure the available statuses that can be assigned to equipment
+            </Typography>
 
             <List>
-                {statuses.map((status, index) => (
-                    <ListItem 
-                        key={index}
-                        sx={{ 
-                            p: 1,
-                            '&:hover': {
-                                bgcolor: 'rgba(255, 255, 255, 0.05)'
-                            }
+                {statuses.map((status: EquipmentStatus) => (
+                    <ListItem
+                        key={status.value}
+                        sx={{
+                            bgcolor: 'background.paper',
+                            mb: 1,
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: 'divider'
                         }}
                     >
                         <Box 
@@ -179,25 +118,93 @@ export function EquipmentStatusSection() {
                                 mr: 2
                             }} 
                         />
-                        <ListItemText primary={status.label} />
-                        <IconButton onClick={() => handleEditStatus(status)}>
+                        <Typography sx={{ flex: 1 }}>{status.label}</Typography>
+                        <IconButton onClick={() => openEditDialog(status)}>
                             <EditIcon />
                         </IconButton>
-                        <IconButton onClick={() => handleDeleteStatus(status)}>
+                        <IconButton onClick={() => openDeleteDialog(status)}>
                             <DeleteIcon />
                         </IconButton>
                     </ListItem>
                 ))}
             </List>
 
-            <EditStatusDialog
-                open={isDialogOpen}
-                status={editingStatus}
-                onClose={() => {
-                    setIsDialogOpen(false);
-                    setEditingStatus(null);
-                }}
-                onSave={handleSaveStatus}
+            {isFormDialog && (
+                <CrudFormDialog
+                    open={true}
+                    onClose={closeDialog}
+                    title={dialogState.mode === 'create' ? 'Add Status' : 'Edit Status'}
+                    actions={
+                        <>
+                            <Button onClick={closeDialog}>
+                                Cancel
+                            </Button>
+                            <Button 
+                                onClick={() => formRef.current?.requestSubmit()}
+                                variant="contained"
+                            >
+                                {dialogState.mode === 'create' ? 'Add Status' : 'Save Changes'}
+                            </Button>
+                        </>
+                    }
+                >
+                    <form ref={formRef} onSubmit={(e) => {
+                        e.preventDefault();
+                        const formData = new FormData(e.currentTarget);
+                        const name = formData.get('name') as string;
+                        const color = formData.get('color') as string;
+                        
+                        if (!name.trim()) return;
+
+                        if (dialogState.mode === 'create' && 
+                            statuses.some(s => s.value === name.trim().toLowerCase())) {
+                            alert('A status with this name already exists');
+                            return;
+                        }
+
+                        handleSave({
+                            value: name.toLowerCase(),
+                            label: name,
+                            color: color || '#94a3b8'
+                        });
+                    }}>
+                        <TextField
+                            name="name"
+                            label="Status Name"
+                            defaultValue={dialogState.data?.label || ''}
+                            fullWidth
+                            autoFocus
+                            required
+                            sx={{ mb: 2 }}
+                        />
+                        <input 
+                            type="hidden" 
+                            name="color" 
+                            value={dialogState.data?.color || '#94a3b8'} 
+                        />
+                        <StatusColorPicker
+                            color={dialogState.data?.color || '#94a3b8'}
+                            onChange={(newColor) => {
+                                const input = formRef.current?.querySelector('input[name="color"]') as HTMLInputElement;
+                                if (input) input.value = newColor;
+                            }}
+                        />
+                    </form>
+                </CrudFormDialog>
+            )}
+
+            <CrudDeleteDialog
+                open={dialogState.isOpen && dialogState.mode === 'delete'}
+                onClose={closeDialog}
+                onConfirm={() => dialogState.data && handleDelete(dialogState.data)}
+                title="Delete Status"
+                message={`Are you sure you want to delete the status "${dialogState.data?.label}"? This action cannot be undone.`}
+            />
+
+            <ActionNotifications
+                successMessage={notificationState.successMessage}
+                errorMessage={notificationState.errorMessage}
+                onClose={clearNotifications}
             />
         </Box>
     );

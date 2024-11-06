@@ -30,9 +30,24 @@ interface JobsTableProps {
     onJobsLoad?: (jobs: Job[]) => void;
 }
 
+// Status mapping for display
+const STATUS_DISPLAY: Record<string, { name: string; color: string }> = {
+    pending: { name: 'Pending', color: '#FFA726' },  // Orange
+    in_progress: { name: 'In Progress', color: '#42A5F5' },  // Blue
+    completed: { name: 'Completed', color: '#66BB6A' },  // Green
+    cancelled: { name: 'Cancelled', color: '#EF5350' },  // Red
+};
+
+// Helper function to convert snake_case to Title Case
+const toTitleCase = (str: string): string => {
+    return str.split('_')
+        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+};
+
 const defaultColumns: GridColDef[] = [
     {
-        field: 'name',
+        field: 'title',
         headerName: 'Title',
         flex: 1,
         minWidth: 200
@@ -42,33 +57,61 @@ const defaultColumns: GridColDef[] = [
         headerName: 'Property',
         flex: 1,
         minWidth: 200,
-        valueGetter: (params) => params.value?.name || 'N/A'
+        valueGetter: (params) => params.row.property?.name || 'N/A'
     },
     {
-        field: 'account',
-        headerName: 'Account',
+        field: 'accounts',
+        headerName: 'Accounts',
         flex: 1,
         minWidth: 200,
-        valueGetter: (params) => params.row.property?.accounts?.[0]?.name || 'N/A'
+        renderCell: (params) => {
+            const accounts = params.row.property?.accounts || [];
+            if (accounts.length === 0) return 'N/A';
+            
+            if (accounts.length === 1) {
+                return accounts[0].name;
+            }
+
+            return (
+                <Stack direction="row" spacing={1}>
+                    <Typography>{accounts[0].name}</Typography>
+                    {accounts.length > 1 && (
+                        <Chip 
+                            label={`+${accounts.length - 1}`} 
+                            size="small"
+                            sx={{ ml: 1 }}
+                        />
+                    )}
+                </Stack>
+            );
+        }
     },
     {
-        field: 'type',
+        field: 'job_type_id',
         headerName: 'Type',
         width: 150,
-        valueGetter: (params) => params.row.jobType?.name || 'N/A'
+        valueGetter: (params) => {
+            const type = params.value as string;
+            return type ? toTitleCase(type) : 'N/A';
+        }
     },
     {
         field: 'status',
         headerName: 'Status',
         width: 150,
         renderCell: (params) => {
-            const status = params.value as JobStatus;
+            const status = params.value as string;
+            const displayStatus = STATUS_DISPLAY[status] || { 
+                name: toTitleCase(status),
+                color: '#757575' // Default gray for unknown status
+            };
+
             return (
                 <Chip
-                    label={typeof status === 'string' ? status : status.name}
+                    label={displayStatus.name}
                     size="small"
                     sx={{ 
-                        bgcolor: typeof status === 'string' ? 'primary.main' : status.color,
+                        bgcolor: displayStatus.color,
                         color: 'white'
                     }}
                 />
@@ -76,7 +119,7 @@ const defaultColumns: GridColDef[] = [
         }
     },
     {
-        field: 'createdAt',
+        field: 'created_at',
         headerName: 'Created',
         width: 120,
         valueGetter: (params) => params.value ? new Date(params.value).toLocaleDateString() : 'N/A'
@@ -90,7 +133,6 @@ export function JobsTable({ onJobSelect, selectedJob, onJobsLoad }: JobsTablePro
     const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns.map(col => col.field));
     const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
 
-    // Use React Query for data fetching
     const { 
         data = { jobs: [], total: 0 }, 
         isLoading,
@@ -129,15 +171,15 @@ export function JobsTable({ onJobSelect, selectedJob, onJobsLoad }: JobsTablePro
         
         const searchText = filterText.toLowerCase();
         return data.jobs.filter((job: Job) => {
-            const statusText = typeof job.status === 'object' ? job.status.name : job.status;
+            const status = STATUS_DISPLAY[job.status]?.name || toTitleCase(job.status);
             return (
-                job.name?.toLowerCase().includes(searchText) ||
+                job.title?.toLowerCase().includes(searchText) ||
                 job.property?.name?.toLowerCase().includes(searchText) ||
                 job.property?.accounts?.some(account => 
                     account.name.toLowerCase().includes(searchText)
                 ) ||
-                job.jobType?.name?.toLowerCase().includes(searchText) ||
-                statusText.toLowerCase().includes(searchText)
+                job.job_type_id?.toLowerCase().includes(searchText) ||
+                status.toLowerCase().includes(searchText)
             );
         });
     }, [data.jobs, filterText]);
@@ -231,7 +273,7 @@ export function JobsTable({ onJobSelect, selectedJob, onJobsLoad }: JobsTablePro
             <DataGrid
                 rows={filterText ? filteredJobs : data.jobs}
                 columns={columns}
-                getRowId={(row) => row.jobId}
+                getRowId={(row) => row.job_id}
                 loading={isLoading}
                 paginationMode="server"
                 page={page}
@@ -242,8 +284,8 @@ export function JobsTable({ onJobSelect, selectedJob, onJobsLoad }: JobsTablePro
                 onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
                 disableSelectionOnClick
                 disableColumnMenu
-                onRowClick={(params) => onJobSelect(params.row as Job)}
-                selectionModel={selectedJob ? [selectedJob.jobId] : []}
+                onRowClick={(params) => onJobSelect(params.row)}
+                selectionModel={selectedJob ? [selectedJob.job_id] : []}
                 sx={{
                     '& .MuiDataGrid-row': {
                         cursor: 'pointer'

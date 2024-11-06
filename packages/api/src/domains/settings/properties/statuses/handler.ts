@@ -3,8 +3,23 @@ import { AppDataSource } from '../../../../config/database';
 import { Setting } from '../../entities/Setting';
 import { logger } from '../../../../utils/logger';
 
+interface PropertyStatus {
+    value: string;
+    label: string;
+    color: string;
+}
+
 const settingRepository = AppDataSource.getRepository(Setting);
 const SETTING_KEY = 'property_statuses';
+
+function validatePropertyStatus(status: any): status is PropertyStatus {
+    return (
+        typeof status === 'object' &&
+        typeof status.value === 'string' &&
+        typeof status.label === 'string' &&
+        typeof status.color === 'string'
+    );
+}
 
 export async function getPropertyStatuses(req: Request, res: Response) {
     try {
@@ -37,12 +52,24 @@ export async function getPropertyStatuses(req: Request, res: Response) {
 
 export async function updatePropertyStatuses(req: Request, res: Response) {
     try {
-        const { statuses } = req.body;
-        if (!Array.isArray(statuses) || statuses.some(status => typeof status !== 'string')) {
+        const statuses = req.body;
+        
+        // Validate request body
+        if (!Array.isArray(statuses)) {
             return res.status(400).json({
                 error: 'Validation failed',
-                message: 'Statuses must be an array of strings'
+                message: 'Request body must be an array'
             });
+        }
+
+        // Validate each status
+        for (const status of statuses) {
+            if (!validatePropertyStatus(status)) {
+                return res.status(400).json({
+                    error: 'Validation failed',
+                    message: 'Each status must have value, label, and color properties'
+                });
+            }
         }
 
         let setting = await settingRepository.findOne({

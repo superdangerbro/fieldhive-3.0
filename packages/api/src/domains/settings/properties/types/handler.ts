@@ -3,8 +3,23 @@ import { AppDataSource } from '../../../../config/database';
 import { Setting } from '../../entities/Setting';
 import { logger } from '../../../../utils/logger';
 
+interface PropertyType {
+    value: string;
+    label: string;
+    color: string;
+}
+
 const settingRepository = AppDataSource.getRepository(Setting);
 const SETTING_KEY = 'property_types';
+
+function validatePropertyType(type: any): type is PropertyType {
+    return (
+        typeof type === 'object' &&
+        typeof type.value === 'string' &&
+        typeof type.label === 'string' &&
+        typeof type.color === 'string'
+    );
+}
 
 export async function getPropertyTypes(req: Request, res: Response) {
     try {
@@ -37,12 +52,24 @@ export async function getPropertyTypes(req: Request, res: Response) {
 
 export async function updatePropertyTypes(req: Request, res: Response) {
     try {
-        const { types } = req.body;
-        if (!Array.isArray(types) || types.some(type => typeof type !== 'string')) {
+        const types = req.body;
+        
+        // Validate request body
+        if (!Array.isArray(types)) {
             return res.status(400).json({
                 error: 'Validation failed',
-                message: 'Types must be an array of strings'
+                message: 'Request body must be an array'
             });
+        }
+
+        // Validate each type
+        for (const type of types) {
+            if (!validatePropertyType(type)) {
+                return res.status(400).json({
+                    error: 'Validation failed',
+                    message: 'Each type must have value, label, and color properties'
+                });
+            }
         }
 
         let setting = await settingRepository.findOne({
