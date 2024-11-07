@@ -20,9 +20,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import { useEquipmentTypes, useUpdateEquipmentTypes } from '../hooks/useEquipment';
 import { useCrudDialogs } from '@/app/globalHooks/useCrudDialogs';
-import { useActionNotifications } from '@/app/globalHooks/useActionNotifications';
 import { CrudFormDialog, CrudDeleteDialog } from '@/app/globalComponents/crud/CrudDialogs';
-import { ActionNotifications } from '@/app/globalComponents/crud/ActionNotifications';
 import type { EquipmentTypeConfig, FormField } from './components/types';
 import { AddFieldForm } from './components/AddFieldForm';
 import { FieldList } from './components/FieldList';
@@ -32,7 +30,6 @@ export function EquipmentTypeSection() {
     const { data: types = [], isLoading, error: fetchError } = useEquipmentTypes();
     const updateMutation = useUpdateEquipmentTypes();
     const { dialogState, openCreateDialog, openEditDialog, openDeleteDialog, closeDialog } = useCrudDialogs();
-    const { notificationState, notifyAction, clearNotifications } = useActionNotifications();
     const [expandedType, setExpandedType] = React.useState<string | null>(null);
     const [addingFieldsTo, setAddingFieldsTo] = React.useState<string | null>(null);
     const [editingField, setEditingField] = React.useState<{ typeValue: string; field: FormField } | null>(null);
@@ -48,11 +45,9 @@ export function EquipmentTypeSection() {
                 );
             
             await updateMutation.mutateAsync(updatedTypes);
-            notifyAction(dialogState.mode === 'create' ? 'created' : 'updated', 'Equipment type', true);
             closeDialog();
         } catch (error) {
             console.error('Failed to save type:', error);
-            notifyAction(dialogState.mode === 'create' ? 'create' : 'update', 'Equipment type', false);
         }
     };
 
@@ -61,11 +56,9 @@ export function EquipmentTypeSection() {
         try {
             const updatedTypes = types.filter((type: EquipmentTypeConfig) => type.value !== typeToDelete.value);
             await updateMutation.mutateAsync(updatedTypes);
-            notifyAction('delete', 'Equipment type', true);
             closeDialog();
         } catch (error) {
             console.error('Failed to delete type:', error);
-            notifyAction('delete', 'Equipment type', false);
         }
     };
 
@@ -83,11 +76,9 @@ export function EquipmentTypeSection() {
             });
 
             await updateMutation.mutateAsync(updatedTypes);
-            notifyAction('added', 'Field', true);
             setAddingFieldsTo(null);
         } catch (error) {
             console.error('Failed to add field:', error);
-            notifyAction('add', 'Field', false);
         }
     };
 
@@ -107,11 +98,9 @@ export function EquipmentTypeSection() {
             });
 
             await updateMutation.mutateAsync(updatedTypes);
-            notifyAction('updated', 'Field', true);
             setEditingField(null);
         } catch (error) {
             console.error('Failed to edit field:', error);
-            notifyAction('update', 'Field', false);
         }
     };
 
@@ -129,10 +118,8 @@ export function EquipmentTypeSection() {
             });
 
             await updateMutation.mutateAsync(updatedTypes);
-            notifyAction('deleted', 'Field', true);
         } catch (error) {
             console.error('Failed to delete field:', error);
-            notifyAction('delete', 'Field', false);
         }
     };
 
@@ -344,12 +331,6 @@ export function EquipmentTypeSection() {
                 onConfirm={() => dialogState.data && handleDelete(dialogState.data)}
                 title="Delete Equipment Type"
                 message={`Are you sure you want to delete the equipment type "${dialogState.data?.label}"? This action cannot be undone.`}
-            />
-
-            <ActionNotifications
-                successMessage={notificationState.successMessage}
-                errorMessage={notificationState.errorMessage}
-                onClose={clearNotifications}
             />
         </Box>
     );

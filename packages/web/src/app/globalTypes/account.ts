@@ -29,5 +29,4 @@ export interface AccountStatus {
 export interface AccountType {
     value: string;
     label: string;
-    color: string;
 }

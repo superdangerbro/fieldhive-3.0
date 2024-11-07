@@ -23,10 +23,12 @@ export function AccountSearch({
       <Autocomplete
         sx={{ flexGrow: 1 }}
         options={accounts}
-        value={selectedAccount}
+        value={selectedAccount || null}
         onChange={(event, newValue) => onAccountSelect(newValue)}
         getOptionLabel={(option) => option.name}
-        isOptionEqualToValue={(option, value) => option.account_id === value.account_id}
+        isOptionEqualToValue={(option, value) => 
+          option?.account_id === value?.account_id
+        }
         renderInput={(params) => (
           <TextField
             {...params}

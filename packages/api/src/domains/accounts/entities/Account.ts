@@ -24,7 +24,7 @@ export class Account {
     @JoinColumn({ name: 'billing_address_id' })
     billingAddress: Address | null;
 
-    @ManyToMany(() => Property)
+    @ManyToMany(() => Property, property => property.accounts)
     @JoinTable({
         name: 'properties_accounts',
         joinColumn: {

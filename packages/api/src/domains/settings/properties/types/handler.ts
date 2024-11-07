@@ -6,7 +6,6 @@ import { logger } from '../../../../utils/logger';
 interface PropertyType {
     value: string;
     label: string;
-    color: string;
 }
 
 const settingRepository = AppDataSource.getRepository(Setting);
@@ -16,8 +15,7 @@ function validatePropertyType(type: any): type is PropertyType {
     return (
         typeof type === 'object' &&
         typeof type.value === 'string' &&
-        typeof type.label === 'string' &&
-        typeof type.color === 'string'
+        typeof type.label === 'string'
     );
 }
 
@@ -38,8 +36,10 @@ export async function getPropertyTypes(req: Request, res: Response) {
             return res.json([]);
         }
 
-        logger.info(`Retrieved property types:`, setting.value);
-        res.json(setting.value);
+        // Remove color property from response if it exists
+        const types = setting.value.map(({ color, ...rest }) => rest);
+        logger.info(`Retrieved property types:`, types);
+        res.json(types);
     } catch (error) {
         logger.error('Error fetching property types:', error);
         res.status(500).json({
@@ -67,7 +67,7 @@ export async function updatePropertyTypes(req: Request, res: Response) {
             if (!validatePropertyType(type)) {
                 return res.status(400).json({
                     error: 'Validation failed',
-                    message: 'Each type must have value, label, and color properties'
+                    message: 'Each type must have value and label properties'
                 });
             }
         }
@@ -87,7 +87,7 @@ export async function updatePropertyTypes(req: Request, res: Response) {
 
         await settingRepository.save(setting);
         logger.info(`Updated property types:`, types);
-        res.json(setting.value);
+        res.json(types);
     } catch (error) {
         logger.error('Error updating property types:', error);
         res.status(500).json({

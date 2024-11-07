@@ -163,26 +163,24 @@ export function FieldList({
                                 )}
                             </IconButton>
                             
-                            <ListItemText
-                                primary={field.label}
-                                secondary={
-                                    <Box component="span" sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                            <Box sx={{ flex: 1 }}>
+                                <Typography variant="body1">{field.label}</Typography>
+                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
+                                    <Chip 
+                                        label={getFieldTypeLabel(field)} 
+                                        size="small" 
+                                        variant="outlined"
+                                    />
+                                    {field.required && (
                                         <Chip 
-                                            label={getFieldTypeLabel(field)} 
+                                            label="Required" 
                                             size="small" 
+                                            color="primary" 
                                             variant="outlined"
                                         />
-                                        {field.required && (
-                                            <Chip 
-                                                label="Required" 
-                                                size="small" 
-                                                color="primary" 
-                                                variant="outlined"
-                                            />
-                                        )}
-                                    </Box>
-                                }
-                            />
+                                    )}
+                                </Box>
+                            </Box>
 
                             <Box sx={{ ml: 'auto', display: 'flex' }}>
                                 <Button

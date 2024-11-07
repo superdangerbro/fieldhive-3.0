@@ -69,11 +69,7 @@ export const useUpdatePropertyTypes = () => {
             return Array.isArray(data) ? data : [];
         },
         onSuccess: (data) => {
-            console.log('Update successful, setting query data:', data);
             queryClient.setQueryData(['propertyTypes'], data);
-        },
-        onError: (error) => {
-            console.error('Update failed:', error);
         }
     });
 };
@@ -124,11 +120,7 @@ export const useUpdatePropertyStatuses = () => {
             return Array.isArray(data) ? data : [];
         },
         onSuccess: (data) => {
-            console.log('Update successful, setting query data:', data);
             queryClient.setQueryData(['propertyStatuses'], data);
-        },
-        onError: (error) => {
-            console.error('Update failed:', error);
         }
     });
 };

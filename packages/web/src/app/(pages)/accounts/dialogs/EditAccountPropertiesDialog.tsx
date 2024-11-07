@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -14,10 +14,12 @@ import {
     TextField,
     Chip
 } from '@mui/material';
-import type { Account } from '../../../globalTypes/account';
-import type { Property } from '../../../globalTypes/property';
 import { useUpdateAccount } from '../hooks/useAccounts';
-import { useProperties } from '../../properties/hooks/useProperties';
+import { useProperties } from '@/app/(pages)/properties/hooks/useProperties';
+import { useActionNotifications } from '@/app/globalHooks/useActionNotifications';
+import { useQueryClient } from '@tanstack/react-query';
+import type { Account } from '@/app/globalTypes/account';
+import type { Property } from '@/app/globalTypes/property';
 
 interface EditAccountPropertiesDialogProps {
     open: boolean;
@@ -32,42 +34,87 @@ export function EditAccountPropertiesDialog({
     onClose, 
     onSuccess 
 }: EditAccountPropertiesDialogProps) {
+    const queryClient = useQueryClient();
     const [selectedProperties, setSelectedProperties] = useState<Property[]>(
         account.properties || []
     );
 
+    // Reset selection when account changes or dialog opens
+    useEffect(() => {
+        if (open) {
+            console.log('Resetting selected properties:', account.properties);
+            setSelectedProperties(account.properties || []);
+        }
+    }, [account, open]);
+
     // Fetch all available properties
     const { data: properties = [], isLoading: loadingProperties } = useProperties();
     const updateAccountMutation = useUpdateAccount();
+    const { notifySuccess, notifyError } = useActionNotifications();
 
     const handleSubmit = async () => {
         try {
-            await updateAccountMutation.mutateAsync({
+            console.log('Updating account properties:', {
+                accountId: account.account_id,
+                selectedProperties: selectedProperties.map(p => ({ id: p.property_id, name: p.name }))
+            });
+
+            const result = await updateAccountMutation.mutateAsync({
                 id: account.account_id,
                 data: {
                     property_ids: selectedProperties.map(prop => prop.property_id)
                 }
             });
+
+            // Update the account in the cache
+            queryClient.setQueryData(['account', account.account_id], result);
+
+            // Update the account in the accounts list cache
+            queryClient.setQueriesData({ queryKey: ['accounts'] }, (oldData: any) => {
+                if (!oldData) return oldData;
+                return oldData.map((acc: Account) => 
+                    acc.account_id === account.account_id ? result : acc
+                );
+            });
+
+            // Force refetch to ensure data consistency
+            await queryClient.invalidateQueries({ queryKey: ['account', account.account_id] });
+            await queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            await queryClient.invalidateQueries({ queryKey: ['properties'] });
+
+            notifySuccess('Properties updated successfully');
             onSuccess();
             onClose();
         } catch (error) {
             console.error('Failed to update account properties:', error);
+            notifyError('Failed to update properties');
+            setSelectedProperties(account.properties || []);
         }
     };
+
+    const handleClose = () => {
+        console.log('Closing dialog, resetting properties');
+        setSelectedProperties(account.properties || []);
+        onClose();
+    };
+
+    const isLoading = loadingProperties || updateAccountMutation.isPending;
 
     return (
         <Dialog 
             open={open} 
-            onClose={onClose}
+            onClose={handleClose}
             maxWidth="md"
             fullWidth
         >
             <DialogTitle>Edit Properties</DialogTitle>
             <DialogContent>
                 <Box sx={{ mt: 2 }}>
-                    {updateAccountMutation.isError && (
+                    {updateAccountMutation.error && (
                         <Alert severity="error" sx={{ mb: 2 }}>
-                            Failed to update properties. Please try again.
+                            {updateAccountMutation.error instanceof Error 
+                                ? updateAccountMutation.error.message 
+                                : 'Failed to update properties. Please try again.'}
                         </Alert>
                     )}
 
@@ -75,7 +122,10 @@ export function EditAccountPropertiesDialog({
                         multiple
                         options={properties}
                         value={selectedProperties}
-                        onChange={(_, newValue) => setSelectedProperties(newValue)}
+                        onChange={(_, newValue) => {
+                            console.log('Selected properties changed:', newValue.map(p => ({ id: p.property_id, name: p.name })));
+                            setSelectedProperties(newValue);
+                        }}
                         getOptionLabel={(option) => option.name}
                         loading={loadingProperties}
                         renderInput={(params) => (
@@ -83,6 +133,7 @@ export function EditAccountPropertiesDialog({
                                 {...params}
                                 label="Properties"
                                 variant="outlined"
+                                placeholder={selectedProperties.length === 0 ? "Select properties..." : ""}
                                 InputProps={{
                                     ...params.InputProps,
                                     endAdornment: (
@@ -108,26 +159,24 @@ export function EditAccountPropertiesDialog({
                         isOptionEqualToValue={(option, value) => 
                             option.property_id === value.property_id
                         }
+                        disabled={isLoading}
                     />
                 </Box>
             </DialogContent>
             <DialogActions>
                 <Button 
-                    onClick={onClose}
-                    disabled={updateAccountMutation.isPending}
+                    onClick={handleClose}
+                    disabled={isLoading}
                 >
                     Cancel
                 </Button>
                 <Button
                     onClick={handleSubmit}
                     variant="contained"
-                    disabled={updateAccountMutation.isPending}
+                    disabled={isLoading}
+                    startIcon={isLoading ? <CircularProgress size={20} /> : null}
                 >
-                    {updateAccountMutation.isPending ? (
-                        <CircularProgress size={24} color="inherit" />
-                    ) : (
-                        'Save Changes'
-                    )}
+                    {isLoading ? 'Saving...' : 'Save Changes'}
                 </Button>
             </DialogActions>
         </Dialog>

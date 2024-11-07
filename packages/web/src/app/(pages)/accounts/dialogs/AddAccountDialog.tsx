@@ -17,11 +17,10 @@ import {
     CircularProgress,
     Alert
 } from '@mui/material';
-import { CreateAddressDto } from '@/app/globalTypes/address';
-import { AccountType } from '@/app/globalTypes/account';
-import { useAccountStore } from '../store';
 import { useAccountSettings, useCreateAccount } from '../hooks/useAccounts';
 import { AddressForm } from '@/app/globalComponents/AddressForm';
+import type { AccountType } from '@/app/globalTypes/account';
+import type { CreateAddressDto } from '@/app/globalTypes/address';
 
 interface AddAccountDialogProps {
     open: boolean;
@@ -94,13 +93,10 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
         }));
     };
 
-    const handleAddressChange = (addressUpdate: Partial<CreateAddressDto>) => {
+    const handleAddressChange = (address: CreateAddressDto) => {
         setFormData(prev => ({
             ...prev,
-            address: {
-                ...prev.address,
-                ...addressUpdate
-            }
+            address
         }));
     };
 
@@ -238,8 +234,9 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
                 </Typography>
                 
                 <AddressForm
-                    address={formData.address}
+                    initialAddress={formData.address}
                     onChange={handleAddressChange}
+                    disabled={isLoading}
                 />
             </DialogContent>
             <DialogActions>

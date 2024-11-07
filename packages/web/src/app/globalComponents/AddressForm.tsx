@@ -3,14 +3,22 @@ import { Box, TextField, Grid } from '@mui/material';
 import type { Address, CreateAddressDto } from '@/app/globalTypes/address';
 
 interface AddressFormProps {
-    address?: Partial<Address>;
-    onChange: (address: Partial<CreateAddressDto>) => void;
+    initialAddress?: CreateAddressDto;
+    onChange: (address: CreateAddressDto) => void;
+    disabled?: boolean;
 }
 
-export function AddressForm({ address = {}, onChange }: AddressFormProps) {
+export function AddressForm({ initialAddress = {
+    address1: '',
+    address2: '',
+    city: '',
+    province: '',
+    postal_code: '',
+    country: 'Canada'
+}, onChange, disabled }: AddressFormProps) {
     const handleChange = (field: keyof CreateAddressDto) => (event: React.ChangeEvent<HTMLInputElement>) => {
         onChange({
-            ...address,
+            ...initialAddress,
             [field]: event.target.value
         });
     };
@@ -22,48 +30,59 @@ export function AddressForm({ address = {}, onChange }: AddressFormProps) {
                     <TextField
                         fullWidth
                         label="Address Line 1"
-                        value={address.address1 || ''}
+                        value={initialAddress.address1}
                         onChange={handleChange('address1')}
+                        disabled={disabled}
+                        required
                     />
                 </Grid>
                 <Grid item xs={12}>
                     <TextField
                         fullWidth
                         label="Address Line 2"
-                        value={address.address2 || ''}
+                        value={initialAddress.address2}
                         onChange={handleChange('address2')}
+                        disabled={disabled}
                     />
                 </Grid>
                 <Grid item xs={12} sm={6}>
                     <TextField
                         fullWidth
                         label="City"
-                        value={address.city || ''}
+                        value={initialAddress.city}
                         onChange={handleChange('city')}
+                        disabled={disabled}
+                        required
                     />
                 </Grid>
                 <Grid item xs={12} sm={6}>
                     <TextField
                         fullWidth
                         label="Province"
-                        value={address.province || ''}
+                        value={initialAddress.province}
                         onChange={handleChange('province')}
+                        disabled={disabled}
+                        required
                     />
                 </Grid>
                 <Grid item xs={12} sm={6}>
                     <TextField
                         fullWidth
                         label="Postal Code"
-                        value={address.postal_code || ''}
+                        value={initialAddress.postal_code}
                         onChange={handleChange('postal_code')}
+                        disabled={disabled}
+                        required
                     />
                 </Grid>
                 <Grid item xs={12} sm={6}>
                     <TextField
                         fullWidth
                         label="Country"
-                        value={address.country || ''}
+                        value={initialAddress.country}
                         onChange={handleChange('country')}
+                        disabled={disabled}
+                        required
                     />
                 </Grid>
             </Grid>

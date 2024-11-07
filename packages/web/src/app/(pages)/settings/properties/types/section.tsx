@@ -15,48 +15,41 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { usePropertyTypes, useUpdatePropertyTypes } from '../hooks/useProperties';
 import { useCrudDialogs } from '@/app/globalHooks/useCrudDialogs';
-import { useActionNotifications } from '@/app/globalHooks/useActionNotifications';
 import { CrudFormDialog, CrudDeleteDialog } from '@/app/globalComponents/crud/CrudDialogs';
-import { ActionNotifications } from '@/app/globalComponents/crud/ActionNotifications';
-import { StatusColorPicker } from '@/app/globalComponents/StatusColorPicker';
 import type { PropertyType } from '@/app/globalTypes/property';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function PropertyTypeSection() {
     console.log('PropertyTypeSection render');
+    const queryClient = useQueryClient();
     const { data: types = [], isLoading, error: fetchError } = usePropertyTypes();
-    const updateMutation = useUpdatePropertyTypes();
     const { dialogState, openCreateDialog, openEditDialog, openDeleteDialog, closeDialog } = useCrudDialogs();
-    const { notificationState, notifyAction, clearNotifications } = useActionNotifications();
     const formRef = React.useRef<HTMLFormElement>(null);
 
+    const updateMutation = useUpdatePropertyTypes();
+
     const handleSave = async (data: PropertyType) => {
-        console.log('Saving type:', { mode: dialogState.mode, data });
         try {
             const updatedTypes = dialogState.mode === 'create'
                 ? [...types, data]
-                : types.map((type: PropertyType) => 
+                : types.map((type) => 
                     type.value === dialogState.data?.value ? data : type
                 );
             
             await updateMutation.mutateAsync(updatedTypes);
-            notifyAction(dialogState.mode === 'create' ? 'created' : 'updated', 'Property type', true);
             closeDialog();
         } catch (error) {
             console.error('Failed to save type:', error);
-            notifyAction(dialogState.mode === 'create' ? 'create' : 'update', 'Property type', false);
         }
     };
 
     const handleDelete = async (typeToDelete: PropertyType) => {
-        console.log('Deleting type:', typeToDelete);
         try {
-            const updatedTypes = types.filter((type: PropertyType) => type.value !== typeToDelete.value);
+            const updatedTypes = types.filter((type) => type.value !== typeToDelete.value);
             await updateMutation.mutateAsync(updatedTypes);
-            notifyAction('delete', 'Property type', true);
             closeDialog();
         } catch (error) {
             console.error('Failed to delete type:', error);
-            notifyAction('delete', 'Property type', false);
         }
     };
 
@@ -98,7 +91,7 @@ export function PropertyTypeSection() {
             </Typography>
 
             <List>
-                {types.map((type: PropertyType) => (
+                {types.map((type) => (
                     <ListItem
                         key={type.value}
                         sx={{
@@ -109,15 +102,6 @@ export function PropertyTypeSection() {
                             borderColor: 'divider'
                         }}
                     >
-                        <Box 
-                            sx={{ 
-                                width: 16, 
-                                height: 16, 
-                                borderRadius: 1,
-                                bgcolor: type.color,
-                                mr: 2
-                            }} 
-                        />
                         <Typography sx={{ flex: 1 }}>{type.label}</Typography>
                         <IconButton onClick={() => openEditDialog(type)}>
                             <EditIcon />
@@ -152,7 +136,6 @@ export function PropertyTypeSection() {
                         e.preventDefault();
                         const formData = new FormData(e.currentTarget);
                         const name = formData.get('name') as string;
-                        const color = formData.get('color') as string;
                         
                         if (!name.trim()) return;
 
@@ -164,8 +147,7 @@ export function PropertyTypeSection() {
 
                         handleSave({
                             value: name.toLowerCase(),
-                            label: name,
-                            color: color || '#94a3b8'
+                            label: name
                         });
                     }}>
                         <TextField
@@ -177,18 +159,6 @@ export function PropertyTypeSection() {
                             required
                             sx={{ mb: 2 }}
                         />
-                        <input 
-                            type="hidden" 
-                            name="color" 
-                            value={dialogState.data?.color || '#94a3b8'} 
-                        />
-                        <StatusColorPicker
-                            color={dialogState.data?.color || '#94a3b8'}
-                            onChange={(newColor) => {
-                                const input = formRef.current?.querySelector('input[name="color"]') as HTMLInputElement;
-                                if (input) input.value = newColor;
-                            }}
-                        />
                     </form>
                 </CrudFormDialog>
             )}
@@ -199,12 +169,6 @@ export function PropertyTypeSection() {
                 onConfirm={() => dialogState.data && handleDelete(dialogState.data)}
                 title="Delete Property Type"
                 message={`Are you sure you want to delete the property type "${dialogState.data?.label}"? This action cannot be undone.`}
-            />
-
-            <ActionNotifications
-                successMessage={notificationState.successMessage}
-                errorMessage={notificationState.errorMessage}
-                onClose={clearNotifications}
             />
         </Box>
     );

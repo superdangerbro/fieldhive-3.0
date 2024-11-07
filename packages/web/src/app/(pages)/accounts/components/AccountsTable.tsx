@@ -26,8 +26,9 @@ import { DataGrid, GridColDef, GridRowParams, GridSelectionModel } from '@mui/x-
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useAccountStore } from '../store';
-import { useAccounts, useBulkDeleteAccounts } from '../hooks/useAccounts';
+import { useAccounts, useBulkDeleteAccounts, useAccountSettings } from '../hooks/useAccounts';
+import { useActionNotifications } from '@/app/globalHooks/useActionNotifications';
+import { getTypeColor, getStatusColor } from '../utils/colorHelpers';
 import type { Account } from '@/app/globalTypes/account';
 
 interface AccountsTableProps {
@@ -43,12 +44,6 @@ export function AccountsTable({
   selectedAccount,
   onAccountsLoad
 }: AccountsTableProps) {
-  const { 
-    getTypeColor, 
-    getStatusColor,
-    settingsLoaded 
-  } = useAccountStore();
-
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(0);
   const [filterText, setFilterText] = useState('');
@@ -57,13 +52,24 @@ export function AccountsTable({
   const [selectedRows, setSelectedRows] = useState<GridSelectionModel>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
+  const { notifySuccess, notifyError } = useActionNotifications();
   const { data: accounts = [], isLoading } = useAccounts({
     limit: pageSize,
     offset: page * pageSize,
     search: filterText
   });
 
+  const { data: settings } = useAccountSettings();
   const bulkDeleteMutation = useBulkDeleteAccounts();
+
+  // Reset selection when accounts change
+  useEffect(() => {
+    if (selectedAccount) {
+      setSelectedRows([selectedAccount.account_id]);
+    } else {
+      setSelectedRows([]);
+    }
+  }, [selectedAccount]);
 
   const defaultColumns: GridColDef[] = [
     {
@@ -98,10 +104,10 @@ export function AccountsTable({
       headerName: 'Type',
       width: 150,
       renderCell: (params) => {
-        if (!settingsLoaded) {
+        if (!settings) {
           return <Chip label={params.value} size="small" />;
         }
-        const color = getTypeColor(params.value);
+        const color = getTypeColor(params.value, settings.types);
         return (
           <Chip 
             label={params.value} 
@@ -119,10 +125,10 @@ export function AccountsTable({
       headerName: 'Status',
       width: 120,
       renderCell: (params) => {
-        if (!settingsLoaded) {
+        if (!settings) {
           return <Chip label={params.value} size="small" />;
         }
-        const color = getStatusColor(params.value);
+        const color = getStatusColor(params.value, settings.statuses);
         return (
           <Chip 
             label={params.value} 
@@ -176,7 +182,7 @@ export function AccountsTable({
 
   const handleRowClick = useCallback((params: GridRowParams) => {
     const account = accounts.find((a: Account) => a.account_id === params.id);
-    if (account && account.account_id !== selectedAccount?.account_id) {
+    if (account && (!selectedAccount || account.account_id !== selectedAccount.account_id)) {
       onAccountSelect(account);
     }
   }, [accounts, onAccountSelect, selectedAccount]);
@@ -200,8 +206,10 @@ export function AccountsTable({
       setSelectedRows([]);
       onAccountSelect(null);
       setDeleteDialogOpen(false);
+      notifySuccess(`Successfully deleted ${selectedRows.length} accounts`);
     } catch (error) {
       console.error('Failed to delete accounts:', error);
+      notifyError('Failed to delete accounts');
     }
   };
 

@@ -10,7 +10,7 @@ import {
     Button,
     CircularProgress
 } from '@mui/material';
-import { useAccountStore } from '../store';
+import { useDeleteAccount, useArchiveAccount } from '../hooks/useAccounts';
 
 interface DeleteAccountDialogProps {
     open: boolean;
@@ -25,26 +25,29 @@ export function DeleteAccountDialog({
     onClose, 
     onDeleted 
 }: DeleteAccountDialogProps) {
-    const { deleteAccount, archiveAccount, isLoading, error: storeError } = useAccountStore();
+    const deleteMutation = useDeleteAccount();
+    const archiveMutation = useArchiveAccount();
     const [error, setError] = React.useState<string | null>(null);
     const [canArchive, setCanArchive] = React.useState(false);
 
     const handleArchive = async () => {
         try {
-            await archiveAccount(accountId);
+            await archiveMutation.mutateAsync(accountId);
             onDeleted();
             onClose();
         } catch (error) {
+            console.error('Failed to archive account:', error);
             setError('Failed to archive account');
         }
     };
 
     const handleDelete = async () => {
         try {
-            await deleteAccount(accountId);
+            await deleteMutation.mutateAsync(accountId);
             onDeleted();
             onClose();
         } catch (error: any) {
+            console.error('Failed to delete account:', error);
             setError(error.message);
             // Check if the error response indicates we can archive
             if (error.cause?.canArchive) {
@@ -61,6 +64,9 @@ export function DeleteAccountDialog({
         }
     }, [open]);
 
+    const isLoading = deleteMutation.isPending || archiveMutation.isPending;
+    const mutationError = deleteMutation.error || archiveMutation.error;
+
     return (
         <Dialog
             open={open}
@@ -70,10 +76,10 @@ export function DeleteAccountDialog({
         >
             <DialogTitle>Delete Account</DialogTitle>
             <DialogContent>
-                {(error || storeError) ? (
+                {(error || mutationError) ? (
                     <>
                         <DialogContentText color="error">
-                            {error || storeError}
+                            {error || (mutationError instanceof Error ? mutationError.message : 'An error occurred')}
                         </DialogContentText>
                         {canArchive && (
                             <DialogContentText sx={{ mt: 2 }}>
@@ -92,7 +98,7 @@ export function DeleteAccountDialog({
                 <Button onClick={onClose} disabled={isLoading}>
                     Cancel
                 </Button>
-                {(error || storeError) ? (
+                {(error || mutationError) ? (
                     canArchive && (
                         <Button 
                             onClick={handleArchive} 

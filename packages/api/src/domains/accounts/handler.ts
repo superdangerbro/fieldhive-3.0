@@ -1,11 +1,14 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../../config/database';
 import { Account } from './entities/Account';
+import { Property } from '../properties/entities/Property';
+import { Job } from '../jobs/entities/Job';
 import { logger } from '../../utils/logger';
 import { Repository, In, ILike, Not } from 'typeorm';
 import { Address } from '../addresses/entities/Address';
 
 const accountRepository: Repository<Account> = AppDataSource.getRepository(Account);
+const propertyRepository: Repository<Property> = AppDataSource.getRepository(Property);
 const addressRepository: Repository<Address> = AppDataSource.getRepository(Address);
 
 // Get accounts with filters
@@ -17,7 +20,9 @@ export async function getAccounts(req: Request, res: Response) {
             .createQueryBuilder('accounts')
             .leftJoinAndSelect('accounts.billingAddress', 'billingAddress')
             .leftJoinAndSelect('accounts.properties', 'properties')
-            .leftJoinAndSelect('accounts.users', 'users');
+            .leftJoin('properties.jobs', 'jobs')
+            .leftJoinAndSelect('accounts.users', 'users')
+            .loadRelationCountAndMap('accounts.jobCount', 'properties.jobs');
 
         // Add filters
         if (type) {
@@ -66,10 +71,17 @@ export async function getAccounts(req: Request, res: Response) {
 export async function getAccount(req: Request, res: Response) {
     try {
         const { id } = req.params;
-        const account = await accountRepository.findOne({
-            where: { account_id: id },
-            relations: ['billingAddress', 'properties', 'users']
-        });
+        
+        // Create query builder for more complex joins
+        const account = await accountRepository
+            .createQueryBuilder('account')
+            .leftJoinAndSelect('account.billingAddress', 'billingAddress')
+            .leftJoinAndSelect('account.properties', 'properties')
+            .leftJoin('properties.jobs', 'jobs')
+            .leftJoinAndSelect('account.users', 'users')
+            .loadRelationCountAndMap('account.jobCount', 'properties.jobs')
+            .where('account.account_id = :id', { id })
+            .getOne();
 
         if (!account) {
             return res.status(404).json({
@@ -134,10 +146,15 @@ export async function createAccount(req: Request, res: Response) {
         const savedAccount = Array.isArray(result) ? result[0] : result;
 
         // Fetch the saved account with relations
-        const accountWithRelations = await accountRepository.findOne({
-            where: { account_id: savedAccount.account_id },
-            relations: ['billingAddress', 'properties', 'users']
-        });
+        const accountWithRelations = await accountRepository
+            .createQueryBuilder('account')
+            .leftJoinAndSelect('account.billingAddress', 'billingAddress')
+            .leftJoinAndSelect('account.properties', 'properties')
+            .leftJoin('properties.jobs', 'jobs')
+            .leftJoinAndSelect('account.users', 'users')
+            .loadRelationCountAndMap('account.jobCount', 'properties.jobs')
+            .where('account.account_id = :id', { id: savedAccount.account_id })
+            .getOne();
 
         if (!accountWithRelations) {
             throw new Error('Failed to retrieve saved account');
@@ -171,7 +188,7 @@ export async function updateAccount(req: Request, res: Response) {
         }
 
         // Validate fields if they're being updated
-        const { name, type } = req.body;
+        const { name, type, property_ids } = req.body;
         if (name !== undefined) {
             if (!name.trim()) {
                 return res.status(400).json({
@@ -205,14 +222,51 @@ export async function updateAccount(req: Request, res: Response) {
             });
         }
 
+        // Handle property updates if property_ids are provided
+        if (property_ids) {
+            logger.info('Updating account properties:', { account_id: id, property_ids });
+            
+            // Fetch properties by IDs
+            const properties = await propertyRepository.findBy({
+                property_id: In(property_ids)
+            });
+
+            if (properties.length !== property_ids.length) {
+                return res.status(400).json({
+                    error: 'Validation failed',
+                    message: 'One or more property IDs are invalid'
+                });
+            }
+
+            // Update the account's properties
+            account.properties = properties;
+            logger.info('Properties fetched and assigned:', { 
+                account_id: id, 
+                property_count: properties.length,
+                properties: properties.map(p => ({ id: p.property_id, name: p.name }))
+            });
+        }
+
         // Update account with new timestamp
         accountRepository.merge(account, {
             ...req.body,
-            name: name?.trim() || account.name, // Ensure trimmed name is saved
+            name: name?.trim() || account.name,
             updated_at: new Date()
         });
-        const result = await accountRepository.save(account);
-        const updatedAccount = Array.isArray(result) ? result[0] : result;
+
+        // Save the account (this will update the join table)
+        await accountRepository.save(account);
+
+        // Fetch the updated account with all relations and job count
+        const updatedAccount = await accountRepository
+            .createQueryBuilder('account')
+            .leftJoinAndSelect('account.billingAddress', 'billingAddress')
+            .leftJoinAndSelect('account.properties', 'properties')
+            .leftJoin('properties.jobs', 'jobs')
+            .leftJoinAndSelect('account.users', 'users')
+            .loadRelationCountAndMap('account.jobCount', 'properties.jobs')
+            .where('account.account_id = :id', { id })
+            .getOne();
 
         res.json(updatedAccount);
     } catch (error) {

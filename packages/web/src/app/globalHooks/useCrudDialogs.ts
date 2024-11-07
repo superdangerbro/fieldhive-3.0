@@ -41,11 +41,11 @@ export function useCrudDialogs(initialState: Partial<CrudDialogState> = {}) {
     }, []);
 
     const closeDialog = useCallback(() => {
-        setDialogState(prev => ({
-            ...prev,
+        setDialogState({
             isOpen: false,
+            mode: 'create',
             data: null
-        }));
+        });
     }, []);
 
     return {

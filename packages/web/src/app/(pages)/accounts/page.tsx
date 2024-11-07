@@ -1,36 +1,38 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import { AccountDetails, AccountSearch, AccountsTable } from './components';
 import { AddAccountDialog } from './dialogs';
 import type { Account } from '@/app/globalTypes/account';
 import { useAccounts, useAccountSettings } from './hooks/useAccounts';
+import { useSelectedAccount } from './hooks/useSelectedAccount';
 
 export default function AccountsPage() {
     const { data: accounts = [], isLoading: isLoadingAccounts } = useAccounts();
     const { data: settings, isLoading: isLoadingSettings } = useAccountSettings();
-    const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+    const { selectedAccount, setSelectedAccount } = useSelectedAccount();
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
     const handleAccountSelect = (account: Account | null) => {
-        // If we already have the account in our accounts list, use that data
-        if (account) {
-            const existingAccount = accounts.find((a: Account) => a.account_id === account.account_id);
-            setSelectedAccount(existingAccount || account);
-        } else {
-            setSelectedAccount(null);
-        }
+        setSelectedAccount(account?.account_id || null);
     };
 
     const handleAccountsLoad = (loadedAccounts: Account[]) => {
         if (selectedAccount) {
-            const updatedAccount = loadedAccounts.find((a: Account) => a.account_id === selectedAccount.account_id);
+            const updatedAccount = loadedAccounts.find(
+                (a: Account) => a.account_id === selectedAccount.account_id
+            );
             if (updatedAccount && JSON.stringify(updatedAccount) !== JSON.stringify(selectedAccount)) {
-                setSelectedAccount(updatedAccount);
+                setSelectedAccount(updatedAccount.account_id);
             }
         }
     };
+
+    // Find the full account object for the selected account ID
+    const selectedAccountObject = selectedAccount 
+        ? accounts.find((a: Account) => a.account_id === selectedAccount.account_id) || null
+        : null;
 
     if (isLoadingSettings) {
         return (
@@ -54,7 +56,7 @@ export default function AccountsPage() {
                 <Box sx={{ flex: 1 }}>
                     <AccountSearch
                         accounts={accounts}
-                        selectedAccount={selectedAccount}
+                        selectedAccount={selectedAccountObject}
                         onAccountSelect={handleAccountSelect}
                         onAddClick={() => setIsAddDialogOpen(true)}
                     />

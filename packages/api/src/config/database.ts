@@ -7,7 +7,7 @@ import { Address } from '../domains/addresses/entities/Address';
 import { Job } from '../domains/jobs/entities/Job';
 import { Setting } from '../domains/settings/entities/Setting';
 import { User } from '../domains/users/entities/User';
-import { PropertiesAccounts, UsersAccounts } from '../jointables';
+import { UsersAccounts } from '../jointables';
 
 export const AppDataSource = new DataSource({
     type: 'postgres',
@@ -25,7 +25,6 @@ export const AppDataSource = new DataSource({
         Address, 
         Job,
         User,
-        PropertiesAccounts,
         UsersAccounts
     ],
     migrations: ['src/migrations/**/*.ts'],

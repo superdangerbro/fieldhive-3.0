@@ -1,52 +1,60 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { create } from 'zustand';
 
-interface ActionNotificationState {
+interface NotificationState {
     successMessage: string | null;
     errorMessage: string | null;
 }
 
+interface NotificationStore extends NotificationState {
+    notifySuccess: (message: string) => void;
+    notifyError: (message: string) => void;
+    clearNotifications: () => void;
+}
+
+const useNotificationStore = create<NotificationStore>((set) => ({
+    successMessage: null,
+    errorMessage: null,
+    notifySuccess: (message) => {
+        console.log('Success notification:', message);
+        set({ successMessage: message, errorMessage: null });
+        setTimeout(() => {
+            set((state) => {
+                // Only clear if this is still the current message
+                if (state.successMessage === message) {
+                    return { successMessage: null, errorMessage: null };
+                }
+                return state;
+            });
+        }, 3000);
+    },
+    notifyError: (message) => {
+        console.error('Error notification:', message);
+        set({ successMessage: null, errorMessage: message });
+        setTimeout(() => {
+            set((state) => {
+                // Only clear if this is still the current message
+                if (state.errorMessage === message) {
+                    return { successMessage: null, errorMessage: null };
+                }
+                return state;
+            });
+        }, 3000);
+    },
+    clearNotifications: () => set({ successMessage: null, errorMessage: null })
+}));
+
 export function useActionNotifications() {
-    const [notificationState, setNotificationState] = useState<ActionNotificationState>({
-        successMessage: null,
-        errorMessage: null
-    });
-
-    const notifySuccess = useCallback((message: string) => {
-        setNotificationState(prev => ({
-            ...prev,
-            successMessage: message
-        }));
-    }, []);
-
-    const notifyError = useCallback((message: string) => {
-        setNotificationState(prev => ({
-            ...prev,
-            errorMessage: message
-        }));
-    }, []);
-
-    const clearNotifications = useCallback(() => {
-        setNotificationState({
-            successMessage: null,
-            errorMessage: null
-        });
-    }, []);
-
-    const notifyAction = useCallback((action: string, type: string, success: boolean) => {
-        if (success) {
-            notifySuccess(`${type} ${action} successfully`);
-        } else {
-            notifyError(`Failed to ${action.toLowerCase()} ${type.toLowerCase()}`);
-        }
-    }, [notifySuccess, notifyError]);
+    const store = useNotificationStore();
 
     return {
-        notificationState,
-        notifySuccess,
-        notifyError,
-        notifyAction,
-        clearNotifications
+        notificationState: {
+            successMessage: store.successMessage,
+            errorMessage: store.errorMessage
+        },
+        notifySuccess: store.notifySuccess,
+        notifyError: store.notifyError,
+        clearNotifications: store.clearNotifications
     };
 }

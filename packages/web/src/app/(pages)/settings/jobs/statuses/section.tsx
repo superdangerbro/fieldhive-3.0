@@ -15,9 +15,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { useJobStatuses, useUpdateJobStatuses } from '../hooks/useJobs';
 import { useCrudDialogs } from '@/app/globalHooks/useCrudDialogs';
-import { useActionNotifications } from '@/app/globalHooks/useActionNotifications';
 import { CrudFormDialog, CrudDeleteDialog } from '@/app/globalComponents/crud/CrudDialogs';
-import { ActionNotifications } from '@/app/globalComponents/crud/ActionNotifications';
 import { StatusColorPicker } from '@/app/globalComponents/StatusColorPicker';
 import type { JobStatus } from '@/app/globalTypes/job';
 
@@ -26,7 +24,6 @@ export function JobStatusSection() {
     const { data: statuses = [], isLoading, error: fetchError } = useJobStatuses();
     const updateMutation = useUpdateJobStatuses();
     const { dialogState, openCreateDialog, openEditDialog, openDeleteDialog, closeDialog } = useCrudDialogs();
-    const { notificationState, notifyAction, clearNotifications } = useActionNotifications();
     const formRef = React.useRef<HTMLFormElement>(null);
 
     const handleSave = async (data: JobStatus) => {
@@ -39,11 +36,9 @@ export function JobStatusSection() {
                 );
             
             await updateMutation.mutateAsync(updatedStatuses);
-            notifyAction(dialogState.mode === 'create' ? 'created' : 'updated', 'Job status', true);
             closeDialog();
         } catch (error) {
             console.error('Failed to save status:', error);
-            notifyAction(dialogState.mode === 'create' ? 'create' : 'update', 'Job status', false);
         }
     };
 
@@ -52,11 +47,9 @@ export function JobStatusSection() {
         try {
             const updatedStatuses = statuses.filter((status: JobStatus) => status.value !== statusToDelete.value);
             await updateMutation.mutateAsync(updatedStatuses);
-            notifyAction('delete', 'Job status', true);
             closeDialog();
         } catch (error) {
             console.error('Failed to delete status:', error);
-            notifyAction('delete', 'Job status', false);
         }
     };
 
@@ -199,12 +192,6 @@ export function JobStatusSection() {
                 onConfirm={() => dialogState.data && handleDelete(dialogState.data)}
                 title="Delete Status"
                 message={`Are you sure you want to delete the status "${dialogState.data?.label}"? This action cannot be undone.`}
-            />
-
-            <ActionNotifications
-                successMessage={notificationState.successMessage}
-                errorMessage={notificationState.errorMessage}
-                onClose={clearNotifications}
             />
         </Box>
     );

@@ -15,9 +15,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { useJobTypes, useUpdateJobTypes } from '../hooks/useJobs';
 import { useCrudDialogs } from '@/app/globalHooks/useCrudDialogs';
-import { useActionNotifications } from '@/app/globalHooks/useActionNotifications';
 import { CrudFormDialog, CrudDeleteDialog } from '@/app/globalComponents/crud/CrudDialogs';
-import { ActionNotifications } from '@/app/globalComponents/crud/ActionNotifications';
 import type { JobType } from '@/app/globalTypes/job';
 
 export function JobTypeSection() {
@@ -25,7 +23,6 @@ export function JobTypeSection() {
     const { data: types = [], isLoading, error: fetchError } = useJobTypes();
     const updateMutation = useUpdateJobTypes();
     const { dialogState, openCreateDialog, openEditDialog, openDeleteDialog, closeDialog } = useCrudDialogs();
-    const { notificationState, notifyAction, clearNotifications } = useActionNotifications();
     const formRef = React.useRef<HTMLFormElement>(null);
 
     const handleSave = async (data: JobType) => {
@@ -38,11 +35,9 @@ export function JobTypeSection() {
                 );
             
             await updateMutation.mutateAsync(updatedTypes);
-            notifyAction(dialogState.mode === 'create' ? 'created' : 'updated', 'Job type', true);
             closeDialog();
         } catch (error) {
             console.error('Failed to save type:', error);
-            notifyAction(dialogState.mode === 'create' ? 'create' : 'update', 'Job type', false);
         }
     };
 
@@ -51,11 +46,9 @@ export function JobTypeSection() {
         try {
             const updatedTypes = types.filter((type: JobType) => type.value !== typeToDelete.value);
             await updateMutation.mutateAsync(updatedTypes);
-            notifyAction('delete', 'Job type', true);
             closeDialog();
         } catch (error) {
             console.error('Failed to delete type:', error);
-            notifyAction('delete', 'Job type', false);
         }
     };
 
@@ -175,12 +168,6 @@ export function JobTypeSection() {
                 onConfirm={() => dialogState.data && handleDelete(dialogState.data)}
                 title="Delete Job Type"
                 message={`Are you sure you want to delete the job type "${dialogState.data?.label}"? This action cannot be undone.`}
-            />
-
-            <ActionNotifications
-                successMessage={notificationState.successMessage}
-                errorMessage={notificationState.errorMessage}
-                onClose={clearNotifications}
             />
         </Box>
     );

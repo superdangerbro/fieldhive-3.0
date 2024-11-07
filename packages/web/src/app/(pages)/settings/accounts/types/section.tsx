@@ -15,10 +15,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { useAccountTypes, useUpdateAccountTypes } from '../hooks/useAccounts';
 import { useCrudDialogs } from '@/app/globalHooks/useCrudDialogs';
-import { useActionNotifications } from '@/app/globalHooks/useActionNotifications';
 import { CrudFormDialog, CrudDeleteDialog } from '@/app/globalComponents/crud/CrudDialogs';
-import { ActionNotifications } from '@/app/globalComponents/crud/ActionNotifications';
-import { StatusColorPicker } from '@/app/globalComponents/StatusColorPicker';
 import type { AccountType } from '@/app/globalTypes/account';
 
 export function AccountTypeSection() {
@@ -26,7 +23,6 @@ export function AccountTypeSection() {
     const { data: types = [], isLoading, error: fetchError } = useAccountTypes();
     const updateMutation = useUpdateAccountTypes();
     const { dialogState, openCreateDialog, openEditDialog, openDeleteDialog, closeDialog } = useCrudDialogs();
-    const { notificationState, notifyAction, clearNotifications } = useActionNotifications();
     const formRef = React.useRef<HTMLFormElement>(null);
 
     const handleSave = async (data: AccountType) => {
@@ -39,11 +35,9 @@ export function AccountTypeSection() {
                 );
             
             await updateMutation.mutateAsync(updatedTypes);
-            notifyAction(dialogState.mode === 'create' ? 'created' : 'updated', 'Account type', true);
             closeDialog();
         } catch (error) {
             console.error('Failed to save type:', error);
-            notifyAction(dialogState.mode === 'create' ? 'create' : 'update', 'Account type', false);
         }
     };
 
@@ -52,11 +46,9 @@ export function AccountTypeSection() {
         try {
             const updatedTypes = types.filter((type: AccountType) => type.value !== typeToDelete.value);
             await updateMutation.mutateAsync(updatedTypes);
-            notifyAction('delete', 'Account type', true);
             closeDialog();
         } catch (error) {
             console.error('Failed to delete type:', error);
-            notifyAction('delete', 'Account type', false);
         }
     };
 
@@ -109,15 +101,6 @@ export function AccountTypeSection() {
                             borderColor: 'divider'
                         }}
                     >
-                        <Box 
-                            sx={{ 
-                                width: 16, 
-                                height: 16, 
-                                borderRadius: 1,
-                                bgcolor: type.color,
-                                mr: 2
-                            }} 
-                        />
                         <Typography sx={{ flex: 1 }}>{type.label}</Typography>
                         <IconButton onClick={() => openEditDialog(type)}>
                             <EditIcon />
@@ -152,7 +135,6 @@ export function AccountTypeSection() {
                         e.preventDefault();
                         const formData = new FormData(e.currentTarget);
                         const name = formData.get('name') as string;
-                        const color = formData.get('color') as string;
                         
                         if (!name.trim()) return;
 
@@ -164,8 +146,7 @@ export function AccountTypeSection() {
 
                         handleSave({
                             value: name.toLowerCase(),
-                            label: name,
-                            color: color || '#94a3b8'
+                            label: name
                         });
                     }}>
                         <TextField
@@ -177,18 +158,6 @@ export function AccountTypeSection() {
                             required
                             sx={{ mb: 2 }}
                         />
-                        <input 
-                            type="hidden" 
-                            name="color" 
-                            value={dialogState.data?.color || '#94a3b8'} 
-                        />
-                        <StatusColorPicker
-                            color={dialogState.data?.color || '#94a3b8'}
-                            onChange={(newColor) => {
-                                const input = formRef.current?.querySelector('input[name="color"]') as HTMLInputElement;
-                                if (input) input.value = newColor;
-                            }}
-                        />
                     </form>
                 </CrudFormDialog>
             )}
@@ -199,12 +168,6 @@ export function AccountTypeSection() {
                 onConfirm={() => dialogState.data && handleDelete(dialogState.data)}
                 title="Delete Account Type"
                 message={`Are you sure you want to delete the account type "${dialogState.data?.label}"? This action cannot be undone.`}
-            />
-
-            <ActionNotifications
-                successMessage={notificationState.successMessage}
-                errorMessage={notificationState.errorMessage}
-                onClose={clearNotifications}
             />
         </Box>
     );

@@ -17,9 +17,10 @@ import {
     CircularProgress,
     Alert
 } from '@mui/material';
-import { Account, CreateAddressDto } from '@/app/globaltypes';
-import { useAccountStore } from '../store';
+import { useUpdateAccount, useAccountSettings } from '../hooks/useAccounts';
 import { AddressForm } from '@/app/globalComponents/AddressForm';
+import type { Account } from '@/app/globalTypes/account';
+import type { CreateAddressDto } from '@/app/globalTypes/address';
 
 interface EditAccountDialogProps {
     open: boolean;
@@ -35,7 +36,8 @@ interface FormData {
 }
 
 export function EditAccountDialog({ open, account, onClose, onSuccess }: EditAccountDialogProps) {
-    const { updateAccount, fetchAccountSettings, accountTypes, isLoading, error: storeError } = useAccountStore();
+    const updateMutation = useUpdateAccount();
+    const { data: settings, isLoading: isLoadingSettings } = useAccountSettings();
     const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState<FormData>({
         name: '',
@@ -49,15 +51,6 @@ export function EditAccountDialog({ open, account, onClose, onSuccess }: EditAcc
             country: 'Canada',
         },
     });
-
-    useEffect(() => {
-        if (open) {
-            fetchAccountSettings().catch((error: Error) => {
-                console.error('Failed to load account settings:', error);
-                setError('Unable to load account settings. Please try again or contact support.');
-            });
-        }
-    }, [open, fetchAccountSettings]);
 
     useEffect(() => {
         if (account) {
@@ -122,10 +115,13 @@ export function EditAccountDialog({ open, account, onClose, onSuccess }: EditAcc
                 throw new Error('Please fill in all required address fields');
             }
 
-            await updateAccount(account.account_id, {
-                name: formData.name.trim(),
-                type: formData.type,
-                billingAddress: formData.address
+            await updateMutation.mutateAsync({
+                id: account.account_id,
+                data: {
+                    name: formData.name.trim(),
+                    type: formData.type,
+                    billingAddress: formData.address
+                }
             });
 
             onSuccess();
@@ -137,6 +133,8 @@ export function EditAccountDialog({ open, account, onClose, onSuccess }: EditAcc
     };
 
     if (!account) return null;
+
+    const isLoading = updateMutation.isPending || isLoadingSettings;
 
     return (
         <Dialog 
@@ -151,9 +149,9 @@ export function EditAccountDialog({ open, account, onClose, onSuccess }: EditAcc
         >
             <DialogTitle>Edit Account</DialogTitle>
             <DialogContent>
-                {(error || storeError) && (
+                {(error || updateMutation.error) && (
                     <Alert severity="error" sx={{ mb: 2 }}>
-                        {error || storeError}
+                        {error || (updateMutation.error instanceof Error ? updateMutation.error.message : 'An error occurred')}
                     </Alert>
                 )}
                 
@@ -178,9 +176,9 @@ export function EditAccountDialog({ open, account, onClose, onSuccess }: EditAcc
                         value={formData.type}
                         onChange={handleSelectChange}
                         label="Account Type"
-                        disabled={isLoading || accountTypes.length === 0}
+                        disabled={isLoading || !settings?.types?.length}
                     >
-                        {accountTypes.map(type => (
+                        {settings?.types?.map(type => (
                             <MenuItem 
                                 key={type.value} 
                                 value={type.value}
@@ -202,9 +200,7 @@ export function EditAccountDialog({ open, account, onClose, onSuccess }: EditAcc
                 
                 <AddressForm
                     initialAddress={formData.address}
-                    onSubmit={handleAddressChange}
-                    onCancel={() => {}}
-                    hideButtons={true}
+                    onChange={handleAddressChange}
                     disabled={isLoading}
                 />
             </DialogContent>
@@ -215,7 +211,7 @@ export function EditAccountDialog({ open, account, onClose, onSuccess }: EditAcc
                 <Button 
                     type="submit" 
                     variant="contained"
-                    disabled={isLoading || accountTypes.length === 0}
+                    disabled={isLoading || !settings?.types?.length}
                     startIcon={isLoading ? <CircularProgress size={20} /> : null}
                 >
                     {isLoading ? 'Saving...' : 'Save Changes'}

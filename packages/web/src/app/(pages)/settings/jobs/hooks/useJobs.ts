@@ -68,9 +68,9 @@ export const useUpdateJobTypes = () => {
             return Array.isArray(data) ? data : [];
         },
         onSuccess: (data) => {
-            console.log('Update successful:', data);
+            console.log('Update successful, setting query data:', data);
             queryClient.setQueryData(['jobTypes'], data);
-        },
+        }
     });
 };
 
@@ -120,8 +120,8 @@ export const useUpdateJobStatuses = () => {
             return data?.statuses || [];
         },
         onSuccess: (data) => {
-            console.log('Update successful:', data);
+            console.log('Update successful, setting query data:', data);
             queryClient.setQueryData(['jobStatuses'], data);
-        },
+        }
     });
 };

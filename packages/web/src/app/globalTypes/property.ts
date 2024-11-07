@@ -4,7 +4,6 @@ import { Account } from './account';
 export interface PropertyType {
     value: string;
     label: string;
-    color: string;
 }
 
 export interface PropertyStatus {

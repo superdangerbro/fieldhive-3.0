@@ -22,6 +22,6 @@ router.delete('/:id', deleteAccount);
 router.post('/bulk-delete', bulkDeleteAccounts);
 
 // Archive account
-router.post('/:id/archive', archiveAccount);
+router.put('/:id/archive', archiveAccount);
 
 export default router;
