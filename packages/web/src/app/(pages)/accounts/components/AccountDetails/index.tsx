@@ -5,7 +5,6 @@ import { Box, Card, CardContent, Grid, Typography, Divider, Chip, Avatar } from 
 import { AccountHeader } from './AccountHeader';
 import { AccountSummary } from './AccountSummary';
 import ContactsIcon from '@mui/icons-material/Contacts';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
 import GroupIcon from '@mui/icons-material/Group';
 import { useDeleteAccount } from '../../hooks/useAccounts';
 import type { Account } from '@/app/globalTypes/account';
@@ -34,13 +33,12 @@ export function AccountDetails({ account, onUpdate }: AccountDetailsProps) {
                     <AccountHeader
                         account={account}
                         onUpdate={onUpdate}
-                        onDeleteClick={handleDelete}
                     />
                     <Divider sx={{ my: 3 }} />
                     
                     <Grid container spacing={3}>
                         {/* Contact Information */}
-                        <Grid item xs={12} md={4}>
+                        <Grid item xs={12} md={6}>
                             <Box>
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                                     <ContactsIcon sx={{ mr: 1, color: '#6B46C1' }} />
@@ -75,39 +73,8 @@ export function AccountDetails({ account, onUpdate }: AccountDetailsProps) {
                             </Box>
                         </Grid>
 
-                        {/* Billing Address */}
-                        <Grid item xs={12} md={4}>
-                            <Box>
-                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                    <LocationOnIcon sx={{ mr: 1, color: '#6B46C1' }} />
-                                    <Typography variant="h6">
-                                        Billing Address
-                                    </Typography>
-                                </Box>
-                                {account.billingAddress ? (
-                                    <>
-                                        <Typography>
-                                            {account.billingAddress.address1}
-                                        </Typography>
-                                        {account.billingAddress.address2 && (
-                                            <Typography>
-                                                {account.billingAddress.address2}
-                                            </Typography>
-                                        )}
-                                        <Typography>
-                                            {account.billingAddress.city}, {account.billingAddress.province} {account.billingAddress.postal_code}
-                                        </Typography>
-                                    </>
-                                ) : (
-                                    <Typography color="text.secondary">
-                                        No billing address provided
-                                    </Typography>
-                                )}
-                            </Box>
-                        </Grid>
-
                         {/* Associated Users */}
-                        <Grid item xs={12} md={4}>
+                        <Grid item xs={12} md={6}>
                             <Box>
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                                     <GroupIcon sx={{ mr: 1, color: '#6B46C1' }} />
@@ -120,7 +87,7 @@ export function AccountDetails({ account, onUpdate }: AccountDetailsProps) {
                                         account.users.map((user) => (
                                             <Chip
                                                 key={user.user_id}
-                                                avatar={<Avatar>{user.email[0]}</Avatar>}
+                                                avatar={<Avatar>{user.email[0].toUpperCase()}</Avatar>}
                                                 label={user.email}
                                                 title={user.email}
                                                 sx={{ mb: 1 }}

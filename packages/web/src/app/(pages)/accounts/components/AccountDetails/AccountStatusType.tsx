@@ -35,47 +35,19 @@ export function AccountStatusType({ account, onUpdate }: AccountStatusTypeProps)
         try {
             console.log('Updating account status:', { id: account.account_id, status: event.target.value });
             
-            // Optimistic update
-            const optimisticAccount = {
-                ...account,
-                status: event.target.value
-            };
-
-            queryClient.setQueryData(['account', account.account_id], optimisticAccount);
-            queryClient.setQueriesData({ queryKey: ['accounts'] }, (oldData: any) => {
-                if (!oldData) return oldData;
-                return oldData.map((acc: Account) => 
-                    acc.account_id === account.account_id ? optimisticAccount : acc
-                );
-            });
-
-            const result = await updateAccountMutation.mutateAsync({ 
+            await updateAccountMutation.mutateAsync({ 
                 id: account.account_id, 
                 data: { status: event.target.value }
             });
 
-            queryClient.setQueryData(['account', account.account_id], result);
-            queryClient.setQueriesData({ queryKey: ['accounts'] }, (oldData: any) => {
-                if (!oldData) return oldData;
-                return oldData.map((acc: Account) => 
-                    acc.account_id === account.account_id ? result : acc
-                );
-            });
+            // Refresh everything
+            await queryClient.refetchQueries();
 
             notifySuccess('Account status updated successfully');
             onUpdate();
         } catch (error) {
             console.error('Failed to update status:', error);
             notifyError('Failed to update account status');
-            
-            // Revert optimistic update
-            queryClient.setQueryData(['account', account.account_id], account);
-            queryClient.setQueriesData({ queryKey: ['accounts'] }, (oldData: any) => {
-                if (!oldData) return oldData;
-                return oldData.map((acc: Account) => 
-                    acc.account_id === account.account_id ? account : acc
-                );
-            });
         }
     };
 
@@ -83,47 +55,19 @@ export function AccountStatusType({ account, onUpdate }: AccountStatusTypeProps)
         try {
             console.log('Updating account type:', { id: account.account_id, type: event.target.value });
             
-            // Optimistic update
-            const optimisticAccount = {
-                ...account,
-                type: event.target.value
-            };
-
-            queryClient.setQueryData(['account', account.account_id], optimisticAccount);
-            queryClient.setQueriesData({ queryKey: ['accounts'] }, (oldData: any) => {
-                if (!oldData) return oldData;
-                return oldData.map((acc: Account) => 
-                    acc.account_id === account.account_id ? optimisticAccount : acc
-                );
-            });
-
-            const result = await updateAccountMutation.mutateAsync({ 
+            await updateAccountMutation.mutateAsync({ 
                 id: account.account_id, 
                 data: { type: event.target.value }
             });
 
-            queryClient.setQueryData(['account', account.account_id], result);
-            queryClient.setQueriesData({ queryKey: ['accounts'] }, (oldData: any) => {
-                if (!oldData) return oldData;
-                return oldData.map((acc: Account) => 
-                    acc.account_id === account.account_id ? result : acc
-                );
-            });
+            // Refresh everything
+            await queryClient.refetchQueries();
 
             notifySuccess('Account type updated successfully');
             onUpdate();
         } catch (error) {
             console.error('Failed to update type:', error);
             notifyError('Failed to update account type');
-            
-            // Revert optimistic update
-            queryClient.setQueryData(['account', account.account_id], account);
-            queryClient.setQueriesData({ queryKey: ['accounts'] }, (oldData: any) => {
-                if (!oldData) return oldData;
-                return oldData.map((acc: Account) => 
-                    acc.account_id === account.account_id ? account : acc
-                );
-            });
         }
     };
 
@@ -205,10 +149,7 @@ export function AccountStatusType({ account, onUpdate }: AccountStatusTypeProps)
                                         <Chip 
                                             label={type.label || type.value}
                                             size="small"
-                                            sx={{ 
-                                                backgroundColor: type.color || '#666666',
-                                                color: 'white'
-                                            }}
+                                            variant="outlined"
                                         />
                                     </MenuItem>
                                 ))

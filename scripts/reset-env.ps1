@@ -12,8 +12,9 @@ function Kill-ProcessOnPort {
     
     foreach ($process in $processes) {
         try {
+            $processName = (Get-Process -Id $process).ProcessName
             Stop-Process -Id $process -Force -ErrorAction SilentlyContinue
-            Write-Host "Killed process on port $Port"
+            Write-Host "Killed process '$processName' on port $Port"
         } catch {
             Write-Host "Could not kill process on port $Port"
         }
@@ -21,22 +22,41 @@ function Kill-ProcessOnPort {
 }
 
 # Kill processes on development ports
+Write-Host "Cleaning up existing processes..."
 Kill-ProcessOnPort 3000  # Web server
 Kill-ProcessOnPort 3001  # API server
 Kill-ProcessOnPort 3004  # WebSocket server
 
-Write-Host "Starting development servers..."
-
 # Change to project root directory
 Set-Location $PSScriptRoot/..
 
-# Start API server in a new window
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd packages/api; pnpm run dev"
+# Build infrastructure package
+Write-Host "Building infrastructure package..."
+try {
+    pnpm build:infrastructure
+    if ($LASTEXITCODE -ne 0) {
+        throw "Infrastructure build failed"
+    }
+} catch {
+    Write-Host "Error building infrastructure: $_" -ForegroundColor Red
+    exit 1
+}
 
-# Wait a moment for API to initialize
+Write-Host "Starting development servers..."
+
+# Start API server in a new window
+Write-Host "Starting API server..."
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd packages/api; pnpm run dev" -WindowStyle Normal
+
+# Wait for API to initialize
+Write-Host "Waiting for API to initialize..."
 Start-Sleep -Seconds 3
 
 # Start web server in a new window
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd packages/web; pnpm run dev"
+Write-Host "Starting web server..."
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd packages/web; pnpm run dev" -WindowStyle Normal
 
-Write-Host "Development environment reset complete!"
+Write-Host "Development environment reset complete!" -ForegroundColor Green
+Write-Host "API server running on http://localhost:3001"
+Write-Host "Web server running on http://localhost:3000"
+Write-Host "WebSocket server running on ws://localhost:3004"

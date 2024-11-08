@@ -21,27 +21,38 @@ export function AccountHeader({ account, onUpdate }: AccountHeaderProps) {
         openDeleteDialog(account);
     };
 
+    const handleUpdate = () => {
+        // Force a refetch when any child component updates
+        onUpdate();
+    };
+
     return (
         <Box sx={{ mb: 4 }}>
             <AccountNameSection 
                 account={account} 
-                onUpdate={onUpdate}
+                onUpdate={handleUpdate}
                 onDeleteClick={handleDeleteClick}
             />
 
-            <Box sx={{ display: 'flex', gap: 3 }}>
-                <AccountBillingAddress 
-                    account={account}
-                    onUpdate={onUpdate}
-                />
-                <AccountContacts 
-                    account={account}
-                    onUpdate={onUpdate}
-                />
-                <AccountStatusType 
-                    account={account}
-                    onUpdate={onUpdate}
-                />
+            <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                <Box sx={{ flex: '1 1 300px', minWidth: 0 }}>
+                    <AccountBillingAddress 
+                        account={account}
+                        onUpdate={handleUpdate}
+                    />
+                </Box>
+                <Box sx={{ flex: '1 1 300px', minWidth: 0 }}>
+                    <AccountContacts 
+                        account={account}
+                        onUpdate={handleUpdate}
+                    />
+                </Box>
+                <Box sx={{ flex: '1 1 300px', minWidth: 0 }}>
+                    <AccountStatusType 
+                        account={account}
+                        onUpdate={handleUpdate}
+                    />
+                </Box>
             </Box>
         </Box>
     );

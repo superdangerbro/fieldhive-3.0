@@ -22,7 +22,7 @@ import {
   DialogActions,
   Alert
 } from '@mui/material';
-import { DataGrid, GridColDef, GridRowParams, GridSelectionModel } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRowParams, GridRowSelectionModel } from '@mui/x-data-grid';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -38,33 +38,29 @@ interface AccountsTableProps {
   onAccountsLoad: (accounts: Account[]) => void;
 }
 
-export function AccountsTable({ 
+type GridParams = {
+  row: Account;
+  value: any;
+}
+
+export const AccountsTable: React.FC<AccountsTableProps> = ({ 
   refreshTrigger = 0, 
   onAccountSelect,
   selectedAccount,
   onAccountsLoad
-}: AccountsTableProps) {
+}) => {
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(0);
   const [filterText, setFilterText] = useState('');
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [columnMenuAnchor, setColumnMenuAnchor] = useState<null | HTMLElement>(null);
-  const [selectedRows, setSelectedRows] = useState<GridSelectionModel>([]);
+  const [selectedRows, setSelectedRows] = useState<GridRowSelectionModel>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const { notifySuccess, notifyError } = useActionNotifications();
   const { data: accounts = [], isLoading } = useAccounts();
   const { data: settings } = useAccountSettings();
   const bulkDeleteMutation = useBulkDeleteAccounts();
-
-  // Reset selection when accounts change
-  useEffect(() => {
-    if (selectedAccount) {
-      setSelectedRows([selectedAccount.account_id]);
-    } else {
-      setSelectedRows([]);
-    }
-  }, [selectedAccount]);
 
   const defaultColumns: GridColDef[] = [
     {
@@ -78,10 +74,23 @@ export function AccountsTable({
       headerName: 'Billing Address',
       flex: 1,
       minWidth: 200,
-      valueGetter: (params) => {
-        const address = params.row.billingAddress;
-        if (!address) return 'No address';
-        return `${address.address1}${address.address2 ? `, ${address.address2}` : ''}, ${address.city}, ${address.province} ${address.postal_code}`;
+      valueGetter: (params: GridParams) => {
+        try {
+          const address = params.value;
+          if (!address) return 'No address';
+          
+          const parts = [];
+          if (address.address1) parts.push(address.address1);
+          if (address.address2) parts.push(address.address2);
+          if (address.city) parts.push(address.city);
+          if (address.province) parts.push(address.province);
+          if (address.postal_code) parts.push(address.postal_code);
+          
+          return parts.length > 0 ? parts.join(', ') : 'No address';
+        } catch (error) {
+          console.error('Error formatting address:', error);
+          return 'No address';
+        }
       }
     },
     {
@@ -89,7 +98,7 @@ export function AccountsTable({
       headerName: 'Properties',
       flex: 1,
       minWidth: 200,
-      valueGetter: (params) => {
+      valueGetter: (params: GridParams) => {
         const properties = params.value || [];
         return properties.length ? properties.map((p: { name: string }) => p.name).join(', ') : 'No properties';
       }
@@ -100,13 +109,14 @@ export function AccountsTable({
       width: 150,
       renderCell: (params) => {
         if (!settings) {
-          return <Chip label={params.value} size="small" />;
+          return <Chip label={params.value} size="small" variant="filled" />;
         }
         const color = getTypeColor(params.value, settings.types);
         return (
           <Chip 
             label={params.value} 
-            size="small" 
+            size="small"
+            variant="filled"
             sx={{ 
               backgroundColor: color,
               color: color ? 'white' : 'inherit'
@@ -121,13 +131,14 @@ export function AccountsTable({
       width: 120,
       renderCell: (params) => {
         if (!settings) {
-          return <Chip label={params.value} size="small" />;
+          return <Chip label={params.value} size="small" variant="filled" />;
         }
         const color = getStatusColor(params.value, settings.statuses);
         return (
           <Chip 
             label={params.value} 
-            size="small" 
+            size="small"
+            variant="filled"
             sx={{ 
               backgroundColor: color,
               color: color ? 'white' : 'inherit'
@@ -184,40 +195,39 @@ export function AccountsTable({
       account.name.toLowerCase().includes(searchText) ||
       account.type.toLowerCase().includes(searchText) ||
       account.status.toLowerCase().includes(searchText) ||
-      account.properties?.some(property => property.name.toLowerCase().includes(searchText)) ||
+      account.properties?.some((property: { name: string }) => property.name.toLowerCase().includes(searchText)) ||
       (account.billingAddress && (
-        account.billingAddress.address1.toLowerCase().includes(searchText) ||
-        account.billingAddress.city.toLowerCase().includes(searchText) ||
-        account.billingAddress.province.toLowerCase().includes(searchText)
+        (account.billingAddress.address1 && account.billingAddress.address1.toLowerCase().includes(searchText)) ||
+        (account.billingAddress.city && account.billingAddress.city.toLowerCase().includes(searchText)) ||
+        (account.billingAddress.province && account.billingAddress.province.toLowerCase().includes(searchText))
       ))
     );
   }, [accounts, filterText]);
 
-  const handleRowClick = useCallback((params: GridRowParams) => {
+  // Handle row click (for details view)
+  const handleRowClick = useCallback((params: GridRowParams, event: any) => {
+    // Ignore clicks on checkboxes
+    if (event.target.type === 'checkbox') return;
+    
     const account = accounts.find((a: Account) => a.account_id === params.id);
     if (account && (!selectedAccount || account.account_id !== selectedAccount.account_id)) {
       onAccountSelect(account);
     }
   }, [accounts, onAccountSelect, selectedAccount]);
 
-  const handleSelectionChange = (newSelection: GridSelectionModel) => {
+  // Handle checkbox selection (for bulk actions)
+  const handleSelectionChange = (newSelection: GridRowSelectionModel) => {
     setSelectedRows(newSelection);
-    // If only one row is selected, update the selected account
-    if (newSelection.length === 1) {
-      const account = accounts.find((a: Account) => a.account_id === newSelection[0]);
-      if (account) {
-        onAccountSelect(account);
-      }
-    } else {
-      onAccountSelect(null);
-    }
   };
 
   const handleBulkDelete = async () => {
     try {
       await bulkDeleteMutation.mutateAsync(selectedRows as string[]);
       setSelectedRows([]);
-      onAccountSelect(null);
+      // Only clear selected account if it was part of the deleted rows
+      if (selectedAccount && selectedRows.includes(selectedAccount.account_id)) {
+        onAccountSelect(null);
+      }
       setDeleteDialogOpen(false);
       notifySuccess(`Successfully deleted ${selectedRows.length} accounts`);
     } catch (error) {
@@ -286,15 +296,21 @@ export function AccountsTable({
               }}
             >
               {defaultColumns.map((column) => (
-                <MenuItem key={column.field} onClick={() => toggleColumn(column.field)}>
+                <MenuItem 
+                  key={column.field} 
+                  onClick={() => toggleColumn(column.field)}
+                  sx={{ padding: 0 }}
+                >
                   <FormControlLabel
                     control={
                       <Checkbox
                         checked={visibleColumns.includes(column.field)}
                         onChange={() => toggleColumn(column.field)}
+                        onClick={(e) => e.stopPropagation()}
                       />
                     }
                     label={column.headerName}
+                    sx={{ width: '100%', padding: '6px 16px', margin: 0 }}
                   />
                 </MenuItem>
               ))}
@@ -307,28 +323,37 @@ export function AccountsTable({
         rows={filteredAccounts}
         columns={columns}
         getRowId={(row) => row.account_id}
-        rowCount={filteredAccounts.length}
         loading={isLoading}
         paginationMode="client"
-        page={page}
-        pageSize={pageSize}
-        rowsPerPageOptions={[25, 50, 100]}
-        onPageChange={(newPage) => setPage(newPage)}
-        onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
+        initialState={{
+          pagination: {
+            paginationModel: {
+              pageSize,
+              page
+            }
+          }
+        }}
+        pageSizeOptions={[25, 50, 100]}
+        onPaginationModelChange={(model) => {
+          setPage(model.page);
+          setPageSize(model.pageSize);
+        }}
         onRowClick={handleRowClick}
         checkboxSelection
-        disableSelectionOnClick
+        disableRowSelectionOnClick
         disableColumnMenu
-        selectionModel={selectedRows}
-        onSelectionModelChange={handleSelectionChange}
+        rowSelectionModel={selectedRows}
+        onRowSelectionModelChange={handleSelectionChange}
         sx={{
           '& .MuiDataGrid-row': {
             cursor: 'pointer'
+          },
+          '& .MuiCheckbox-root': {
+            color: 'primary.main'
           }
         }}
       />
 
-      {/* Bulk Delete Confirmation Dialog */}
       <Dialog
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
@@ -345,14 +370,18 @@ export function AccountsTable({
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>
+          <Button 
+            onClick={() => setDeleteDialogOpen(false)}
+            type="button"
+          >
             Cancel
           </Button>
           <Button 
             onClick={handleBulkDelete}
             variant="contained" 
             color="error"
-            disabled={bulkDeleteMutation.isPending}
+            disabled={isLoading}
+            type="button"
           >
             {bulkDeleteMutation.isPending ? 'Deleting...' : 'Delete'}
           </Button>
@@ -360,4 +389,4 @@ export function AccountsTable({
       </Dialog>
     </Box>
   );
-}
+};

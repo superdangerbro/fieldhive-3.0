@@ -1,105 +1,77 @@
+import { z } from 'zod';
 import { DataSource } from 'typeorm';
-import { logger } from '../utils/logger';
-import { dbConfig, env } from './env';
-import { Property } from '../domains/properties/entities/Property';
-import { Account } from '../domains/accounts/entities/Account';
-import { Address } from '../domains/addresses/entities/Address';
-import { Job } from '../domains/jobs/entities/Job';
-import { Setting } from '../domains/settings/entities/Setting';
-import { User } from '../domains/users/entities/User';
-import { UsersAccounts } from '../jointables';
+import { getSecrets } from '@fieldhive/infrastructure';
 
+// Database config schema
+const dbConfigSchema = z.object({
+  host: z.string(),
+  port: z.coerce.number().default(5432), // Use coerce for better number parsing
+  username: z.string(),
+  password: z.string(),
+  database: z.string(),
+  ssl: z.boolean().default(true),
+  sslRejectUnauthorized: z.boolean().default(false),
+});
+
+// Environment schema
+const envSchema = z.object({
+  DB_HOST: z.string(),
+  DB_PORT: z.coerce.number().default(5432), // Use coerce here too
+  DB_USER: z.string(),
+  DB_PASSWORD: z.string(),
+  DB_NAME: z.string(),
+  DB_SSL: z.coerce.boolean().default(true),
+  DB_SSL_REJECT_UNAUTHORIZED: z.coerce.boolean().default(false),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+});
+
+// Parse environment variables
+export const env = envSchema.parse({
+  DB_HOST: process.env.DB_HOST || 'field-hive.cdgykw2u8hxy.us-east-1.rds.amazonaws.com',
+  DB_PORT: process.env.DB_PORT || 5432,
+  DB_USER: process.env.DB_USER || 'superdangerbro',
+  DB_PASSWORD: process.env.DB_PASSWORD || 'Tripod2001!',
+  DB_NAME: process.env.DB_NAME || 'field_hive_development',
+  DB_SSL: process.env.DB_SSL || true,
+  DB_SSL_REJECT_UNAUTHORIZED: process.env.DB_SSL_REJECT_UNAUTHORIZED || false,
+  NODE_ENV: process.env.NODE_ENV || 'development',
+});
+
+// Create TypeORM data source
 export const AppDataSource = new DataSource({
-    type: 'postgres',
-    host: dbConfig.host,
-    port: dbConfig.port,
-    username: dbConfig.username,
-    password: dbConfig.password,
-    database: dbConfig.database,
-    synchronize: false,
-    logging: env.ENABLE_QUERY_LOGGING,
-    entities: [
-        Setting,
-        Property, 
-        Account, 
-        Address, 
-        Job,
-        User,
-        UsersAccounts
-    ],
-    migrations: ['src/migrations/**/*.ts'],
-    subscribers: ['src/subscribers/**/*.ts'],
-    ssl: dbConfig.ssl,
-    connectTimeoutMS: dbConfig.pool.idleTimeoutMillis,
-    extra: {
-        ssl: dbConfig.ssl,
-        poolSize: dbConfig.pool.max
-    }
+  type: 'postgres',
+  host: env.DB_HOST,
+  port: env.DB_PORT,
+  username: env.DB_USER,
+  password: env.DB_PASSWORD,
+  database: env.DB_NAME,
+  synchronize: false,
+  logging: true,
+  entities: ['src/domains/*/entities/*.ts'],
+  migrations: ['src/migrations/**/*.ts'],
+  subscribers: ['src/subscribers/**/*.ts'],
+  ssl: env.DB_SSL ? {
+    rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED
+  } : false,
 });
 
-export async function setupDatabase() {
-    try {
-        logger.info('Environment variables:', {
-            DB_HOST: env.DB_HOST,
-            DB_PORT: env.DB_PORT,
-            DB_USER: env.DB_USER,
-            DB_NAME: env.DB_NAME
-        });
-
-        logger.info('Database config:', {
-            ...dbConfig,
-            password: '******' // Hide password in logs
-        });
-
-        logger.info('Connecting to database...');
-        logger.info(`Host: ${dbConfig.host}`);
-        logger.info(`Database: ${dbConfig.database}`);
-
-        // Initialize database connection
-        await AppDataSource.initialize();
-
-        // Enable PostGIS extension if not already enabled
-        await AppDataSource.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
-        await AppDataSource.query('CREATE EXTENSION IF NOT EXISTS "postgis"');
-
-        // Get PostgreSQL version
-        const result = await AppDataSource.query('SELECT version()');
-        logger.info('Database connection established', { version: result[0].version });
-
-        // Verify connection is working
-        const timestamp = await AppDataSource.query('SELECT NOW()');
-        logger.info('Database connection verified:', timestamp[0].now);
-
-        return AppDataSource;
-    } catch (error) {
-        logger.error('Error connecting to database:', error);
-        throw error;
-    }
-}
-
-export async function closeDatabase() {
-    try {
-        if (AppDataSource.isInitialized) {
-            await AppDataSource.destroy();
-            logger.info('Database connection closed');
-        }
-    } catch (error) {
-        logger.error('Error closing database connection:', error);
-        throw error;
-    }
-}
-
-// Handle cleanup on process termination
-process.on('SIGINT', async () => {
-    logger.info('Received SIGINT. Closing database connection...');
-    await closeDatabase();
-    process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-    logger.info('Received SIGTERM. Closing database connection...');
-    await closeDatabase();
-    process.exit(0);
-});
-
-export default AppDataSource;
+// Load secrets in production
+export const loadSecrets = async () => {
+  if (env.NODE_ENV === 'production') {
+    const secrets = await getSecrets('production');
+    return {
+      host: secrets.database.host,
+      port: secrets.database.port,
+      username: secrets.database.user,
+      password: secrets.database.password,
+      database: secrets.database.name,
+    };
+  }
+  return {
+    host: env.DB_HOST,
+    port: env.DB_PORT,
+    username: env.DB_USER,
+    password: env.DB_PASSWORD,
+    database: env.DB_NAME,
+  };
+};

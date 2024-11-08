@@ -2,16 +2,21 @@
   "name": "fieldhive",
   "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
-  "scripts": {
-    "dev": "pnpm run --parallel dev",
-    "build": "pnpm run --parallel build",
+ "scripts": {
+    "dev": "pnpm build:infrastructure && pnpm run --parallel dev",
+    "build": "pnpm run build:infrastructure && pnpm run --parallel build",
+    "build:infrastructure": "pnpm --filter @fieldhive/infrastructure build",
     "lint": "pnpm run --parallel lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "api:dev": "pnpm --filter @fieldhive/api dev",
-    "web:dev": "pnpm --filter @fieldhive/web dev"
+    "api:dev": "pnpm build:infrastructure && pnpm --filter @fieldhive/api dev",
+    "web:dev": "pnpm --filter @fieldhive/web dev",
+    "ws:dev": "pnpm build:infrastructure && pnpm --filter @fieldhive/api ws:dev",
+    "start:dev": "concurrently \"pnpm api:dev\" \"pnpm ws:dev\" \"pnpm web:dev\""
+  },
+  "pnpm": {
+    "workspaces": [
+      "packages/*"
+    ]
   },
   "devDependencies": {
     "@types/node": "^20.8.0",
@@ -25,12 +30,5 @@
   "packageManager": "pnpm@8.8.0",
   "engines": {
     "node": ">=18.0.0"
-  },
-  "dependencies": {
-    "@types/react-color": "^3.0.12",
-    "@types/ws": "^8.5.13",
-    "react-color": "^2.19.3",
-    "ws": "^8.18.0",
-    "zod": "^3.23.8"
   }
 }

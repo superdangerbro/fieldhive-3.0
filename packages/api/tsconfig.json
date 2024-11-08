@@ -13,16 +13,15 @@
     "strictPropertyInitialization": false,
     "baseUrl": ".",
     "paths": {
-      "@fieldhive/shared": ["../shared/src"]
+      "@fieldhive/infrastructure/*": ["../infrastructure/src/*"]
     },
     "typeRoots": [
-      "./node_modules/@types",
-      "../shared/src/types"
+      "./node_modules/@types"
     ]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"],
   "references": [
-    { "path": "../shared" }
+    { "path": "../infrastructure" }
   ]
 }

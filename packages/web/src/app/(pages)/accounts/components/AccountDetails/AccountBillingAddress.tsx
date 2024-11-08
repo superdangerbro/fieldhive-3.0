@@ -39,49 +39,34 @@ export function AccountBillingAddress({ account, onUpdate }: AccountBillingAddre
 
     const handleSave = async () => {
         try {
-            // Validate required fields
             if (!editedAddress.address1.trim() || !editedAddress.city.trim() || 
                 !editedAddress.province.trim() || !editedAddress.postal_code.trim()) {
                 notifyError('Please fill in all required fields');
                 return;
             }
 
-            let addressResult;
-            
-            // Update or create address
             if (account.billingAddress?.address_id) {
-                // Update existing address
-                addressResult = await updateAddressMutation.mutateAsync({
+                await updateAddressMutation.mutateAsync({
                     id: account.billingAddress.address_id,
                     data: editedAddress
                 });
             } else {
-                // Create new address
-                addressResult = await createAddressMutation.mutateAsync(editedAddress);
-
-                // Update account with new address ID
-                const result = await updateAccountMutation.mutateAsync({
+                const addressResult = await createAddressMutation.mutateAsync(editedAddress);
+                await updateAccountMutation.mutateAsync({
                     id: account.account_id,
                     data: { billing_address_id: addressResult.address_id }
                 });
-
-                // Update cache with actual result
-                queryClient.setQueryData(['account', account.account_id], result);
-                queryClient.setQueriesData({ queryKey: ['accounts'] }, (oldData: any) => {
-                    if (!oldData) return oldData;
-                    return oldData.map((acc: Account) => 
-                        acc.account_id === account.account_id ? result : acc
-                    );
-                });
             }
 
+            // Refresh everything
+            await queryClient.refetchQueries();
+            
             setIsEditing(false);
             notifySuccess('Billing address updated successfully');
             onUpdate();
         } catch (error) {
             console.error('Failed to update billing address:', error);
             notifyError('Failed to update billing address');
-            
             setEditedAddress(account.billingAddress || {
                 address1: '',
                 address2: '',
@@ -107,11 +92,7 @@ export function AccountBillingAddress({ account, onUpdate }: AccountBillingAddre
                     </Typography>
                     <IconButton 
                         size="small" 
-                        onClick={() => {
-                            setIsEditing(true);
-                            // Test notification
-                            notifySuccess('Edit mode enabled');
-                        }}
+                        onClick={() => setIsEditing(true)}
                         sx={{ ml: 1 }}
                         disabled={isLoading}
                     >

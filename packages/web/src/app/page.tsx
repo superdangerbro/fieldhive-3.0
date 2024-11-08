@@ -25,7 +25,7 @@ const features = [
         icon: <MapIcon sx={{ fontSize: 40 }} />,
         title: 'Field Map',
         description: 'View and manage your equipment locations in real-time.',
-        path: '/map'
+        path: '/field-map'
     },
     {
         icon: <SettingsIcon sx={{ fontSize: 40 }} />,

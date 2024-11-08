@@ -11,11 +11,15 @@ import { theme } from '../theme';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-      refetchOnReconnect: false,
-      retry: false,
-      staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+      refetchOnWindowFocus: true,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
+      retry: 1,
+      staleTime: 0, // Consider data stale immediately
+      gcTime: 5 * 60 * 1000, // Keep unused data in cache for 5 minutes
+    },
+    mutations: {
+      retry: 1,
     },
   },
 });

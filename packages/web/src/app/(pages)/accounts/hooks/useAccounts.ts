@@ -49,15 +49,12 @@ export const useAccounts = (params?: { limit?: number; offset?: number; search?:
     return useQuery({
         queryKey: ['accounts', params],
         queryFn: async () => {
-            console.log('Fetching accounts with params:', params);
             const searchParams = new URLSearchParams();
             if (params?.limit) searchParams.append('limit', params.limit.toString());
             if (params?.offset) searchParams.append('offset', params.offset.toString());
             if (params?.search) searchParams.append('search', params.search);
 
             const url = `${buildUrl(ENDPOINTS.accounts)}?${searchParams.toString()}`;
-            console.log('API Request:', { method: 'GET', url });
-            
             const response = await fetch(url, {
                 headers: { 'Content-Type': 'application/json' },
                 signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
@@ -68,11 +65,12 @@ export const useAccounts = (params?: { limit?: number; offset?: number; search?:
             }
 
             const data = await response.json();
-            console.log('API Response:', { accounts: data.accounts.length });
             return data.accounts;
         },
-        staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
-        gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
+        staleTime: 30000,
+        refetchOnWindowFocus: false,
+        refetchOnMount: false,
+        refetchInterval: false
     });
 };
 
@@ -101,8 +99,9 @@ export const useAccount = (accountId: string | null) => {
             return data;
         },
         enabled: !!accountId,
-        staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
-        gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
+        staleTime: 30000,
+        refetchOnWindowFocus: false,
+        refetchOnMount: false,
     });
 };
 
@@ -131,10 +130,12 @@ export const useUpdateAccount = () => {
             console.log('API Response:', { updatedAccount: result });
             return result;
         },
-        onSuccess: (data, { id }) => {
+        onSuccess: async (data, { id }) => {
             console.log('Update successful, invalidating queries');
-            queryClient.setQueryData(['account', id], data);
-            queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['account', id] }),
+                queryClient.invalidateQueries({ queryKey: ['accounts'] })
+            ]);
         },
         onError: (error) => {
             console.error('Update failed:', error);
@@ -307,7 +308,6 @@ export const useAccountSettings = () => {
 
             console.log('API Response:', { types, statusesData });
 
-            // Extract statuses array from the response
             const statuses = statusesData?.statuses || [];
 
             return { types, statuses };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { CreateAddressDto } from '@/app/globalTypes/address';
 import { ENV_CONFIG } from '@/config/environment';
 
@@ -25,6 +25,8 @@ const handleApiError = async (response: Response) => {
 
 // Update Address Hook
 export const useUpdateAddress = () => {
+    const queryClient = useQueryClient();
+
     return useMutation({
         mutationFn: async ({ id, data }: { id: string; data: CreateAddressDto }) => {
             console.log('Updating address:', { id, data });
@@ -45,12 +47,44 @@ export const useUpdateAddress = () => {
             const result = await response.json();
             console.log('API Response:', { updatedAddress: result });
             return result;
+        },
+        onSuccess: async (data) => {
+            // Invalidate all relevant queries immediately
+            await Promise.all([
+                // Invalidate all account queries as they might reference this address
+                queryClient.invalidateQueries({ 
+                    queryKey: ['account']
+                }),
+                queryClient.invalidateQueries({ 
+                    queryKey: ['accounts']
+                }),
+                queryClient.invalidateQueries({ 
+                    queryKey: ['address', data.address_id]
+                }),
+                queryClient.invalidateQueries({
+                    queryKey: ['addresses']
+                })
+            ]);
+
+            // Force refetch of affected queries
+            await Promise.all([
+                queryClient.refetchQueries({ 
+                    queryKey: ['account'],
+                    exact: false
+                }),
+                queryClient.refetchQueries({ 
+                    queryKey: ['accounts'],
+                    exact: false
+                })
+            ]);
         }
     });
 };
 
 // Create Address Hook
 export const useCreateAddress = () => {
+    const queryClient = useQueryClient();
+
     return useMutation({
         mutationFn: async (data: CreateAddressDto) => {
             console.log('Creating address:', data);
@@ -71,6 +105,26 @@ export const useCreateAddress = () => {
             const result = await response.json();
             console.log('API Response:', { newAddress: result });
             return result;
+        },
+        onSuccess: async () => {
+            // Invalidate and refetch all relevant queries
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+                queryClient.invalidateQueries({ queryKey: ['account'] }),
+                queryClient.invalidateQueries({ queryKey: ['addresses'] })
+            ]);
+
+            // Force refetch
+            await Promise.all([
+                queryClient.refetchQueries({ 
+                    queryKey: ['account'],
+                    exact: false
+                }),
+                queryClient.refetchQueries({ 
+                    queryKey: ['accounts'],
+                    exact: false
+                })
+            ]);
         }
     });
 };

@@ -1,38 +1,58 @@
-# Dependencies
-node_modules
-.pnp
-.pnp.js
-
-# Testing
-coverage
-
-# Next.js
-.next/
-out/
-build
-dist
-
-# Misc
-.DS_Store
-*.pem
+# Environment variables
 .env
 .env.local
+.env.*.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Keep example files
+!.env.example
 
-# IDE
-.idea
-.vscode
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.pnpm-store/
 
-# TypeScript
+# Build outputs
+dist/
+build/
+out/
+.next/
 *.tsbuildinfo
+
+# Testing
+coverage/
+.nyc_output/
 
 # Logs
 logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.sublime-workspace
+*.sublime-project
+
+# OS
+.DS_Store
+Thumbs.db
+*.pem
+
+# Package specific
+packages/**/dist/
+packages/**/.turbo
+packages/**/.cache
+
+# Temporary files
+*.swp
+*.swo
+*~

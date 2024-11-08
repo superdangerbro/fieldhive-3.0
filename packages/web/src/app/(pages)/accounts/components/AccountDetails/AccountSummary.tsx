@@ -23,14 +23,6 @@ export function AccountSummary({ account }: AccountSummaryProps) {
     const propertyCount = account.properties?.length || 0;
     const jobCount = account.jobs?.length || 0;
 
-    // Ensure we have the latest data
-    useEffect(() => {
-        if (account.account_id) {
-            console.log('Refreshing account data:', account.account_id);
-            queryClient.invalidateQueries({ queryKey: ['account', account.account_id] });
-        }
-    }, [account.account_id, queryClient]);
-
     const handleEditSuccess = () => {
         console.log('Properties updated successfully');
         setIsEditingProperties(false);

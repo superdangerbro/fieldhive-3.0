@@ -48,31 +48,21 @@ export function EditAccountPropertiesDialog({
 
     const handleSubmit = useCallback(async () => {
         try {
-            const result = await updateAccountMutation.mutateAsync({
+            await updateAccountMutation.mutateAsync({
                 id: account.account_id,
                 data: {
                     property_ids: selectedProperties.map(prop => prop.property_id)
                 }
             });
 
-            // Update the specific account in the cache
-            queryClient.setQueryData(['account', account.account_id], result);
-
-            // Update the account in the accounts list if it exists in cache
-            queryClient.setQueriesData({ queryKey: ['accounts'] }, (oldData: any) => {
-                if (!oldData?.accounts) return oldData;
-                return {
-                    ...oldData,
-                    accounts: oldData.accounts.map((acc: Account) => 
-                        acc.account_id === account.account_id ? result : acc
-                    )
-                };
-            });
+            // Refresh everything
+            await queryClient.refetchQueries();
 
             notifySuccess('Properties updated successfully');
             onSuccess();
             onClose();
         } catch (error) {
+            console.error('Failed to update properties:', error);
             notifyError('Failed to update properties');
             setSelectedProperties(account.properties || []);
         }
@@ -91,7 +81,13 @@ export function EditAccountPropertiesDialog({
             onClose={handleClose}
             maxWidth="md"
             fullWidth
-            keepMounted={false}
+            PaperProps={{
+                component: 'form',
+                onSubmit: (e: React.FormEvent) => {
+                    e.preventDefault();
+                    handleSubmit();
+                }
+            }}
         >
             <DialogTitle>Edit Properties</DialogTitle>
             <DialogContent>
@@ -120,22 +116,27 @@ export function EditAccountPropertiesDialog({
                                 InputProps={{
                                     ...params.InputProps,
                                     endAdornment: (
-                                        <React.Fragment>
+                                        <>
                                             {loadingProperties ? (
                                                 <CircularProgress color="inherit" size={20} />
                                             ) : null}
                                             {params.InputProps.endAdornment}
-                                        </React.Fragment>
+                                        </>
                                     ),
                                 }}
                             />
                         )}
-                        renderTags={(value, getTagProps) =>
-                            value.map((option, index) => (
+                        renderTags={(value) =>
+                            value.map((option) => (
                                 <Chip
-                                    label={option.name}
-                                    {...getTagProps({ index })}
                                     key={option.property_id}
+                                    label={option.name}
+                                    variant="filled"
+                                    onDelete={() => {
+                                        setSelectedProperties(prev => 
+                                            prev.filter(p => p.property_id !== option.property_id)
+                                        );
+                                    }}
                                 />
                             ))
                         }
@@ -143,6 +144,11 @@ export function EditAccountPropertiesDialog({
                             option.property_id === value.property_id
                         }
                         disabled={isLoading}
+                        componentsProps={{
+                            paper: {
+                                sx: { marginTop: 1 }
+                            }
+                        }}
                     />
                 </Box>
             </DialogContent>
@@ -150,11 +156,12 @@ export function EditAccountPropertiesDialog({
                 <Button 
                     onClick={handleClose}
                     disabled={isLoading}
+                    type="button"
                 >
                     Cancel
                 </Button>
                 <Button
-                    onClick={handleSubmit}
+                    type="submit"
                     variant="contained"
                     disabled={isLoading}
                     startIcon={isLoading ? <CircularProgress size={20} /> : null}

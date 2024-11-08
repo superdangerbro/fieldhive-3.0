@@ -136,7 +136,7 @@ export async function createAccount(req: Request, res: Response) {
         const newAccount = accountRepository.create({
             ...req.body,
             name: name.trim(), // Ensure trimmed name is saved
-            status: 'Active',
+            status: req.body.status || 'active', // Default to lowercase 'active' if not provided
             created_at: now,
             updated_at: now
         });
@@ -402,7 +402,7 @@ export async function archiveAccount(req: Request, res: Response) {
             });
         }
 
-        account.status = 'Archived';
+        account.status = 'archived'; // lowercase status
         account.updated_at = new Date();
         const result = await accountRepository.save(account);
         const archivedAccount = Array.isArray(result) ? result[0] : result;

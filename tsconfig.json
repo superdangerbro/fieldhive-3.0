@@ -6,12 +6,16 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "composite": true
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@fieldhive/*": ["packages/*/src"]
+    }
   },
   "references": [
-    { "path": "./packages/shared" },
     { "path": "./packages/api" },
-    { "path": "./packages/web" }
+    { "path": "./packages/web" },
+    { "path": "./packages/infrastructure" }
   ],
   "files": []
 }

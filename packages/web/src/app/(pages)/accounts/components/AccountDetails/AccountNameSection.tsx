@@ -30,20 +30,23 @@ export function AccountNameSection({ account, onUpdate, onDeleteClick }: Account
             return;
         }
 
+        if (!editedName.trim()) {
+            notifyError('Account name cannot be empty');
+            return;
+        }
+
         try {
             console.log('Updating account name:', { id: account.account_id, name: editedName });
-            const result = await updateAccountMutation.mutateAsync({ 
+            await updateAccountMutation.mutateAsync({ 
                 id: account.account_id, 
                 data: { name: editedName }
             });
 
-            queryClient.setQueryData(['account', account.account_id], result);
-            queryClient.setQueriesData({ queryKey: ['accounts'] }, (oldData: any) => {
-                if (!oldData) return oldData;
-                return oldData.map((acc: Account) => 
-                    acc.account_id === account.account_id ? result : acc
-                );
-            });
+            // Invalidate and refetch queries
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['account', account.account_id] }),
+                queryClient.invalidateQueries({ queryKey: ['accounts'] })
+            ]);
 
             setIsEditing(false);
             notifySuccess('Account name updated successfully');
@@ -68,6 +71,7 @@ export function AccountNameSection({ account, onUpdate, onDeleteClick }: Account
                         autoFocus
                         error={!editedName.trim()}
                         helperText={!editedName.trim() ? 'Name is required' : ''}
+                        disabled={isLoading}
                     />
                     <IconButton 
                         size="small" 

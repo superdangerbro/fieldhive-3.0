@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { Box, Drawer, List, ListItem, ListItemIcon, ListItemText, AppBar, Toolbar, Typography, IconButton, Collapse } from '@mui/material';
+import { Box, Drawer, List, ListItem, ListItemIcon, ListItemText, AppBar, Toolbar, Typography, IconButton, Collapse, ButtonBase } from '@mui/material';
 import MapIcon from '@mui/icons-material/Map';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -37,7 +37,12 @@ export default function PagesLayout({ children }: { children: React.ReactNode })
 
     return (
       <Link key={item.text} href={item.path} passHref style={{ textDecoration: 'none', color: 'inherit' }}>
-        <ListItem button selected={isSelected} sx={{ pl: isSubItem ? 4 : 2 }}>
+        <ListItem 
+          sx={{ 
+            pl: isSubItem ? 4 : 2,
+            backgroundColor: isSelected ? 'action.selected' : 'transparent'
+          }}
+        >
           <ListItemIcon>{item.icon}</ListItemIcon>
           {isDrawerOpen && <ListItemText primary={item.text} />}
         </ListItem>

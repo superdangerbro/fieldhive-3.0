@@ -18,6 +18,9 @@ import {
     Alert
 } from '@mui/material';
 import { useAccountSettings, useCreateAccount } from '../hooks/useAccounts';
+import { useCreateAddress } from '../hooks/useAddresses';
+import { useSelectedAccount } from '../hooks/useSelectedAccount';
+import { useQueryClient } from '@tanstack/react-query';
 import { AddressForm } from '@/app/globalComponents/AddressForm';
 import type { AccountType } from '@/app/globalTypes/account';
 import type { CreateAddressDto } from '@/app/globalTypes/address';
@@ -35,8 +38,11 @@ interface FormData {
 }
 
 export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDialogProps) {
+    const queryClient = useQueryClient();
     const { data: settings, isLoading: isLoadingSettings, error: settingsError } = useAccountSettings();
     const createAccountMutation = useCreateAccount();
+    const createAddressMutation = useCreateAddress();
+    const { setSelectedAccount } = useSelectedAccount();
     const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState<FormData>({
         name: '',
@@ -136,18 +142,29 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
             // Validate form
             validateForm();
 
-            await createAccountMutation.mutateAsync({
+            // First create the address
+            const addressResult = await createAddressMutation.mutateAsync({
+                address1: formData.address.address1?.trim() || '',
+                address2: formData.address.address2?.trim(),
+                city: formData.address.city?.trim() || '',
+                province: formData.address.province?.trim() || '',
+                postal_code: formData.address.postal_code?.trim() || '',
+                country: formData.address.country?.trim() || 'Canada',
+            });
+
+            // Then create the account with the new address ID
+            const accountResult = await createAccountMutation.mutateAsync({
                 name: formData.name.trim(),
                 type: formData.type.toLowerCase(),
-                billingAddress: {
-                    address1: formData.address.address1?.trim() || '',
-                    address2: formData.address.address2?.trim(),
-                    city: formData.address.city?.trim() || '',
-                    province: formData.address.province?.trim() || '',
-                    postal_code: formData.address.postal_code?.trim() || '',
-                    country: formData.address.country?.trim() || 'Canada',
-                }
+                status: 'active', // lowercase status
+                billing_address_id: addressResult.address_id
             });
+
+            // Refresh all queries
+            await queryClient.refetchQueries();
+
+            // Select the newly created account
+            setSelectedAccount(accountResult.account_id);
 
             onAccountAdded();
             onClose();
@@ -166,8 +183,8 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
         }
     };
 
-    const isLoading = isLoadingSettings || createAccountMutation.isPending;
-    const displayError = error || settingsError?.message || createAccountMutation.error?.message;
+    const isLoading = isLoadingSettings || createAccountMutation.isPending || createAddressMutation.isPending;
+    const displayError = error || settingsError?.message || createAccountMutation.error?.message || createAddressMutation.error?.message;
     const accountTypes = settings?.types || [];
 
     return (
@@ -240,7 +257,11 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
                 />
             </DialogContent>
             <DialogActions>
-                <Button onClick={onClose} disabled={isLoading}>
+                <Button 
+                    onClick={onClose} 
+                    disabled={isLoading}
+                    type="button"
+                >
                     Cancel
                 </Button>
                 <Button 

@@ -1,64 +1,187 @@
 import { z } from 'zod';
-import * as dotenv from 'dotenv';
-import { resolve } from 'path';
-
-// Load environment variables from .env file
-const envPath = resolve(__dirname, '../../.env'); // Adjusted path
-const result = dotenv.config({ path: envPath });
-
-if (result.error) {
-    throw new Error(`Error loading .env file: ${result.error.message}`);
-}
+import { getSecrets } from '@fieldhive/infrastructure';
 
 // Schema for environment variables
 const envSchema = z.object({
     // Database
-    DB_HOST: z.string(),
-    DB_PORT: z.string().transform(Number),
-    DB_USER: z.string(),
-    DB_NAME: z.string(),
-    DB_PASSWORD: z.string(),
-    DB_SSL: z.string().transform(val => val === 'true').default('true'),
-    DB_SSL_REJECT_UNAUTHORIZED: z.string().transform(val => val === 'true').default('false'),
-    DB_POOL_MIN: z.string().transform(Number).default('2'),
-    DB_POOL_MAX: z.string().transform(Number).default('10'),
-    DB_POOL_IDLE_TIMEOUT: z.string().transform(Number).default('10000'),
+    database: z.object({
+        host: z.string(),
+        port: z.number(),
+        name: z.string(),
+        user: z.string(),
+        password: z.string(),
+        ssl: z.boolean().default(true),
+        sslRejectUnauthorized: z.boolean().default(false),
+        pool: z.object({
+            min: z.number().default(2),
+            max: z.number().default(10),
+            idleTimeoutMillis: z.number().default(10000),
+        }),
+    }),
 
     // Server
-    PORT: z.string().transform(Number).default('3001'),
-    WS_PORT: z.string().transform(Number).default('3004'),
-    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    server: z.object({
+        port: z.number().default(3001),
+        wsPort: z.number().default(3004),
+        nodeEnv: z.enum(['development', 'production', 'test']).default('development'),
+        corsOrigin: z.string().default('http://localhost:3000'),
+    }),
 
     // Logging
-    LOG_LEVEL: z.enum(['error', 'warn', 'info', 'http', 'debug']).default('info'),
-    ENABLE_REQUEST_LOGGING: z.string().transform(val => val === 'true').default('true'),
-    ENABLE_QUERY_LOGGING: z.string().transform(val => val === 'true').default('true'),
+    logging: z.object({
+        level: z.enum(['error', 'warn', 'info', 'http', 'debug']).default('info'),
+        enableRequestLogging: z.boolean().default(true),
+        enableQueryLogging: z.boolean().default(true),
+    }),
 
     // Security
-    JWT_SECRET: z.string().optional(),
-    CORS_ORIGIN: z.string().default('http://localhost:3000'),
+    security: z.object({
+        jwtSecret: z.string(),
+    }),
 
     // Rate Limiting
-    RATE_LIMIT_WINDOW_MS: z.string().transform(Number).default('900000'),
-    RATE_LIMIT_MAX_REQUESTS: z.string().transform(Number).default('100'),
+    rateLimit: z.object({
+        windowMs: z.number().default(900000), // 15 minutes
+        maxRequests: z.number().default(100),
+    }),
 
     // Cache
-    CACHE_TTL: z.string().transform(Number).default('3600'),
-    CACHE_CHECK_PERIOD: z.string().transform(Number).default('120'),
+    cache: z.object({
+        ttl: z.number().default(3600), // 1 hour
+        checkPeriod: z.number().default(120), // 2 minutes
+    }),
 
     // File Upload
-    MAX_FILE_SIZE: z.string().transform(Number).default('5242880'),
-    ALLOWED_FILE_TYPES: z.string().default('image/jpeg,image/png,application/pdf'),
+    fileUpload: z.object({
+        maxSize: z.number().default(5242880), // 5MB
+        allowedTypes: z.array(z.string()).default(['image/jpeg', 'image/png', 'application/pdf']),
+    }),
 
     // Maintenance
-    MAINTENANCE_MODE: z.string().transform(val => val === 'true').default('false'),
-    MAINTENANCE_MESSAGE: z.string().default('System is under maintenance. Please try again later.')
+    maintenance: z.object({
+        enabled: z.boolean().default(false),
+        message: z.string().default('System is under maintenance. Please try again later.'),
+    }),
+
+    // AWS Configuration
+    aws: z.object({
+        region: z.string(),
+        accessKeyId: z.string().optional(),
+        secretAccessKey: z.string().optional(),
+    }),
 });
 
-// Parse and validate environment variables
-const parseEnv = () => {
+export const loadConfig = async () => {
+    const nodeEnv = process.env.NODE_ENV || 'development';
+
     try {
-        return envSchema.parse(process.env);
+        if (nodeEnv === 'production') {
+            const secrets = await getSecrets('production');
+            return envSchema.parse({
+                database: {
+                    host: secrets.database.host,
+                    port: secrets.database.port,
+                    name: secrets.database.name,
+                    user: secrets.database.user,
+                    password: secrets.database.password,
+                    ssl: true,
+                    sslRejectUnauthorized: false,
+                    pool: {
+                        min: Number(process.env.DB_POOL_MIN) || 2,
+                        max: Number(process.env.DB_POOL_MAX) || 10,
+                        idleTimeoutMillis: Number(process.env.DB_POOL_IDLE_TIMEOUT) || 10000,
+                    },
+                },
+                server: {
+                    port: Number(process.env.PORT) || 3001,
+                    wsPort: Number(process.env.WS_PORT) || 3004,
+                    nodeEnv,
+                    corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+                },
+                logging: {
+                    level: (process.env.LOG_LEVEL || 'info') as any,
+                    enableRequestLogging: process.env.ENABLE_REQUEST_LOGGING === 'true',
+                    enableQueryLogging: process.env.ENABLE_QUERY_LOGGING === 'true',
+                },
+                security: {
+                    jwtSecret: secrets.jwt.secret,
+                },
+                rateLimit: {
+                    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
+                    maxRequests: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+                },
+                cache: {
+                    ttl: Number(process.env.CACHE_TTL) || 3600,
+                    checkPeriod: Number(process.env.CACHE_CHECK_PERIOD) || 120,
+                },
+                fileUpload: {
+                    maxSize: Number(process.env.MAX_FILE_SIZE) || 5242880,
+                    allowedTypes: process.env.ALLOWED_FILE_TYPES?.split(',') || ['image/jpeg', 'image/png', 'application/pdf'],
+                },
+                maintenance: {
+                    enabled: process.env.MAINTENANCE_MODE === 'true',
+                    message: process.env.MAINTENANCE_MESSAGE || 'System is under maintenance. Please try again later.',
+                },
+                aws: {
+                    region: process.env.AWS_REGION || 'us-east-1',
+                    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+                },
+            });
+        }
+
+        // Development/Test environment
+        return envSchema.parse({
+            database: {
+                host: process.env.DB_HOST!,
+                port: Number(process.env.DB_PORT),
+                name: process.env.DB_NAME!,
+                user: process.env.DB_USER!,
+                password: process.env.DB_PASSWORD!,
+                ssl: process.env.DB_SSL === 'true',
+                sslRejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true',
+                pool: {
+                    min: Number(process.env.DB_POOL_MIN) || 2,
+                    max: Number(process.env.DB_POOL_MAX) || 10,
+                    idleTimeoutMillis: Number(process.env.DB_POOL_IDLE_TIMEOUT) || 10000,
+                },
+            },
+            server: {
+                port: Number(process.env.PORT) || 3001,
+                wsPort: Number(process.env.WS_PORT) || 3004,
+                nodeEnv,
+                corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+            },
+            logging: {
+                level: (process.env.LOG_LEVEL || 'info') as any,
+                enableRequestLogging: process.env.ENABLE_REQUEST_LOGGING === 'true',
+                enableQueryLogging: process.env.ENABLE_QUERY_LOGGING === 'true',
+            },
+            security: {
+                jwtSecret: process.env.JWT_SECRET || 'development-secret',
+            },
+            rateLimit: {
+                windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
+                maxRequests: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+            },
+            cache: {
+                ttl: Number(process.env.CACHE_TTL) || 3600,
+                checkPeriod: Number(process.env.CACHE_CHECK_PERIOD) || 120,
+            },
+            fileUpload: {
+                maxSize: Number(process.env.MAX_FILE_SIZE) || 5242880,
+                allowedTypes: process.env.ALLOWED_FILE_TYPES?.split(',') || ['image/jpeg', 'image/png', 'application/pdf'],
+            },
+            maintenance: {
+                enabled: process.env.MAINTENANCE_MODE === 'true',
+                message: process.env.MAINTENANCE_MESSAGE || 'System is under maintenance. Please try again later.',
+            },
+            aws: {
+                region: process.env.AWS_REGION || 'us-east-1',
+                accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+            },
+        });
     } catch (error) {
         if (error instanceof z.ZodError) {
             const missingVars = error.errors
@@ -81,72 +204,10 @@ const parseEnv = () => {
     }
 };
 
-// Export validated environment variables
-export const env = parseEnv();
-
 // Export type for environment variables
 export type Env = z.infer<typeof envSchema>;
 
-// Helper function to check if we're in production
-export const isProduction = env.NODE_ENV === 'production';
-
-// Helper function to check if we're in development
-export const isDevelopment = env.NODE_ENV === 'development';
-
-// Helper function to check if we're in test
-export const isTest = env.NODE_ENV === 'test';
-
-// Export database configuration
-export const dbConfig = {
-    host: env.DB_HOST,
-    port: env.DB_PORT,
-    username: env.DB_USER,
-    password: env.DB_PASSWORD,
-    database: env.DB_NAME,
-    ssl: env.DB_SSL ? {
-        rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED
-    } : false,
-    pool: {
-        min: env.DB_POOL_MIN,
-        max: env.DB_POOL_MAX,
-        idleTimeoutMillis: env.DB_POOL_IDLE_TIMEOUT
-    }
-};
-
-// Export server configuration
-export const serverConfig = {
-    port: env.PORT,
-    wsPort: env.WS_PORT,
-    corsOrigin: env.CORS_ORIGIN
-};
-
-// Export logging configuration
-export const loggingConfig = {
-    level: env.LOG_LEVEL,
-    enableRequestLogging: env.ENABLE_REQUEST_LOGGING,
-    enableQueryLogging: env.ENABLE_QUERY_LOGGING
-};
-
-// Export rate limiting configuration
-export const rateLimitConfig = {
-    windowMs: env.RATE_LIMIT_WINDOW_MS,
-    max: env.RATE_LIMIT_MAX_REQUESTS
-};
-
-// Export cache configuration
-export const cacheConfig = {
-    ttl: env.CACHE_TTL,
-    checkPeriod: env.CACHE_CHECK_PERIOD
-};
-
-// Export file upload configuration
-export const fileUploadConfig = {
-    maxSize: env.MAX_FILE_SIZE,
-    allowedTypes: env.ALLOWED_FILE_TYPES.split(',')
-};
-
-// Export maintenance configuration
-export const maintenanceConfig = {
-    enabled: env.MAINTENANCE_MODE,
-    message: env.MAINTENANCE_MESSAGE
-};
+// Helper functions
+export const isProduction = () => process.env.NODE_ENV === 'production';
+export const isDevelopment = () => process.env.NODE_ENV === 'development';
+export const isTest = () => process.env.NODE_ENV === 'test';
