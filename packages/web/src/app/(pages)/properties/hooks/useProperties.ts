@@ -59,7 +59,7 @@ export const useProperties = (params?: { limit?: number; offset?: number; search
             }
             return data.properties || [];
         },
-        staleTime: 0 // Always fetch fresh data
+        staleTime: 30000 // Data considered fresh for 30 seconds
     });
 };
 
@@ -93,7 +93,7 @@ export const useProperty = (propertyId: string | null) => {
             return data;
         },
         enabled: !!propertyId,
-        staleTime: 0 // Always fetch fresh data
+        staleTime: 30000 // Data considered fresh for 30 seconds
     });
 };
 
@@ -127,7 +127,7 @@ export const useSelectedProperty = () => {
             return data;
         },
         enabled: !!selectedPropertyId,
-        staleTime: 0 // Always fetch fresh data
+        staleTime: 30000 // Data considered fresh for 30 seconds
     });
 
     const setSelectedProperty = async (property: Property | null) => {

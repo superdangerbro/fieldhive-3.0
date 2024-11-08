@@ -53,12 +53,7 @@ export function AccountsTable({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const { notifySuccess, notifyError } = useActionNotifications();
-  const { data: accounts = [], isLoading } = useAccounts({
-    limit: pageSize,
-    offset: page * pageSize,
-    search: filterText
-  });
-
+  const { data: accounts = [], isLoading } = useAccounts();
   const { data: settings } = useAccountSettings();
   const bulkDeleteMutation = useBulkDeleteAccounts();
 
@@ -180,6 +175,24 @@ export function AccountsTable({
       }))
   , [visibleColumns]);
 
+  // Client-side filtering
+  const filteredAccounts = useMemo(() => {
+    if (!filterText) return accounts;
+
+    const searchText = filterText.toLowerCase();
+    return accounts.filter((account: Account) => 
+      account.name.toLowerCase().includes(searchText) ||
+      account.type.toLowerCase().includes(searchText) ||
+      account.status.toLowerCase().includes(searchText) ||
+      account.properties?.some(property => property.name.toLowerCase().includes(searchText)) ||
+      (account.billingAddress && (
+        account.billingAddress.address1.toLowerCase().includes(searchText) ||
+        account.billingAddress.city.toLowerCase().includes(searchText) ||
+        account.billingAddress.province.toLowerCase().includes(searchText)
+      ))
+    );
+  }, [accounts, filterText]);
+
   const handleRowClick = useCallback((params: GridRowParams) => {
     const account = accounts.find((a: Account) => a.account_id === params.id);
     if (account && (!selectedAccount || account.account_id !== selectedAccount.account_id)) {
@@ -226,7 +239,7 @@ export function AccountsTable({
             <Box sx={{ flexGrow: 1 }}>
               <Stack direction="row" spacing={2} alignItems="center">
                 <Typography variant="body2" color="text.secondary">
-                  {accounts.length} accounts found
+                  {filteredAccounts.length} accounts found
                 </Typography>
                 {selectedRows.length > 0 && (
                   <Button
@@ -291,12 +304,12 @@ export function AccountsTable({
       </Card>
 
       <DataGrid
-        rows={accounts}
+        rows={filteredAccounts}
         columns={columns}
         getRowId={(row) => row.account_id}
-        rowCount={accounts.length}
+        rowCount={filteredAccounts.length}
         loading={isLoading}
-        paginationMode="server"
+        paginationMode="client"
         page={page}
         pageSize={pageSize}
         rowsPerPageOptions={[25, 50, 100]}

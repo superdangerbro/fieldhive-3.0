@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
@@ -30,16 +30,31 @@ interface PropertyParentAccountsProps {
 
 export default function PropertyParentAccounts({ property, onUpdate }: PropertyParentAccountsProps) {
     const [isEditing, setIsEditing] = useState(false);
-    const [selectedAccounts, setSelectedAccounts] = useState<Account[]>(
-        property.accounts || []
-    );
+    const [selectedAccounts, setSelectedAccounts] = useState<Account[]>([]);
+    const [error, setError] = useState<string | null>(null);
 
-    // Fetch available accounts
     const { data: accounts = [], isLoading: loadingAccounts } = useAccounts();
     const updatePropertyMutation = useUpdateProperty();
 
+    useEffect(() => {
+        if (property.accounts) {
+            setSelectedAccounts([...property.accounts]);
+        }
+    }, [property.accounts]);
+
+    const handleClose = () => {
+        setIsEditing(false);
+        setError(null);
+        if (property.accounts) {
+            setSelectedAccounts([...property.accounts]);
+        }
+    };
+
     const handleSubmit = async () => {
+        if (!property.property_id) return;
+        
         try {
+            setError(null);
             await updatePropertyMutation.mutateAsync({
                 id: property.property_id,
                 data: {
@@ -48,13 +63,14 @@ export default function PropertyParentAccounts({ property, onUpdate }: PropertyP
             });
             onUpdate();
             setIsEditing(false);
-        } catch (error) {
-            console.error('Failed to update property accounts:', error);
+        } catch (err) {
+            setError('Failed to update parent accounts. Please try again.');
+            console.error('Failed to update property accounts:', err);
         }
     };
 
     return (
-        <>
+        <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <BusinessIcon sx={{ mr: 1, color: 'primary.main' }} />
                 <Typography variant="h6">
@@ -84,81 +100,84 @@ export default function PropertyParentAccounts({ property, onUpdate }: PropertyP
                 )}
             </Box>
 
-            <Dialog
-                open={isEditing}
-                onClose={() => setIsEditing(false)}
-                maxWidth="sm"
-                fullWidth
-            >
-                <DialogTitle>Edit Parent Accounts</DialogTitle>
-                <DialogContent>
-                    <Box sx={{ mt: 2 }}>
-                        {updatePropertyMutation.isError && (
-                            <Alert severity="error" sx={{ mb: 2 }}>
-                                Failed to update parent accounts. Please try again.
-                            </Alert>
-                        )}
-
-                        <Autocomplete
-                            multiple
-                            options={accounts}
-                            value={selectedAccounts}
-                            onChange={(_, newValue) => setSelectedAccounts(newValue)}
-                            getOptionLabel={(option) => option.name}
-                            loading={loadingAccounts}
-                            renderInput={(params) => (
-                                <TextField
-                                    {...params}
-                                    label="Parent Accounts"
-                                    variant="outlined"
-                                    InputProps={{
-                                        ...params.InputProps,
-                                        endAdornment: (
-                                            <React.Fragment>
-                                                {loadingAccounts ? (
-                                                    <CircularProgress color="inherit" size={20} />
-                                                ) : null}
-                                                {params.InputProps.endAdornment}
-                                            </React.Fragment>
-                                        ),
-                                    }}
-                                />
+            {isEditing && (
+                <Dialog
+                    open={true}
+                    onClose={handleClose}
+                    maxWidth="sm"
+                    fullWidth
+                    keepMounted={false}
+                >
+                    <DialogTitle>Edit Parent Accounts</DialogTitle>
+                    <DialogContent>
+                        <Box sx={{ mt: 2 }}>
+                            {(error || updatePropertyMutation.isError) && (
+                                <Alert severity="error" sx={{ mb: 2 }}>
+                                    {error || 'Failed to update parent accounts. Please try again.'}
+                                </Alert>
                             )}
-                            renderTags={(value, getTagProps) =>
-                                value.map((option, index) => (
-                                    <Chip
-                                        label={option.name}
-                                        {...getTagProps({ index })}
-                                        key={option.account_id}
+
+                            <Autocomplete
+                                multiple
+                                options={accounts}
+                                value={selectedAccounts}
+                                onChange={(_, newValue) => setSelectedAccounts(newValue || [])}
+                                getOptionLabel={(option) => option.name || ''}
+                                loading={loadingAccounts}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Parent Accounts"
+                                        variant="outlined"
+                                        InputProps={{
+                                            ...params.InputProps,
+                                            endAdornment: (
+                                                <React.Fragment>
+                                                    {loadingAccounts ? (
+                                                        <CircularProgress color="inherit" size={20} />
+                                                    ) : null}
+                                                    {params.InputProps.endAdornment}
+                                                </React.Fragment>
+                                            ),
+                                        }}
                                     />
-                                ))
-                            }
-                            isOptionEqualToValue={(option, value) => 
-                                option.account_id === value.account_id
-                            }
-                        />
-                    </Box>
-                </DialogContent>
-                <DialogActions>
-                    <Button 
-                        onClick={() => setIsEditing(false)}
-                        disabled={updatePropertyMutation.isPending}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleSubmit}
-                        variant="contained"
-                        disabled={updatePropertyMutation.isPending}
-                    >
-                        {updatePropertyMutation.isPending ? (
-                            <CircularProgress size={24} color="inherit" />
-                        ) : (
-                            'Save Changes'
-                        )}
-                    </Button>
-                </DialogActions>
-            </Dialog>
-        </>
+                                )}
+                                renderTags={(value, getTagProps) =>
+                                    value.map((option, index) => (
+                                        <Chip
+                                            label={option.name}
+                                            {...getTagProps({ index })}
+                                            key={option.account_id}
+                                        />
+                                    ))
+                                }
+                                isOptionEqualToValue={(option, value) => 
+                                    option.account_id === value.account_id
+                                }
+                            />
+                        </Box>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button 
+                            onClick={handleClose}
+                            disabled={updatePropertyMutation.isPending}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleSubmit}
+                            variant="contained"
+                            disabled={updatePropertyMutation.isPending}
+                        >
+                            {updatePropertyMutation.isPending ? (
+                                <CircularProgress size={24} color="inherit" />
+                            ) : (
+                                'Save Changes'
+                            )}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+            )}
+        </Box>
     );
 }

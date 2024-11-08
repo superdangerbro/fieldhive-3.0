@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -35,30 +35,19 @@ export function EditAccountPropertiesDialog({
     onSuccess 
 }: EditAccountPropertiesDialogProps) {
     const queryClient = useQueryClient();
-    const [selectedProperties, setSelectedProperties] = useState<Property[]>(
-        account.properties || []
-    );
-
-    // Reset selection when account changes or dialog opens
-    useEffect(() => {
-        if (open) {
-            console.log('Resetting selected properties:', account.properties);
-            setSelectedProperties(account.properties || []);
-        }
-    }, [account, open]);
-
-    // Fetch all available properties
+    const [selectedProperties, setSelectedProperties] = useState<Property[]>([]);
+    const { notifySuccess, notifyError } = useActionNotifications();
     const { data: properties = [], isLoading: loadingProperties } = useProperties();
     const updateAccountMutation = useUpdateAccount();
-    const { notifySuccess, notifyError } = useActionNotifications();
 
-    const handleSubmit = async () => {
+    useEffect(() => {
+        if (open && account.properties) {
+            setSelectedProperties([...account.properties]);
+        }
+    }, [open, account.properties]);
+
+    const handleSubmit = useCallback(async () => {
         try {
-            console.log('Updating account properties:', {
-                accountId: account.account_id,
-                selectedProperties: selectedProperties.map(p => ({ id: p.property_id, name: p.name }))
-            });
-
             const result = await updateAccountMutation.mutateAsync({
                 id: account.account_id,
                 data: {
@@ -66,37 +55,33 @@ export function EditAccountPropertiesDialog({
                 }
             });
 
-            // Update the account in the cache
+            // Update the specific account in the cache
             queryClient.setQueryData(['account', account.account_id], result);
 
-            // Update the account in the accounts list cache
+            // Update the account in the accounts list if it exists in cache
             queryClient.setQueriesData({ queryKey: ['accounts'] }, (oldData: any) => {
-                if (!oldData) return oldData;
-                return oldData.map((acc: Account) => 
-                    acc.account_id === account.account_id ? result : acc
-                );
+                if (!oldData?.accounts) return oldData;
+                return {
+                    ...oldData,
+                    accounts: oldData.accounts.map((acc: Account) => 
+                        acc.account_id === account.account_id ? result : acc
+                    )
+                };
             });
-
-            // Force refetch to ensure data consistency
-            await queryClient.invalidateQueries({ queryKey: ['account', account.account_id] });
-            await queryClient.invalidateQueries({ queryKey: ['accounts'] });
-            await queryClient.invalidateQueries({ queryKey: ['properties'] });
 
             notifySuccess('Properties updated successfully');
             onSuccess();
             onClose();
         } catch (error) {
-            console.error('Failed to update account properties:', error);
             notifyError('Failed to update properties');
             setSelectedProperties(account.properties || []);
         }
-    };
+    }, [account.account_id, account.properties, selectedProperties, updateAccountMutation, queryClient, onSuccess, onClose, notifySuccess, notifyError]);
 
-    const handleClose = () => {
-        console.log('Closing dialog, resetting properties');
+    const handleClose = useCallback(() => {
         setSelectedProperties(account.properties || []);
         onClose();
-    };
+    }, [account.properties, onClose]);
 
     const isLoading = loadingProperties || updateAccountMutation.isPending;
 
@@ -106,6 +91,7 @@ export function EditAccountPropertiesDialog({
             onClose={handleClose}
             maxWidth="md"
             fullWidth
+            keepMounted={false}
         >
             <DialogTitle>Edit Properties</DialogTitle>
             <DialogContent>
@@ -122,10 +108,7 @@ export function EditAccountPropertiesDialog({
                         multiple
                         options={properties}
                         value={selectedProperties}
-                        onChange={(_, newValue) => {
-                            console.log('Selected properties changed:', newValue.map(p => ({ id: p.property_id, name: p.name })));
-                            setSelectedProperties(newValue);
-                        }}
+                        onChange={(_, newValue) => setSelectedProperties(newValue)}
                         getOptionLabel={(option) => option.name}
                         loading={loadingProperties}
                         renderInput={(params) => (
