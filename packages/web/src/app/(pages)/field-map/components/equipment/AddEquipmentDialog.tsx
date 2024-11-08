@@ -23,8 +23,14 @@ import {
   TextareaAutosize
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { useEquipmentStore } from '@/stores/equipmentStore';
-import type { Field, FormData, FieldCondition } from '../../../equipment/types';
+import { useEquipment } from '@/app/globalHooks/useEquipment';
+import type { 
+  Field, 
+  FormData, 
+  FieldCondition, 
+  EquipmentType, 
+  EquipmentStatus 
+} from '@/app/globalTypes/equipment';
 
 interface AddEquipmentDialogProps {
   open: boolean;
@@ -51,7 +57,7 @@ export function AddEquipmentDialog({
   onClose,
   onSubmit,
 }: AddEquipmentDialogProps) {
-  const { equipmentTypes, equipmentStatuses, fetchEquipmentTypes, fetchEquipmentStatuses } = useEquipmentStore();
+  const { equipmentTypes, equipmentStatuses, isLoading } = useEquipment();
   const [selectedType, setSelectedType] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [formData, setFormData] = useState<FormData>({});
@@ -65,21 +71,17 @@ export function AddEquipmentDialog({
       setSelectedStatus('');
       setFormData({});
       setError(null);
-      
-      // Fetch equipment types and statuses
-      fetchEquipmentTypes();
-      fetchEquipmentStatuses();
     }
-  }, [open, fetchEquipmentTypes, fetchEquipmentStatuses]);
+  }, [open]);
 
   // Get the selected equipment type configuration
-  const selectedTypeConfig = equipmentTypes.find(t => t.name === selectedType);
+  const selectedTypeConfig = equipmentTypes.find((t: EquipmentType) => t.name === selectedType);
 
   // Get visible fields based on conditions
   const getVisibleFields = () => {
     if (!selectedTypeConfig) return [];
     
-    return selectedTypeConfig.fields.filter(field => {
+    return selectedTypeConfig.fields.filter((field: Field) => {
       if (!field.showWhen || field.showWhen.length === 0) return true;
       
       return field.showWhen.some((condition: FieldCondition) => {
@@ -90,7 +92,7 @@ export function AddEquipmentDialog({
   };
 
   // Check if a field is required based on conditions
-  const isFieldRequired = (field: Field) => {
+  const isFieldRequired = (field: Field): boolean => {
     if (field.required) return true;
     
     if (!field.showWhen) return false;
@@ -108,8 +110,8 @@ export function AddEquipmentDialog({
     // Validate required fields
     const visibleFields = getVisibleFields();
     const missingFields = visibleFields
-      .filter(field => isFieldRequired(field) && !formData[field.name])
-      .map(field => field.name);
+      .filter((field: Field) => isFieldRequired(field) && !formData[field.name])
+      .map((field: Field) => field.name);
 
     if (missingFields.length > 0) {
       setError(`Required fields missing: ${missingFields.join(', ')}`);
@@ -147,10 +149,10 @@ export function AddEquipmentDialog({
       case 'select':
         return (
           <FormControl fullWidth key={field.name}>
-            <InputLabel>{field.name}</InputLabel>
+            <InputLabel>{field.label || field.name}</InputLabel>
             <Select
               value={formData[field.name] || ''}
-              label={field.name}
+              label={field.label || field.name}
               onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
               required={isFieldRequired(field)}
             >
@@ -173,7 +175,7 @@ export function AddEquipmentDialog({
                 onChange={(e) => setFormData({ ...formData, [field.name]: e.target.checked })}
               />
             }
-            label={field.name}
+            label={field.label || field.name}
           />
         );
 
@@ -181,7 +183,7 @@ export function AddEquipmentDialog({
         return (
           <FormControl fullWidth key={field.name}>
             <Typography variant="subtitle2" gutterBottom>
-              {field.name}
+              {field.label || field.name}
               {isFieldRequired(field) && ' *'}
             </Typography>
             <TextareaAutosize
@@ -205,7 +207,7 @@ export function AddEquipmentDialog({
           <TextField
             key={field.name}
             fullWidth
-            label={field.name}
+            label={field.label || field.name}
             type="number"
             value={formData[field.name] || ''}
             onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
@@ -223,7 +225,7 @@ export function AddEquipmentDialog({
           <TextField
             key={field.name}
             fullWidth
-            label={field.name}
+            label={field.label || field.name}
             value={formData[field.name] || ''}
             onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
             required={isFieldRequired(field)}
@@ -288,12 +290,12 @@ export function AddEquipmentDialog({
                 setSelectedType(e.target.value);
                 setFormData({});  // Reset form data when type changes
               }}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLoading}
               required
             >
-              {equipmentTypes.map((type) => (
+              {equipmentTypes.map((type: EquipmentType) => (
                 <MenuItem key={type.name} value={type.name}>
-                  {type.name}
+                  {type.label || type.name}
                 </MenuItem>
               ))}
             </Select>
@@ -305,10 +307,10 @@ export function AddEquipmentDialog({
               value={selectedStatus}
               label="Status"
               onChange={(e) => setSelectedStatus(e.target.value)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLoading}
               required
             >
-              {equipmentStatuses.map((status) => (
+              {equipmentStatuses.map((status: EquipmentStatus) => (
                 <MenuItem key={status.name} value={status.name}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Box
@@ -320,14 +322,14 @@ export function AddEquipmentDialog({
                         mr: 1
                       }}
                     />
-                    {status.name}
+                    {status.label || status.name}
                   </Box>
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
 
-          {selectedTypeConfig && getVisibleFields().map(field => renderField(field))}
+          {selectedTypeConfig && getVisibleFields().map((field: Field) => renderField(field))}
         </Box>
       </DialogContent>
       <DialogActions sx={{ p: 2, gap: 1 }}>
@@ -343,7 +345,7 @@ export function AddEquipmentDialog({
           onClick={handleSubmit}
           variant="contained"
           fullWidth
-          disabled={!selectedType || !selectedStatus || isSubmitting}
+          disabled={!selectedType || !selectedStatus || isSubmitting || isLoading}
           startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
         >
           {isSubmitting ? 'Adding Equipment...' : 'Add Equipment'}

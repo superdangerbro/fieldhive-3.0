@@ -3,8 +3,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { FormControlLabel, Switch, useTheme } from '@mui/material';
 import { MapRef } from 'react-map-gl';
-import { useFieldMapStore } from '../../stores/fieldMapStore';
-import { useMapEquipmentStore } from '../../stores/mapEquipmentStore';
+import { useFieldMap } from '@/app/globalHooks/useFieldMap';
 import { BaseMap, MapControls } from '.';
 import { PropertyLayer } from '../properties';
 import { EquipmentLayer } from '../equipment';
@@ -25,7 +24,7 @@ import type { MapProperty } from '../../types';
  * Architecture:
  * - Uses BaseMap for core map functionality
  * - Separate layers for properties, equipment, and floor plans
- * - Centralized state management via stores
+ * - Centralized state management via React Query
  * - Modular component structure for maintainability
  */
 export function FieldMap() {
@@ -35,16 +34,13 @@ export function FieldMap() {
   const [showFieldEquipment, setShowFieldEquipment] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
 
-  // Get state and actions from stores
+  // Get state and actions from hooks
   const { 
-    fetchPropertiesInBounds,
     selectedProperty,
-    setSelectedProperty
-  } = useFieldMapStore();
-
-  const {
+    setSelectedProperty,
+    currentBounds,
     setCurrentBounds
-  } = useMapEquipmentStore();
+  } = useFieldMap();
 
   // Debug component state
   useEffect(() => {
@@ -63,18 +59,15 @@ export function FieldMap() {
    */
   const handleMoveEnd = useCallback(async (bounds: [number, number, number, number]) => {
     console.log('Map bounds updated:', bounds);
-    
-    // Update bounds in store
     setCurrentBounds(bounds);
-    
-    // Fetch properties in new bounds
-    await fetchPropertiesInBounds(bounds);
-  }, [fetchPropertiesInBounds, setCurrentBounds]);
+  }, [setCurrentBounds]);
 
   /**
    * Handle property selection
    */
   const handlePropertyClick = useCallback((property: MapProperty) => {
+    if (!property.location?.coordinates) return;
+
     console.log('Property selected:', property.property_id);
     setSelectedProperty({
       id: property.property_id,
@@ -170,6 +163,7 @@ export function FieldMap() {
       <EquipmentLayer
         visible={showFieldEquipment}
         selectedPropertyId={selectedProperty?.id}
+        bounds={currentBounds || undefined}
       />
 
       {/* Floor plan overlay and controls */}

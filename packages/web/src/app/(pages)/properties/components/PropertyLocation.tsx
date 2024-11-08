@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Paper, Typography, Stack, Button, CircularProgress, Alert } from '@mui/material';
 import Map, { Marker, Source, Layer } from 'react-map-gl';
-import type { Property } from '@/app/globalTypes';
+import type { Property } from '@/app/globalTypes/property';
 import MapDialog from '../dialogs/MapDialog';
 import EditIcon from '@mui/icons-material/Edit';
 import { usePropertyLocation, useUpdatePropertyLocation, useUpdatePropertyBoundary } from '../hooks/usePropertyLocation';
@@ -13,7 +13,24 @@ interface PropertyLocationProps {
   property: Property;
 }
 
-// ... (keep all the interfaces)
+interface GeoJSONPoint {
+  type: 'Point';
+  coordinates: [number, number];
+}
+
+interface GeoJSONPolygon {
+  type: 'Polygon';
+  coordinates: [number, number][][];
+}
+
+interface LocationData {
+  location?: {
+    geometry: GeoJSONPoint;
+  } | null;
+  boundary?: {
+    geometry: GeoJSONPolygon;
+  } | null;
+}
 
 const APP_THEME_COLOR = '#6366f1';
 
@@ -26,17 +43,31 @@ const DEFAULT_LOCATION: [number, number] = [
 const DEFAULT_ZOOM = Number(process.env.NEXT_PUBLIC_DEFAULT_ZOOM) || 12;
 
 // Helper functions
-function asTuple<T extends any[]>(arr: T): [T[0], T[1]] {
-  return [arr[0], arr[1]];
+function asTuple<T extends any[]>(arr: T): [number, number] {
+  if (!arr || !Array.isArray(arr) || arr.length < 2) {
+    console.warn('Invalid coordinates array:', arr);
+    return DEFAULT_LOCATION;
+  }
+  const [first, second] = arr;
+  if (typeof first !== 'number' || typeof second !== 'number') {
+    console.warn('Invalid coordinate values:', { first, second });
+    return DEFAULT_LOCATION;
+  }
+  return [first, second];
 }
 
-function formatCoordinates(coords: [number, number]) {
+function formatCoordinates(coords: [number, number] | undefined | null): string {
   if (!coords || !Array.isArray(coords) || coords.length !== 2) {
+    console.warn('Invalid coordinates:', coords);
     return 'Not set';
   }
+
   try {
-    // GeoJSON format is [longitude, latitude]
     const [longitude, latitude] = coords;
+    if (typeof longitude !== 'number' || typeof latitude !== 'number') {
+      console.warn('Invalid coordinate values:', { longitude, latitude });
+      return 'Invalid format';
+    }
     return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
   } catch (error) {
     console.error('Error formatting coordinates:', error);
@@ -100,10 +131,17 @@ export default function PropertyLocation({ property }: PropertyLocationProps) {
     }
   }, [isLoading, isError, locationData]);
 
+  // Log boundary data safely
   useEffect(() => {
     if (locationData?.boundary) {
-      console.log('Received boundary data:', locationData.boundary);
-      console.log('Boundary coordinates:', locationData.boundary.geometry.coordinates);
+      try {
+        console.log('Received boundary data:', {
+          type: locationData.boundary.geometry.type,
+          coordinates: locationData.boundary.geometry.coordinates
+        });
+      } catch (error) {
+        console.error('Error logging boundary data:', error);
+      }
     }
   }, [locationData]);
   
@@ -147,7 +185,7 @@ export default function PropertyLocation({ property }: PropertyLocationProps) {
     );
   };
 
-  const handleBoundarySelect = (polygon: any) => {
+  const handleBoundarySelect = (polygon: GeoJSONPolygon) => {
     console.log('Boundary selected:', polygon);
     resetBoundaryError();
     
@@ -179,6 +217,35 @@ export default function PropertyLocation({ property }: PropertyLocationProps) {
     return error instanceof Error ? error.message : 'An unexpected error occurred';
   };
 
+  // Get coordinates safely
+  const coordinates: [number, number] = useMemo(() => {
+    try {
+      if (locationData?.location?.geometry?.coordinates) {
+        const [lng, lat] = locationData.location.geometry.coordinates;
+        if (typeof lng === 'number' && typeof lat === 'number') {
+          return [lat, lng];
+        }
+      }
+      return DEFAULT_LOCATION;
+    } catch (error) {
+      console.error('Error getting coordinates:', error);
+      return DEFAULT_LOCATION;
+    }
+  }, [locationData]);
+
+  // Get boundary data safely
+  const boundaryData = useMemo(() => {
+    try {
+      if (locationData?.boundary?.geometry) {
+        return locationData.boundary;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting boundary data:', error);
+      return null;
+    }
+  }, [locationData]);
+
   if (isLoading) {
     return (
       <Paper sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
@@ -203,15 +270,6 @@ export default function PropertyLocation({ property }: PropertyLocationProps) {
     );
   }
 
-  // Get coordinates from locationData or use default
-  // Convert from GeoJSON [lng, lat] to [lat, lng] for display
-  const coordinates: [number, number] = locationData?.location?.geometry?.coordinates 
-    ? asTuple([locationData.location.geometry.coordinates[1], locationData.location.geometry.coordinates[0]])
-    : DEFAULT_LOCATION;
-
-  // Pass the boundary data directly to MapDialog without converting coordinates
-  const boundaryForDialog = locationData?.boundary?.geometry;
-
   return (
     <Paper sx={{ p: 2, display: 'flex', gap: 2 }}>
       {/* Left side - Location and boundary information */}
@@ -226,7 +284,9 @@ export default function PropertyLocation({ property }: PropertyLocationProps) {
             )}
             <Stack direction="row" spacing={2} alignItems="center">
               <Typography variant="body2" sx={{ minWidth: 140, fontFamily: 'monospace' }}>
-                {locationData?.location ? formatCoordinates(locationData.location.geometry.coordinates) : 'Not set'}
+                {locationData?.location?.geometry?.coordinates 
+                  ? formatCoordinates(locationData.location.geometry.coordinates) 
+                  : 'Not set'}
               </Typography>
               <Button
                 variant="outlined"
@@ -254,8 +314,8 @@ export default function PropertyLocation({ property }: PropertyLocationProps) {
             )}
             <Stack direction="row" spacing={2} alignItems="center">
               <Typography variant="body2" sx={{ minWidth: 140, fontFamily: 'monospace' }}>
-                {locationData?.boundary 
-                  ? `${locationData.boundary.geometry.coordinates[0].length - 1} points` 
+                {boundaryData?.geometry?.coordinates?.[0] 
+                  ? `${boundaryData.geometry.coordinates[0].length - 1} points` 
                   : 'Not set'}
               </Typography>
               <Button
@@ -265,7 +325,7 @@ export default function PropertyLocation({ property }: PropertyLocationProps) {
                 onClick={() => setBoundaryDialogOpen(true)}
                 disabled={isUpdatingBoundary}
               >
-                {locationData?.boundary ? 'Edit Boundary' : 'Add Boundary'}
+                {boundaryData ? 'Edit Boundary' : 'Add Boundary'}
               </Button>
             </Stack>
             {updateBoundaryError && (
@@ -281,7 +341,7 @@ export default function PropertyLocation({ property }: PropertyLocationProps) {
       <Box sx={{ flex: 1, height: 300, borderRadius: 1, overflow: 'hidden' }}>
         {cssLoaded && (
           <Map
-            key={`${property.property_id}-${locationData?.location?.geometry?.coordinates?.join(',')}-${locationData?.boundary?.geometry?.coordinates?.[0]?.length}`}
+            key={`${property.property_id}-${coordinates.join(',')}-${boundaryData?.geometry?.coordinates?.[0]?.length}`}
             initialViewState={{
               longitude: coordinates[1],
               latitude: coordinates[0],
@@ -292,17 +352,17 @@ export default function PropertyLocation({ property }: PropertyLocationProps) {
             mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
             interactive={true}
           >
-            {locationData?.location && (
+            {locationData?.location?.geometry?.coordinates && (
               <Marker
                 longitude={locationData.location.geometry.coordinates[0]}
                 latitude={locationData.location.geometry.coordinates[1]}
                 color={APP_THEME_COLOR}
               />
             )}
-            {locationData?.boundary && (
+            {boundaryData && (
               <Source
                 type="geojson"
-                data={locationData.boundary}
+                data={boundaryData}
               >
                 <Layer
                   id="boundary-fill"
@@ -349,8 +409,8 @@ export default function PropertyLocation({ property }: PropertyLocationProps) {
         initialLocation={coordinates}
         mode="polygon"
         onBoundarySelect={handleBoundarySelect}
-        initialBoundary={boundaryForDialog}
-        title={locationData?.boundary ? 'Edit Property Boundary' : 'Add Property Boundary'}
+        initialBoundary={boundaryData?.geometry}
+        title={boundaryData ? 'Edit Property Boundary' : 'Add Property Boundary'}
       />
     </Paper>
   );

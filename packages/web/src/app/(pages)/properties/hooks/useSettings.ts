@@ -1,36 +1,39 @@
-import { useQuery, UseQueryResult } from '@tanstack/react-query';
+'use client';
+
+import { useQuery } from '@tanstack/react-query';
 import { ENV_CONFIG } from '@/config/environment';
 
-type SettingKey = 'property_statuses' | 'property_types';
+type SettingKey = 'property_types' | 'property_statuses';
 
-const SETTINGS_ENDPOINT = '/settings/properties';
+interface SettingOption {
+    value: string;
+    label: string;
+    color?: string;
+}
 
-// Helper function to build full API URL
-const buildUrl = (key: SettingKey) => 
-    `${ENV_CONFIG.api.baseUrl}${SETTINGS_ENDPOINT}/${key.replace('property_', '')}`;
-
-export const useSetting = <T>(key: SettingKey): UseQueryResult<T[], Error> => {
-    return useQuery({
+export function useSetting(key: SettingKey) {
+    return useQuery<SettingOption[]>({
         queryKey: ['settings', key],
         queryFn: async () => {
-            const response = await fetch(buildUrl(key), {
-                headers: { 'Content-Type': 'application/json' },
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-            });
+            try {
+                const endpoint = key === 'property_types' ? 'types' : 'statuses';
+                const url = `${ENV_CONFIG.api.baseUrl}/settings/properties/${endpoint}`;
+                console.log('Fetching settings:', { key, url });
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.message || `Failed to fetch setting: ${key}`);
+                const response = await fetch(url);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Failed to fetch settings:', errorText);
+                    throw new Error(`Failed to fetch ${key}: ${errorText}`);
+                }
+
+                const data = await response.json();
+                console.log('Received settings data:', data);
+                return data;
+            } catch (error) {
+                console.error('Settings fetch error:', error);
+                throw error;
             }
-
-            const data = await response.json();
-            if (!Array.isArray(data)) {
-                throw new Error(`Invalid response format for setting: ${key}`);
-            }
-
-            return data;
-        },
-        staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
-        gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
+        }
     });
-};
+}

@@ -19,8 +19,8 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useEquipmentStore } from '@/stores/equipmentStore';
-import type { Equipment, Field } from '../../../equipment/types';
+import { useEquipment } from '@/app/globalHooks/useEquipment';
+import type { Equipment, Field, EquipmentStatus, EquipmentType } from '@/app/globalTypes/equipment';
 
 interface EquipmentMarkerDialogProps {
   /** Whether the dialog is open */
@@ -43,18 +43,6 @@ interface EquipmentMarkerDialogProps {
  * - Field value display
  * - Equipment deletion
  * - Type updates
- * 
- * @component
- * @example
- * ```tsx
- * <EquipmentMarkerDialog
- *   open={true}
- *   equipment={equipmentData}
- *   onClose={() => setDialogOpen(false)}
- *   onDelete={handleDelete}
- *   onUpdateType={handleTypeUpdate}
- * />
- * ```
  */
 export function EquipmentMarkerDialog({
   open,
@@ -63,7 +51,7 @@ export function EquipmentMarkerDialog({
   onDelete,
   onUpdateType
 }: EquipmentMarkerDialogProps) {
-  const { equipmentTypes, equipmentStatuses } = useEquipmentStore();
+  const { equipmentTypes, equipmentStatuses } = useEquipment();
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
@@ -100,7 +88,10 @@ export function EquipmentMarkerDialog({
   };
 
   // Find the status configuration for the current equipment status
-  const statusConfig = equipmentStatuses.find(status => status.name === equipment.status);
+  const statusConfig = equipmentStatuses.find((status: EquipmentStatus) => status.name === equipment.status);
+
+  // Find the type configuration for the current equipment
+  const typeConfig = equipmentTypes.find((type: EquipmentType) => type.name === equipment.type);
 
   return (
     <Dialog 
@@ -143,7 +134,7 @@ export function EquipmentMarkerDialog({
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Type
             </Typography>
-            <Typography>{equipment.equipment_type.name}</Typography>
+            <Typography>{typeConfig?.label || equipment.type}</Typography>
           </Box>
 
           <Box>
@@ -151,7 +142,7 @@ export function EquipmentMarkerDialog({
               Status
             </Typography>
             <Chip 
-              label={equipment.status}
+              label={statusConfig?.label || equipment.status}
               sx={{
                 backgroundColor: statusConfig?.color || '#94a3b8',
                 color: 'white'
@@ -160,21 +151,23 @@ export function EquipmentMarkerDialog({
             />
           </Box>
 
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Fields
-            </Typography>
-            {equipment.equipment_type.fields.map((field: Field) => (
-              <Box key={field.name} sx={{ mb: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                  {field.name}
-                </Typography>
-                <Typography>
-                  {getFieldValue(field)}
-                </Typography>
-              </Box>
-            ))}
-          </Box>
+          {typeConfig && (
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Fields
+              </Typography>
+              {typeConfig.fields.map((field: Field) => (
+                <Box key={field.name} sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    {field.label || field.name}
+                  </Typography>
+                  <Typography>
+                    {getFieldValue(field)}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
         </Box>
       </DialogContent>
 

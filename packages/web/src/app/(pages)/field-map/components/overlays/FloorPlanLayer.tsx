@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useFieldMapStore } from '../../stores/fieldMapStore';
+import { useFieldMap } from '@/app/globalHooks/useFieldMap';
 import { FloorControls } from './FloorControls';
 import { FloorPlanDialog } from './FloorPlanDialog';
 import { ImageOverlay } from './ImageOverlay';
@@ -42,7 +42,7 @@ export function FloorPlanLayer({
     selectedProperty,
     floorPlans,
     activeFloorPlan
-  } = useFieldMapStore();
+  } = useFieldMap();
 
   // Debug floor plan state
   React.useEffect(() => {
@@ -80,7 +80,7 @@ export function FloorPlanLayer({
       )}
 
       {/* Floor plan overlay */}
-      {activeFloorPlan && mapRef.current && (
+      {activeFloorPlan && mapRef.current && selectedProperty.location && (
         <ImageOverlay
           id={activeFloorPlan}
           imageUrl={floorPlans.find(fp => fp.id === activeFloorPlan)?.imageUrl || ''}

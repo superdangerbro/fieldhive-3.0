@@ -10,7 +10,7 @@ import {
   Button,
   Box,
 } from '@mui/material';
-import { useFieldMapStore } from '../../stores/fieldMapStore';
+import { useFieldMap } from '@/app/globalHooks/useFieldMap';
 import type { FloorPlan } from '../../types';
 
 interface FloorPlanDialogProps {
@@ -48,7 +48,7 @@ export function FloorPlanDialog({
   const [name, setName] = useState('');
   const [floor, setFloor] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const { addFloorPlan } = useFieldMapStore();
+  const { addFloorPlan } = useFieldMap();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

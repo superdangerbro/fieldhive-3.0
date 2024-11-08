@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { MapProperty, FloorPlan } from '../types';
-import type { Equipment } from '../../equipment/types';
+import type { Equipment } from '@/app/globalTypes/equipment';
 
 interface SyncQueueItem {
   id: string;

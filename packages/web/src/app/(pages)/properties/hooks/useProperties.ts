@@ -1,38 +1,47 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Property, CreatePropertyDto, UpdatePropertyDto } from '@/app/globalTypes/property';
+import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query';
 import { ENV_CONFIG } from '@/config/environment';
+import type { Property } from '@/app/globalTypes/property';
+import { handleApiError } from './utils';
+
+interface PropertyType {
+    value: string;
+    label: string;
+}
+
+interface PropertyStatus {
+    value: string;
+    label: string;
+    color: string;
+}
 
 const ENDPOINTS = {
     properties: '/properties',
     propertyDetails: (id: string) => `/properties/${id}`,
+    search: '/properties/search',
     bulkDelete: '/properties/bulk-delete',
-    propertyLocation: (id: string) => `/properties/${id}/location`,
-    propertyBoundary: (id: string) => `/properties/${id}/boundary`
+    settings: {
+        propertyTypes: '/settings/properties/types',
+        propertyStatuses: '/settings/properties/statuses'
+    }
 } as const;
 
-// Helper function to build full API URL
-const buildUrl = (endpoint: string) => `${ENV_CONFIG.api.baseUrl}${endpoint}`;
-
-// Helper function to handle API errors consistently
-const handleApiError = async (response: Response) => {
-    const error = await response.json();
-    console.error('API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        error
-    });
-    throw new Error(error.message || 'An error occurred');
-};
-
 // Properties List Hook
-export const useProperties = () => {
+export const useProperties = (params?: { limit?: number; offset?: number; search?: string }) => {
     return useQuery({
-        queryKey: ['properties'],
+        queryKey: ['properties', params],
         queryFn: async () => {
-            console.log('Fetching properties list');
-            const response = await fetch(buildUrl(ENDPOINTS.properties), {
+            console.log('Fetching properties with params:', params);
+            const searchParams = new URLSearchParams();
+            if (params?.limit) searchParams.append('limit', params.limit.toString());
+            if (params?.offset) searchParams.append('offset', params.offset.toString());
+            if (params?.search) searchParams.append('search', params.search);
+
+            const url = `${ENV_CONFIG.api.baseUrl}${ENDPOINTS.properties}?${searchParams.toString()}`;
+            console.log('API Request:', { method: 'GET', url });
+
+            const response = await fetch(url, {
                 headers: { 'Content-Type': 'application/json' },
                 signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
             });
@@ -42,11 +51,15 @@ export const useProperties = () => {
             }
 
             const data = await response.json();
-            console.log('Properties fetched:', { count: data.properties.length });
-            return data.properties;
+            console.log('Properties API Response:', data);
+
+            // Handle both array and object responses
+            if (Array.isArray(data)) {
+                return data;
+            }
+            return data.properties || [];
         },
-        staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
-        gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
+        staleTime: 0 // Always fetch fresh data
     });
 };
 
@@ -58,7 +71,10 @@ export const useProperty = (propertyId: string | null) => {
             if (!propertyId) return null;
 
             console.log('Fetching property details:', { propertyId });
-            const response = await fetch(buildUrl(ENDPOINTS.propertyDetails(propertyId)), {
+            const url = `${ENV_CONFIG.api.baseUrl}${ENDPOINTS.propertyDetails(propertyId)}`;
+            console.log('API Request:', { method: 'GET', url });
+
+            const response = await fetch(url, {
                 headers: { 'Content-Type': 'application/json' },
                 signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
             });
@@ -68,13 +84,64 @@ export const useProperty = (propertyId: string | null) => {
             }
 
             const data = await response.json();
-            console.log('Property details fetched:', { propertyId, data });
+            console.log('Property API Response:', data);
+
+            if (!data) {
+                throw new Error('No property data received');
+            }
+
             return data;
         },
         enabled: !!propertyId,
-        staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
-        gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
+        staleTime: 0 // Always fetch fresh data
     });
+};
+
+// Selected Property Hook
+export const useSelectedProperty = () => {
+    const queryClient = useQueryClient();
+    
+    const selectedPropertyId = typeof window !== 'undefined' 
+        ? localStorage.getItem('selectedPropertyId') 
+        : null;
+
+    const { data: selectedProperty, refetch } = useQuery({
+        queryKey: ['property', selectedPropertyId],
+        queryFn: async () => {
+            if (!selectedPropertyId) return null;
+
+            const response = await fetch(
+                `${ENV_CONFIG.api.baseUrl}${ENDPOINTS.propertyDetails(selectedPropertyId)}`,
+                {
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+                }
+            );
+
+            if (!response.ok) {
+                await handleApiError(response);
+            }
+
+            const data = await response.json();
+            console.log('Selected property data:', data);
+            return data;
+        },
+        enabled: !!selectedPropertyId,
+        staleTime: 0 // Always fetch fresh data
+    });
+
+    const setSelectedProperty = async (property: Property | null) => {
+        if (property) {
+            localStorage.setItem('selectedPropertyId', property.property_id);
+            queryClient.setQueryData(['property', property.property_id], property);
+            await refetch(); // Immediately fetch fresh data
+        } else {
+            localStorage.removeItem('selectedPropertyId');
+            queryClient.setQueryData(['property', selectedPropertyId], null);
+        }
+    };
+
+    return { selectedProperty, setSelectedProperty };
 };
 
 // Update Property Hook
@@ -82,9 +149,12 @@ export const useUpdateProperty = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, data }: { id: string; data: UpdatePropertyDto }) => {
+        mutationFn: async ({ id, data }: { id: string; data: Partial<Property> }) => {
             console.log('Updating property:', { id, data });
-            const response = await fetch(buildUrl(ENDPOINTS.propertyDetails(id)), {
+            const url = `${ENV_CONFIG.api.baseUrl}${ENDPOINTS.propertyDetails(id)}`;
+            console.log('API Request:', { method: 'PUT', url, data });
+
+            const response = await fetch(url, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
@@ -96,48 +166,16 @@ export const useUpdateProperty = () => {
             }
 
             const result = await response.json();
-            console.log('Property updated:', { id, result });
+            console.log('API Response:', { updatedProperty: result });
             return result;
         },
         onSuccess: (data, { id }) => {
-            console.log('Update successful, invalidating queries');
+            console.log('Update successful, updating cache');
             queryClient.setQueryData(['property', id], data);
             queryClient.invalidateQueries({ queryKey: ['properties'] });
         },
         onError: (error) => {
             console.error('Update failed:', error);
-        }
-    });
-};
-
-// Create Property Hook
-export const useCreateProperty = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async (data: CreatePropertyDto) => {
-            console.log('Creating property:', data);
-            const response = await fetch(buildUrl(ENDPOINTS.properties), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-            });
-
-            if (!response.ok) {
-                await handleApiError(response);
-            }
-
-            const result = await response.json();
-            console.log('Property created:', result);
-            return result;
-        },
-        onSuccess: () => {
-            console.log('Create successful, invalidating queries');
-            queryClient.invalidateQueries({ queryKey: ['properties'] });
-        },
-        onError: (error) => {
-            console.error('Create failed:', error);
         }
     });
 };
@@ -149,7 +187,10 @@ export const useDeleteProperty = () => {
     return useMutation({
         mutationFn: async (id: string) => {
             console.log('Deleting property:', { id });
-            const response = await fetch(buildUrl(ENDPOINTS.propertyDetails(id)), {
+            const url = `${ENV_CONFIG.api.baseUrl}${ENDPOINTS.propertyDetails(id)}`;
+            console.log('API Request:', { method: 'DELETE', url });
+
+            const response = await fetch(url, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
@@ -160,11 +201,12 @@ export const useDeleteProperty = () => {
             }
 
             const result = await response.json();
-            console.log('Property deleted:', result);
+            console.log('API Response:', result);
             return result;
         },
-        onSuccess: () => {
-            console.log('Delete successful, invalidating queries');
+        onSuccess: (_, id) => {
+            console.log('Delete successful, updating cache');
+            queryClient.removeQueries({ queryKey: ['property', id] });
             queryClient.invalidateQueries({ queryKey: ['properties'] });
         },
         onError: (error) => {
@@ -180,7 +222,10 @@ export const useBulkDeleteProperties = () => {
     return useMutation({
         mutationFn: async (propertyIds: string[]) => {
             console.log('Bulk deleting properties:', { propertyIds });
-            const response = await fetch(buildUrl(ENDPOINTS.bulkDelete), {
+            const url = `${ENV_CONFIG.api.baseUrl}${ENDPOINTS.bulkDelete}`;
+            console.log('API Request:', { method: 'POST', url, data: { propertyIds } });
+
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ propertyIds }),
@@ -192,11 +237,14 @@ export const useBulkDeleteProperties = () => {
             }
 
             const result = await response.json();
-            console.log('Properties bulk deleted:', result);
+            console.log('API Response:', result);
             return result;
         },
-        onSuccess: () => {
-            console.log('Bulk delete successful, invalidating queries');
+        onSuccess: (_, propertyIds) => {
+            console.log('Bulk delete successful, updating cache');
+            propertyIds.forEach(id => {
+                queryClient.removeQueries({ queryKey: ['property', id] });
+            });
             queryClient.invalidateQueries({ queryKey: ['properties'] });
         },
         onError: (error) => {
@@ -205,119 +253,28 @@ export const useBulkDeleteProperties = () => {
     });
 };
 
-// Get Property Location Hook
-export const usePropertyLocation = (propertyId: string | null) => {
-    return useQuery({
-        queryKey: ['propertyLocation', propertyId],
-        queryFn: async () => {
-            if (!propertyId) return null;
+// Prefetch Property Function
+export const prefetchProperty = async (queryClient: QueryClient, id: string) => {
+    try {
+        await queryClient.prefetchQuery({
+            queryKey: ['property', id],
+            queryFn: async () => {
+                const response = await fetch(
+                    `${ENV_CONFIG.api.baseUrl}${ENDPOINTS.propertyDetails(id)}`,
+                    {
+                        headers: { 'Content-Type': 'application/json' },
+                        signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+                    }
+                );
 
-            console.log('Fetching property location:', { propertyId });
-            const response = await fetch(buildUrl(ENDPOINTS.propertyLocation(propertyId)), {
-                headers: { 'Content-Type': 'application/json' },
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-            });
+                if (!response.ok) {
+                    await handleApiError(response);
+                }
 
-            if (!response.ok) {
-                await handleApiError(response);
+                return await response.json();
             }
-
-            const data = await response.json();
-            console.log('Property location fetched:', { propertyId, data });
-            return data;
-        },
-        enabled: !!propertyId,
-        staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
-        gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
-    });
-};
-
-// Update Property Location Hook
-export const useUpdatePropertyLocation = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async ({ id, coordinates }: { id: string; coordinates: [number, number] }) => {
-            console.log('Updating property location:', { id, coordinates });
-            const response = await fetch(buildUrl(ENDPOINTS.propertyLocation(id)), {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ coordinates }),
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-            });
-
-            if (!response.ok) {
-                await handleApiError(response);
-            }
-
-            const result = await response.json();
-            console.log('Property location updated:', { id, result });
-            return result;
-        },
-        onSuccess: (data, { id }) => {
-            console.log('Location update successful, invalidating queries');
-            queryClient.setQueryData(['propertyLocation', id], data);
-            queryClient.invalidateQueries({ queryKey: ['properties'] });
-        },
-        onError: (error) => {
-            console.error('Location update failed:', error);
-        }
-    });
-};
-
-// Update Property Boundary Hook
-export const useUpdatePropertyBoundary = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async ({ id, coordinates }: { id: string; coordinates: [number, number][] }) => {
-            console.log('Updating property boundary:', { id, coordinates });
-            const response = await fetch(buildUrl(ENDPOINTS.propertyBoundary(id)), {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ coordinates }),
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-            });
-
-            if (!response.ok) {
-                await handleApiError(response);
-            }
-
-            const result = await response.json();
-            console.log('Property boundary updated:', { id, result });
-            return result;
-        },
-        onSuccess: (data, { id }) => {
-            console.log('Boundary update successful, invalidating queries');
-            queryClient.setQueryData(['propertyLocation', id], data);
-            queryClient.invalidateQueries({ queryKey: ['properties'] });
-        },
-        onError: (error) => {
-            console.error('Boundary update failed:', error);
-        }
-    });
-};
-
-// Prefetch Property
-export const prefetchProperty = async (queryClient: any, propertyId: string) => {
-    console.log('Prefetching property:', { propertyId });
-    await queryClient.prefetchQuery({
-        queryKey: ['property', propertyId],
-        queryFn: async () => {
-            const response = await fetch(buildUrl(ENDPOINTS.propertyDetails(propertyId)), {
-                headers: { 'Content-Type': 'application/json' },
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-            });
-
-            if (!response.ok) {
-                await handleApiError(response);
-            }
-
-            const data = await response.json();
-            console.log('Property prefetched:', { propertyId, data });
-            return data;
-        },
-        staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
-        gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
-    });
+        });
+    } catch (error) {
+        console.error('Failed to prefetch property:', error);
+    }
 };

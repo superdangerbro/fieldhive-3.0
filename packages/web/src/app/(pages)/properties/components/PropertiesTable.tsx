@@ -27,10 +27,12 @@ import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useQueryClient } from '@tanstack/react-query';
-import { usePropertyUIStore } from '../store/uiStore';
-import { useProperties, useDeleteProperty, useBulkDeleteProperties, prefetchProperty } from '../hooks/useProperties';
-import type { Property } from '@/app/globalTypes';
+import { useProperties, prefetchProperty } from '../hooks/usePropertyList';
+import { useDeleteProperty, useBulkDeleteProperties } from '../hooks/usePropertyDelete';
+import { useSelectedProperty } from '../hooks/useSelectedProperty';
 import { StatusChip, formatStatus } from './PropertyStatus';
+import type { Property } from '@/app/globalTypes/property';
+import { useState } from 'react';
 
 interface PropertiesTableProps {
   onPropertySelect: (property: Property | null) => void;
@@ -44,16 +46,8 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
   const [columnMenuAnchor, setColumnMenuAnchor] = React.useState<null | HTMLElement>(null);
   const [selectedRows, setSelectedRows] = React.useState<GridSelectionModel>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
-
-  // UI state from Zustand
-  const {
-    selectedProperty,
-    visibleColumns,
-    filterText,
-    setSelectedProperty,
-    toggleColumn,
-    setFilterText
-  } = usePropertyUIStore();
+  const [filterText, setFilterText] = useState('');
+  const [visibleColumns, setVisibleColumns] = useState(['name', 'type', 'accounts', 'status', 'created_at', 'updated_at']);
 
   // Data fetching with React Query
   const { 
@@ -62,6 +56,8 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
     error,
     refetch 
   } = useProperties();
+
+  const { selectedProperty, setSelectedProperty } = useSelectedProperty();
 
   // Delete mutations
   const { mutate: deleteProperty, isPending: isDeleting } = useDeleteProperty();
@@ -75,6 +71,14 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
     setColumnMenuAnchor(null);
   };
 
+  const toggleColumn = (field: string) => {
+    setVisibleColumns(current => 
+      current.includes(field)
+        ? current.filter(f => f !== field)
+        : [...current, field]
+    );
+  };
+
   const defaultColumns = [
     {
       field: 'name',
@@ -86,8 +90,8 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
       field: 'type',
       headerName: 'Type',
       width: 150,
-      valueGetter: (params: any) => {
-        const type = params.value as string;
+      valueGetter: (params: { row: Property }) => {
+        const type = params.row.type;
         return type ? type.charAt(0).toUpperCase() + type.slice(1) : 'N/A';
       }
     },
@@ -95,21 +99,37 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
       field: 'accounts',
       headerName: 'Parent Accounts',
       width: 250,
-      valueGetter: (params: any) => {
+      valueGetter: (params: { row: Property }) => {
         const property = params.row;
         if (!property.accounts || property.accounts.length === 0) {
           return 'No Accounts';
         }
-        return property.accounts.map((account: any) => account.name).join(', ');
+        return property.accounts.map(account => account.name).join(', ');
       }
     },
     {
       field: 'status',
       headerName: 'Status',
       width: 120,
-      renderCell: (params: any) => {
-        const status = params.value || 'active';
+      renderCell: (params: { row: Property }) => {
+        const status = params.row.status || 'active';
         return <StatusChip status={formatStatus(status)} />;
+      }
+    },
+    {
+      field: 'created_at',
+      headerName: 'Created',
+      width: 150,
+      valueGetter: (params: { row: Property }) => {
+        return new Date(params.row.created_at).toLocaleDateString();
+      }
+    },
+    {
+      field: 'updated_at',
+      headerName: 'Updated',
+      width: 150,
+      valueGetter: (params: { row: Property }) => {
+        return new Date(params.row.updated_at).toLocaleDateString();
       }
     }
   ];
@@ -123,9 +143,9 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
     const searchText = filterText.toLowerCase();
     return properties.filter((property: Property) => 
       property.name.toLowerCase().includes(searchText) ||
-      property.type?.toLowerCase().includes(searchText) ||
+      property.type.toLowerCase().includes(searchText) ||
       property.accounts?.some(account => account.name.toLowerCase().includes(searchText)) ||
-      (property.status && property.status.toLowerCase().includes(searchText))
+      property.status.toLowerCase().includes(searchText)
     );
   }, [properties, filterText]);
 
@@ -257,9 +277,9 @@ export default function PropertiesTable({ onPropertySelect, onAddClick }: Proper
       </Card>
 
       <DataGrid
-        rows={filteredProperties}
+        rows={filteredProperties || []} // Ensure we always pass an array
         columns={columns}
-        getRowId={(row) => row.property_id}
+        getRowId={(row: Property) => row.property_id}
         rowCount={filteredProperties.length}
         loading={isLoaderActive}
         paginationMode="server"

@@ -3,6 +3,10 @@
 import React from 'react';
 import { Box } from '@mui/material';
 
+interface CrosshairsProps {
+  onLocationConfirmed: (location: [number, number]) => void;
+}
+
 /**
  * Crosshairs component for equipment placement
  * Features:
@@ -10,25 +14,26 @@ import { Box } from '@mui/material';
  * - Drop shadow for visibility
  * - Outer circle with glow effect
  * - Non-interactive (pointer-events: none)
- * 
- * @component
- * @example
- * ```tsx
- * // Used during equipment placement mode
- * {isPlacingEquipment && <Crosshairs />}
- * ```
  */
-export function Crosshairs() {
+export function Crosshairs({ onLocationConfirmed }: CrosshairsProps) {
+  // Get the current map center when clicked
+  const handleMapClick = () => {
+    // This would need to be implemented to get the actual map center coordinates
+    // For now, using placeholder coordinates
+    onLocationConfirmed([0, 0]);
+  };
+
   return (
     <Box
+      onClick={handleMapClick}
       sx={{
         position: 'absolute',
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        pointerEvents: 'none',
         zIndex: 1000,
         filter: 'drop-shadow(0px 0px 2px rgba(0, 0, 0, 0.5))',
+        cursor: 'pointer',
       }}
     >
       <svg width="48" height="48" viewBox="0 0 48 48">

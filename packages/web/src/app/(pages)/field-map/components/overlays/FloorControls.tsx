@@ -5,7 +5,7 @@ import { Box, List, ListItem, ListItemText, IconButton, Tooltip } from '@mui/mat
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import AddIcon from '@mui/icons-material/Add';
-import { useFieldMapStore } from '../../stores/fieldMapStore';
+import { useFieldMap } from '@/app/globalHooks/useFieldMap';
 import type { FloorPlan } from '../../types';
 
 interface FloorControlsProps {
@@ -41,7 +41,7 @@ export function FloorControls({
     activeFloorPlan,
     setActiveFloorPlan,
     toggleFloorPlanVisibility,
-  } = useFieldMapStore();
+  } = useFieldMap();
 
   if (!isFloorPlansOpen) {
     return null;

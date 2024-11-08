@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Equipment } from '../../equipment/types';
+import type { Equipment } from '@/app/globalTypes/equipment';
 import type { Task, Visit } from '../types';
 
 interface UseVisitWorkflowOptions {

@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, forwardRef } from 'react';
 import Map, { MapRef, GeolocateControl } from 'react-map-gl';
 import { Box, useTheme } from '@mui/material';
 import mapboxgl from 'mapbox-gl';
-import { useFieldMapStore } from '../../stores/fieldMapStore';
+import { useFieldMap } from '@/app/globalHooks/useFieldMap';
 
 // Initialize Mapbox token
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -42,7 +42,7 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
   children
 }, ref) => {
   const theme = useTheme();
-  const { viewState, setViewState } = useFieldMapStore();
+  const { viewState, setViewState } = useFieldMap();
 
   // Debug map initialization
   useEffect(() => {
@@ -138,3 +138,6 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
     </Box>
   );
 });
+
+// Display name for React DevTools
+BaseMap.displayName = 'BaseMap';

@@ -3,30 +3,60 @@ export interface Equipment {
     name: string;
     type: string;
     status: string;
+    data?: Record<string, any>;
     created_at?: Date;
     updated_at?: Date;
+    location: {
+        coordinates: [number, number];
+    };
 }
 
 export interface EquipmentType {
-    value: string;
+    name: string;
     label: string;
-    fields?: any[]; // For rules and conditions
+    fields: Field[];
 }
 
 export interface EquipmentStatus {
-    value: string;    // Used as identifier
-    label: string;    // Display name
-    color: string;    // Status color
+    name: string;    // Used as identifier
+    label: string;   // Display name
+    color: string;   // Status color
 }
 
 export interface CreateEquipmentDto {
     name: string;
     type: string;
     status?: string;
+    data?: Record<string, any>;
 }
 
 export interface UpdateEquipmentDto {
     name?: string;
     type?: string;
     status?: string;
+    data?: Record<string, any>;
+}
+
+export interface Field {
+    name: string;
+    type: 'text' | 'number-input' | 'number-stepper' | 'slider' | 'select' | 'boolean' | 'textarea';
+    label?: string;
+    required?: boolean;
+    options?: string[];
+    showWhen?: FieldCondition[];
+    numberConfig?: {
+        min?: number;
+        max?: number;
+        step?: number;
+    };
+}
+
+export interface FieldCondition {
+    field: string;
+    value: any;
+    makeRequired?: boolean;
+}
+
+export interface FormData {
+    [key: string]: any;
 }

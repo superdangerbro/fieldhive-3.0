@@ -9,24 +9,24 @@ import {
     getPropertyLocation,
     updatePropertyLocation,
     updatePropertyBoundary
-} from './handler';
+} from './handlers';
 
 const router = Router();
 
 // Get all properties with pagination and filtering
-router.get('/', getProperties);
+router.get('/', getProperties as any);
 
 // Get property by ID
-router.get('/:id', getProperty);
+router.get('/:id', getProperty as any);
 
 // Create new property
-router.post('/', createProperty);
+router.post('/', createProperty as any);
 
 // Update property
-router.put('/:id', updateProperty);
+router.put('/:id', updateProperty as any);
 
 // Delete property
-router.delete('/:id', deleteProperty);
+router.delete('/:id', deleteProperty as any);
 
 // Bulk delete properties
 router.post('/bulk-delete', bulkDeleteProperties);

@@ -1,44 +1,24 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+'use client';
+
+import { useMutation } from '@tanstack/react-query';
+import type { CreateAddressDto } from '@/app/globalTypes/address';
 import { ENV_CONFIG } from '@/config/environment';
-import type { Address, CreateAddressDto } from '../../../globalTypes/address';
+import { handleApiError } from './utils';
 
-const ADDRESSES_ENDPOINT = '/addresses';
+const ENDPOINTS = {
+    addresses: '/addresses',
+    addressDetails: (id: string) => `/addresses/${id}`,
+} as const;
 
-// Helper function to build full API URL
-const buildUrl = (endpoint: string) => `${ENV_CONFIG.api.baseUrl}${endpoint}`;
-
-// Create address mutation
-export const useCreateAddress = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation<Address, Error, CreateAddressDto>({
-        mutationFn: async (data) => {
-            const response = await fetch(buildUrl(ADDRESSES_ENDPOINT), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to create address');
-            }
-
-            return response.json();
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['addresses'] });
-        },
-    });
-};
-
-// Update address mutation
+// Update Address Hook
 export const useUpdateAddress = () => {
-    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, data }: { id: string; data: CreateAddressDto }) => {
+            console.log('Updating address:', { id, data });
+            const url = `${ENV_CONFIG.api.baseUrl}${ENDPOINTS.addressDetails(id)}`;
+            console.log('API Request:', { method: 'PUT', url, data });
 
-    return useMutation<Address, Error, { id: string; data: Partial<CreateAddressDto> }>({
-        mutationFn: async ({ id, data }) => {
-            const response = await fetch(buildUrl(`${ADDRESSES_ENDPOINT}/${id}`), {
+            const response = await fetch(url, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
@@ -46,15 +26,38 @@ export const useUpdateAddress = () => {
             });
 
             if (!response.ok) {
-                throw new Error('Failed to update address');
+                await handleApiError(response);
             }
 
-            return response.json();
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['addresses'] });
-        },
+            const result = await response.json();
+            console.log('API Response:', { updatedAddress: result });
+            return result;
+        }
     });
 };
 
-export type { Address, CreateAddressDto };
+// Create Address Hook
+export const useCreateAddress = () => {
+    return useMutation({
+        mutationFn: async (data: CreateAddressDto) => {
+            console.log('Creating address:', data);
+            const url = `${ENV_CONFIG.api.baseUrl}${ENDPOINTS.addresses}`;
+            console.log('API Request:', { method: 'POST', url, data });
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+            });
+
+            if (!response.ok) {
+                await handleApiError(response);
+            }
+
+            const result = await response.json();
+            console.log('API Response:', { newAddress: result });
+            return result;
+        }
+    });
+};

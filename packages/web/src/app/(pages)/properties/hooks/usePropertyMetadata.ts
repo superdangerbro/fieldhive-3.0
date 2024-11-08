@@ -1,127 +1,119 @@
+'use client';
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ENV_CONFIG } from '@/config/environment';
-import type { Property } from '@/app/globalTypes/property';
+import { useSetting } from './useSettings';
 
-const PROPERTIES_ENDPOINT = '/properties';
-
-// Helper function to build full API URL
-const buildUrl = (endpoint: string) => `${ENV_CONFIG.api.baseUrl}${endpoint}`;
-
-interface UpdatePropertyData {
-  id: string;
-  data: Partial<Property>;
+interface MetadataUpdate {
+    type?: string;
+    status?: string;
 }
 
-// Update property
-export const useUpdateProperty = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: UpdatePropertyData) => {
-      const response = await fetch(buildUrl(`${PROPERTIES_ENDPOINT}/${id}`), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-        signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update property');
-      }
-
-      const updatedProperty = await response.json();
-      return updatedProperty;
-    },
-    onSuccess: (updatedProperty, { id }) => {
-      // Update both the individual property and the properties list
-      queryClient.setQueryData(['property', id], updatedProperty);
-      
-      // Update the property in the properties list
-      queryClient.setQueryData(['properties'], (oldData: any) => {
-        if (!oldData?.properties) return oldData;
-        return {
-          ...oldData,
-          properties: oldData.properties.map((property: Property) =>
-            property.property_id === id ? updatedProperty : property
-          )
-        };
-      });
-    },
-  });
-};
-
-// Update property metadata
 export const useUpdatePropertyMetadata = () => {
-  const queryClient = useQueryClient();
+    const queryClient = useQueryClient();
+    const { data: types } = useSetting('property_types');
+    const { data: statuses } = useSetting('property_statuses');
 
-  return useMutation({
-    mutationFn: async ({ id, data }: UpdatePropertyData) => {
-      const response = await fetch(buildUrl(`${PROPERTIES_ENDPOINT}/${id}/metadata`), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-        signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-      });
+    return useMutation({
+        mutationFn: async ({ id, data }: { id: string; data: MetadataUpdate }) => {
+            try {
+                // Validate type if present
+                if (data.type && types && !types.some(t => t.value === data.type)) {
+                    throw new Error(`Invalid property type: ${data.type}`);
+                }
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update property metadata');
-      }
+                // Validate status if present
+                if (data.status && statuses && !statuses.some(s => s.value === data.status)) {
+                    throw new Error(`Invalid property status: ${data.status}`);
+                }
 
-      const updatedProperty = await response.json();
-      return updatedProperty;
-    },
-    onSuccess: (updatedProperty, { id }) => {
-      // Update both the individual property and the properties list
-      queryClient.setQueryData(['property', id], updatedProperty);
-      
-      // Update the property in the properties list
-      queryClient.setQueryData(['properties'], (oldData: any) => {
-        if (!oldData?.properties) return oldData;
-        return {
-          ...oldData,
-          properties: oldData.properties.map((property: Property) =>
-            property.property_id === id ? updatedProperty : property
-          )
-        };
-      });
-    },
-  });
+                const url = `${ENV_CONFIG.api.baseUrl}/properties/${id}`;
+                console.log('Updating property:', { id, data, url });
+
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                console.log('Update response status:', response.status);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Update failed:', errorText);
+                    throw new Error(errorText || 'Failed to update property');
+                }
+
+                const result = await response.json();
+                console.log('Update successful:', result);
+                return result;
+            } catch (error) {
+                console.error('Update error:', error);
+                throw error;
+            }
+        },
+        onSuccess: (data, { id }) => {
+            console.log('Update mutation succeeded, updating cache');
+            // Update both the individual property and the properties list
+            queryClient.setQueryData(['property', id], data);
+            
+            // Update the property in the properties list if it exists
+            queryClient.setQueriesData({ queryKey: ['properties'] }, (oldData: any) => {
+                if (!oldData?.properties) return oldData;
+                return {
+                    ...oldData,
+                    properties: oldData.properties.map((p: any) => 
+                        p.property_id === id ? data : p
+                    )
+                };
+            });
+            
+            // Force refetch to ensure consistency
+            queryClient.invalidateQueries({ queryKey: ['properties'] });
+            queryClient.invalidateQueries({ queryKey: ['property', id] });
+        },
+        onError: (error) => {
+            console.error('Update mutation failed:', error);
+        }
+    });
 };
 
-// Delete property
 export const useDeleteProperty = () => {
-  const queryClient = useQueryClient();
+    const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await fetch(buildUrl(`${PROPERTIES_ENDPOINT}/${id}`), {
-        method: 'DELETE',
-        signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-      });
+    return useMutation({
+        mutationFn: async (id: string) => {
+            try {
+                const url = `${ENV_CONFIG.api.baseUrl}/properties/${id}`;
+                console.log('Deleting property:', { id, url });
+                
+                const response = await fetch(url, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to delete property');
-      }
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(errorText || 'Failed to delete property');
+                }
 
-      return response.json();
-    },
-    onSuccess: (_, id) => {
-      // Remove from cache
-      queryClient.removeQueries({ queryKey: ['property', id] });
-      
-      // Update properties list
-      queryClient.setQueryData(['properties'], (oldData: any) => {
-        if (!oldData?.properties) return oldData;
-        return {
-          ...oldData,
-          properties: oldData.properties.filter((property: Property) => 
-            property.property_id !== id
-          )
-        };
-      });
-    },
-  });
+                return response.json();
+            } catch (error) {
+                console.error('Delete error:', error);
+                throw error;
+            }
+        },
+        onSuccess: (_, id) => {
+            console.log('Delete mutation succeeded, updating cache');
+            queryClient.removeQueries({ queryKey: ['property', id] });
+            queryClient.invalidateQueries({ queryKey: ['properties'] });
+        },
+        onError: (error) => {
+            console.error('Delete mutation failed:', error);
+        }
+    });
 };

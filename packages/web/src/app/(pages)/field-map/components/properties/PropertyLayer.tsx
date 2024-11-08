@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect } from 'react';
 import { Marker } from 'react-map-gl';
 import { Box, Tooltip, useTheme } from '@mui/material';
-import { useFieldMapStore } from '../../stores/fieldMapStore';
+import { useFieldMap } from '@/app/globalHooks/useFieldMap';
 import { PropertyMarker } from '../markers/PropertyMarker';
 import { toPointLocation } from '../../utils/location';
 import type { MapProperty } from '../../types';
@@ -22,15 +22,6 @@ interface PropertyLayerProps {
  * - Handles property selection
  * - Shows selected property marker with animation
  * - Manages property marker visibility and styling
- * 
- * @component
- * @example
- * ```tsx
- * <PropertyLayer
- *   showSelectedMarker={true}
- *   onPropertyClick={(property) => console.log('Property clicked:', property)}
- * />
- * ```
  */
 export function PropertyLayer({
   showSelectedMarker = true,
@@ -41,7 +32,7 @@ export function PropertyLayer({
     properties,
     selectedProperty,
     flyToProperty
-  } = useFieldMapStore();
+  } = useFieldMap();
 
   // Debug property updates
   useEffect(() => {
@@ -54,6 +45,8 @@ export function PropertyLayer({
    * Updates selected property and triggers animation
    */
   const handlePropertyClick = useCallback((property: MapProperty) => {
+    if (!property.location?.coordinates) return;
+
     console.log('Property clicked:', property.property_id);
     
     const propertyData = {
@@ -76,12 +69,14 @@ export function PropertyLayer({
     <>
       {/* Regular property markers */}
       {properties.map((property) => {
+        if (!property.location) return null;
+
         // Convert property to MapProperty if needed
         const mapProperty: MapProperty = {
           ...property,
           location: 'coordinates' in property.location
             ? property.location
-            : toPointLocation(property.location as any)
+            : toPointLocation(property.location)
         };
 
         return (
@@ -94,7 +89,7 @@ export function PropertyLayer({
       })}
 
       {/* Selected property highlight marker */}
-      {selectedProperty && showSelectedMarker && (
+      {selectedProperty?.location && showSelectedMarker && (
         <Marker
           longitude={selectedProperty.location.longitude}
           latitude={selectedProperty.location.latitude}
