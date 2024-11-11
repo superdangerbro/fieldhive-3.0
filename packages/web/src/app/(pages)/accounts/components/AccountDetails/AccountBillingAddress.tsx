@@ -7,7 +7,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import { useQueryClient } from '@tanstack/react-query';
-import { useUpdateAccount } from '../../hooks/useAccounts';
+import { useUpdateAccount } from '../../hooks';
 import { useUpdateAddress, useCreateAddress } from '../../hooks/useAddresses';
 import { useActionNotifications } from '@/app/globalHooks/useActionNotifications';
 import { AddressForm } from '@/app/globalComponents/AddressForm';

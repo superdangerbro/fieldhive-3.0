@@ -1,12 +1,21 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ENV_CONFIG } from '@/config/environment';
+import { ENV_CONFIG } from '../../../../config/environment';
+import { handleApiError, buildApiRequest, retryWithBackoff } from './utils';
 import { useSetting } from './useSettings';
+import type { Property } from '../../../globalTypes/property';
 
 interface MetadataUpdate {
     type?: string;
     status?: string;
+}
+
+interface PropertiesResponse {
+    properties: Property[];
+    total: number;
+    limit: number;
+    offset: number;
 }
 
 export const useUpdatePropertyMetadata = () => {
@@ -16,104 +25,86 @@ export const useUpdatePropertyMetadata = () => {
 
     return useMutation({
         mutationFn: async ({ id, data }: { id: string; data: MetadataUpdate }) => {
-            try {
-                // Validate type if present
-                if (data.type && types && !types.some(t => t.value === data.type)) {
-                    throw new Error(`Invalid property type: ${data.type}`);
-                }
+            // Validate type if present
+            if (data.type && types && !types.some(t => t.value === data.type)) {
+                throw new Error(`Invalid property type: ${data.type}`);
+            }
 
-                // Validate status if present
-                if (data.status && statuses && !statuses.some(s => s.value === data.status)) {
-                    throw new Error(`Invalid property status: ${data.status}`);
-                }
+            // Validate status if present
+            if (data.status && statuses && !statuses.some(s => s.value === data.status)) {
+                throw new Error(`Invalid property status: ${data.status}`);
+            }
 
-                const url = `${ENV_CONFIG.api.baseUrl}/properties/${id}`;
-                console.log('Updating property:', { id, data, url });
+            console.log('Updating property metadata:', { id, data });
+            const url = `${ENV_CONFIG.api.baseUrl}/properties/${id}`;
 
-                const response = await fetch(url, {
+            return retryWithBackoff(async () => {
+                const response = await fetch(url, buildApiRequest({
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
                     body: JSON.stringify(data)
-                });
-
-                console.log('Update response status:', response.status);
+                }));
 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Update failed:', errorText);
-                    throw new Error(errorText || 'Failed to update property');
+                    await handleApiError(response);
                 }
 
                 const result = await response.json();
-                console.log('Update successful:', result);
+                console.log('Update response:', result);
                 return result;
-            } catch (error) {
-                console.error('Update error:', error);
-                throw error;
-            }
+            });
         },
-        onSuccess: (data, { id }) => {
-            console.log('Update mutation succeeded, updating cache');
-            // Update both the individual property and the properties list
-            queryClient.setQueryData(['property', id], data);
+        onSuccess: (updatedProperty: Property, { id }) => {
+            console.log('Metadata update successful:', updatedProperty);
+
+            // Update the individual property cache
+            queryClient.setQueryData(['property', id], updatedProperty);
             
             // Update the property in the properties list if it exists
-            queryClient.setQueriesData({ queryKey: ['properties'] }, (oldData: any) => {
-                if (!oldData?.properties) return oldData;
-                return {
-                    ...oldData,
-                    properties: oldData.properties.map((p: any) => 
-                        p.property_id === id ? data : p
-                    )
-                };
-            });
+            queryClient.setQueriesData<PropertiesResponse | undefined>(
+                { queryKey: ['properties'] }, 
+                (oldData) => {
+                    if (!oldData?.properties) return oldData;
+                    
+                    return {
+                        ...oldData,
+                        properties: oldData.properties.map((p: Property) => 
+                            p.property_id === id ? updatedProperty : p
+                        )
+                    };
+                }
+            );
+
+            // Update the selected property if this is the currently selected one
+            queryClient.setQueriesData<Property | null | undefined>(
+                { queryKey: ['selectedProperty'] },
+                (oldData) => {
+                    if (!oldData) return oldData;
+                    if (oldData.property_id === id) {
+                        return updatedProperty;
+                    }
+                    return oldData;
+                }
+            );
             
-            // Force refetch to ensure consistency
+            // Invalidate queries to ensure consistency
+            queryClient.invalidateQueries({ 
+                queryKey: ['properties'],
+                refetchType: 'none' // Don't refetch immediately since we've already updated the cache
+            });
+            queryClient.invalidateQueries({ 
+                queryKey: ['property', id],
+                refetchType: 'none'
+            });
+        },
+        onError: (error, { id }) => {
+            console.error('Metadata update failed:', error);
+            
+            // Invalidate caches to ensure fresh data on next fetch
             queryClient.invalidateQueries({ queryKey: ['properties'] });
             queryClient.invalidateQueries({ queryKey: ['property', id] });
-        },
-        onError: (error) => {
-            console.error('Update mutation failed:', error);
-        }
-    });
-};
-
-export const useDeleteProperty = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async (id: string) => {
-            try {
-                const url = `${ENV_CONFIG.api.baseUrl}/properties/${id}`;
-                console.log('Deleting property:', { id, url });
-                
-                const response = await fetch(url, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(errorText || 'Failed to delete property');
-                }
-
-                return response.json();
-            } catch (error) {
-                console.error('Delete error:', error);
-                throw error;
-            }
-        },
-        onSuccess: (_, id) => {
-            console.log('Delete mutation succeeded, updating cache');
-            queryClient.removeQueries({ queryKey: ['property', id] });
-            queryClient.invalidateQueries({ queryKey: ['properties'] });
-        },
-        onError: (error) => {
-            console.error('Delete mutation failed:', error);
+            
+            // Optionally refetch the property to ensure consistent state
+            queryClient.refetchQueries({ queryKey: ['property', id] });
         }
     });
 };

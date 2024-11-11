@@ -4,32 +4,27 @@ import React, { useState, useEffect } from 'react';
 import { 
     Card, 
     CardContent, 
-    Dialog, 
-    DialogTitle, 
-    DialogContent, 
-    DialogContentText, 
-    DialogActions, 
-    Button, 
     Divider, 
     SelectChangeEvent,
-    CircularProgress,
     Box,
     TextField,
     Stack,
-    IconButton
+    IconButton,
+    Button,
+    Alert
 } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Close';
-import type { Property } from '@/app/globalTypes/property';
+import DeleteIcon from '@mui/icons-material/Delete';
+import type { Property } from '../../../globalTypes/property';
 import { useUpdatePropertyMetadata } from '../hooks/usePropertyMetadata';
+import { useUpdateProperty } from '../hooks/usePropertyUpdate';
 import { useDeleteProperty } from '../hooks/usePropertyDelete';
 import { usePropertySettings } from '../hooks/usePropertySettings';
-import { useProperty } from '../hooks/usePropertyList';
 import { useSelectedProperty } from '../hooks/useSelectedProperty';
-
-import PropertyHeader from './PropertyHeader';
+import { DeletePropertyDialog } from '../dialogs/DeletePropertyDialog';
 import PropertyMetadata from './PropertyMetadata';
 import PropertyAddresses from './PropertyAddresses';
 import PropertyLocation from './PropertyLocation';
@@ -53,11 +48,22 @@ export default function PropertyDetails({
     const { setSelectedProperty } = useSelectedProperty();
     const queryClient = useQueryClient();
 
+    // Update edited name when property changes
+    useEffect(() => {
+        setEditedName(property.name);
+        setIsEditing(false); // Close edit mode on property change
+    }, [property.property_id, property.name]);
+
     // React Query mutations
     const { 
         mutate: updateMetadata, 
         isPending: isUpdating 
     } = useUpdatePropertyMetadata();
+
+    const {
+        mutate: updateProperty,
+        isPending: isUpdatingProperty
+    } = useUpdateProperty();
 
     const { 
         mutate: deleteProperty, 
@@ -72,26 +78,6 @@ export default function PropertyDetails({
         isLoading: settingsLoading
     } = usePropertySettings();
 
-    // Fetch latest property data
-    const { 
-        data: latestProperty, 
-        refetch: refreshProperty,
-        isLoading: isPropertyLoading,
-        error: propertyError 
-    } = useProperty(property.property_id);
-
-    useEffect(() => {
-        if (property?.property_id) {
-            refreshProperty();
-        }
-    }, [property?.property_id, refreshProperty]);
-
-    useEffect(() => {
-        if (latestProperty) {
-            setEditedName(latestProperty.name);
-        }
-    }, [latestProperty]);
-
     const handleDeleteClick = () => {
         setDeleteDialogOpen(true);
     };
@@ -102,6 +88,7 @@ export default function PropertyDetails({
                 setDeleteDialogOpen(false);
                 onPropertySelect(null);
                 setSelectedProperty(null);
+                queryClient.invalidateQueries({ queryKey: ['properties'] });
             }
         });
     };
@@ -112,8 +99,10 @@ export default function PropertyDetails({
                 id: property.property_id,
                 data: { status: event.target.value }
             });
-            await refreshProperty();
-            await queryClient.invalidateQueries({ queryKey: ['properties'] });
+            // Invalidate queries to trigger a refresh of all property data
+            queryClient.invalidateQueries({ queryKey: ['property', property.property_id] });
+            queryClient.invalidateQueries({ queryKey: ['propertyMetadata', property.property_id] });
+            queryClient.invalidateQueries({ queryKey: ['properties'] });
         } catch (error) {
             console.error('Failed to update status:', error);
         }
@@ -125,8 +114,10 @@ export default function PropertyDetails({
                 id: property.property_id,
                 data: { type: event.target.value }
             });
-            await refreshProperty();
-            await queryClient.invalidateQueries({ queryKey: ['properties'] });
+            // Invalidate queries to trigger a refresh of all property data
+            queryClient.invalidateQueries({ queryKey: ['property', property.property_id] });
+            queryClient.invalidateQueries({ queryKey: ['propertyMetadata', property.property_id] });
+            queryClient.invalidateQueries({ queryKey: ['properties'] });
         } catch (error) {
             console.error('Failed to update type:', error);
         }
@@ -134,18 +125,23 @@ export default function PropertyDetails({
 
     const handleNameSave = async () => {
         if (editedName.trim() !== property.name) {
-            try {
-                await updateMetadata({
+            updateProperty(
+                {
                     id: property.property_id,
                     data: { name: editedName.trim() }
-                });
-                await refreshProperty();
-                await queryClient.invalidateQueries({ queryKey: ['properties'] });
-            } catch (error) {
-                console.error('Failed to update name:', error);
-            }
+                },
+                {
+                    onSuccess: async () => {
+                        setIsEditing(false);
+                        // Invalidate queries to trigger a refresh of all property data
+                        queryClient.invalidateQueries({ queryKey: ['property', property.property_id] });
+                        queryClient.invalidateQueries({ queryKey: ['properties'] });
+                    }
+                }
+            );
+        } else {
+            setIsEditing(false);
         }
-        setIsEditing(false);
     };
 
     const handleNameCancel = () => {
@@ -154,37 +150,15 @@ export default function PropertyDetails({
     };
 
     const handleUpdate = async () => {
-        try {
-            await refreshProperty();
-            await queryClient.invalidateQueries({ 
-                queryKey: ['property', property.property_id]
-            });
-            await queryClient.invalidateQueries({ queryKey: ['properties'] });
-        } catch (error) {
-            console.error('Failed to refresh property:', error);
-        }
+        // Invalidate all property-related queries to ensure fresh data
+        queryClient.invalidateQueries({ queryKey: ['property', property.property_id] });
+        queryClient.invalidateQueries({ queryKey: ['propertyLocation', property.property_id] });
+        queryClient.invalidateQueries({ queryKey: ['propertyAccounts', property.property_id] });
+        queryClient.invalidateQueries({ queryKey: ['propertyMetadata', property.property_id] });
+        queryClient.invalidateQueries({ queryKey: ['properties'] });
     };
 
-    if (isPropertyLoading) {
-        return (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight={200}>
-                <CircularProgress />
-            </Box>
-        );
-    }
-
-    if (propertyError) {
-        return (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight={200}>
-                <DialogContentText color="error">
-                    Failed to load property details. Please try again later.
-                    {propertyError instanceof Error ? `: ${propertyError.message}` : ''}
-                </DialogContentText>
-            </Box>
-        );
-    }
-
-    const currentProperty = latestProperty || property;
+    const isNameUpdating = isUpdatingProperty;
 
     return (
         <>
@@ -199,18 +173,18 @@ export default function PropertyDetails({
                                     size="small"
                                     fullWidth
                                     autoFocus
-                                    disabled={isUpdating}
+                                    disabled={isNameUpdating}
                                 />
                                 <IconButton 
                                     onClick={handleNameSave}
-                                    disabled={isUpdating}
+                                    disabled={isNameUpdating}
                                     color="primary"
                                 >
                                     <SaveIcon />
                                 </IconButton>
                                 <IconButton 
                                     onClick={handleNameCancel}
-                                    disabled={isUpdating}
+                                    disabled={isNameUpdating}
                                 >
                                     <CancelIcon />
                                 </IconButton>
@@ -218,13 +192,19 @@ export default function PropertyDetails({
                         ) : (
                             <>
                                 <Box sx={{ typography: 'h5', flexGrow: 1 }}>
-                                    {currentProperty.name}
+                                    {property.name}
                                 </Box>
                                 <IconButton 
                                     onClick={() => setIsEditing(true)}
                                     color="primary"
                                 >
                                     <EditIcon />
+                                </IconButton>
+                                <IconButton 
+                                    onClick={handleDeleteClick}
+                                    color="error"
+                                >
+                                    <DeleteIcon />
                                 </IconButton>
                             </>
                         )}
@@ -233,7 +213,7 @@ export default function PropertyDetails({
                     <Divider sx={{ my: 2 }} />
 
                     <PropertyMetadata
-                        property={currentProperty}
+                        property={property}
                         propertyTypes={propertyTypes}
                         statusOptions={statusOptions}
                         typeLoading={isUpdating || settingsLoading}
@@ -246,16 +226,16 @@ export default function PropertyDetails({
                     <Divider sx={{ my: 2 }} />
 
                     <PropertyAddresses
-                        propertyId={currentProperty.property_id}
-                        serviceAddress={currentProperty.serviceAddress}
-                        billingAddress={currentProperty.billingAddress}
+                        propertyId={property.property_id}
+                        serviceAddress={property.serviceAddress || null}
+                        billingAddress={property.billingAddress || null}
                         onUpdate={handleUpdate}
                     />
 
                     <Divider sx={{ my: 2 }} />
 
                     <PropertyLocation
-                        property={currentProperty}
+                        property={property}
                     />
 
                     <Divider sx={{ my: 2 }} />
@@ -267,40 +247,13 @@ export default function PropertyDetails({
                 </CardContent>
             </Card>
 
-            <Dialog
+            <DeletePropertyDialog
                 open={deleteDialogOpen}
                 onClose={() => setDeleteDialogOpen(false)}
-                maxWidth="sm"
-                fullWidth
-            >
-                <DialogTitle>Delete Property</DialogTitle>
-                <DialogContent>
-                    {deleteError ? (
-                        <DialogContentText color="error">
-                            {deleteError instanceof Error ? deleteError.message : 'Failed to delete property'}
-                        </DialogContentText>
-                    ) : (
-                        <DialogContentText>
-                            Are you sure you want to delete this property? This action cannot be undone.
-                        </DialogContentText>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    <Button 
-                        onClick={() => setDeleteDialogOpen(false)}
-                        disabled={isDeleting}
-                    >
-                        Cancel
-                    </Button>
-                    <Button 
-                        onClick={handleConfirmDelete} 
-                        color="error"
-                        disabled={isDeleting}
-                    >
-                        Delete
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                onConfirm={handleConfirmDelete}
+                isDeleting={isDeleting}
+                error={deleteError instanceof Error ? deleteError : null}
+            />
         </>
     );
 }

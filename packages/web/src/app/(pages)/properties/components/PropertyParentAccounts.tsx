@@ -6,22 +6,16 @@ import {
     Typography,
     IconButton,
     Chip,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Button,
-    Autocomplete,
-    TextField,
-    CircularProgress,
-    Alert
+    Skeleton,
+    Stack
 } from '@mui/material';
 import BusinessIcon from '@mui/icons-material/Business';
 import EditIcon from '@mui/icons-material/Edit';
 import type { Property } from '../../../globalTypes/property';
 import type { Account } from '../../../globalTypes/account';
 import { useAccounts } from '../../accounts/hooks/useAccounts';
-import { useUpdateProperty } from '../hooks/useProperties';
+import { useUpdateProperty } from '../hooks/usePropertyUpdate';
+import { EditParentAccountsDialog } from '../dialogs/EditParentAccountsDialog';
 
 interface PropertyParentAccountsProps {
     property: Property;
@@ -69,8 +63,10 @@ export default function PropertyParentAccounts({ property, onUpdate }: PropertyP
         }
     };
 
+    const isLoading = loadingAccounts || updatePropertyMutation.isPending;
+
     return (
-        <Box>
+        <>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <BusinessIcon sx={{ mr: 1, color: 'primary.main' }} />
                 <Typography variant="h6">
@@ -80,104 +76,45 @@ export default function PropertyParentAccounts({ property, onUpdate }: PropertyP
                     size="small" 
                     onClick={() => setIsEditing(true)}
                     sx={{ ml: 'auto' }}
+                    disabled={isLoading}
                 >
                     <EditIcon fontSize="small" />
                 </IconButton>
             </Box>
 
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {property.accounts?.map((account) => (
-                    <Chip
-                        key={account.account_id}
-                        label={account.name}
-                        size="small"
-                    />
-                ))}
-                {(!property.accounts || property.accounts.length === 0) && (
-                    <Typography variant="body2" color="text.secondary">
-                        No parent accounts assigned
-                    </Typography>
-                )}
-            </Box>
-
-            {isEditing && (
-                <Dialog
-                    open={true}
-                    onClose={handleClose}
-                    maxWidth="sm"
-                    fullWidth
-                    keepMounted={false}
-                >
-                    <DialogTitle>Edit Parent Accounts</DialogTitle>
-                    <DialogContent>
-                        <Box sx={{ mt: 2 }}>
-                            {(error || updatePropertyMutation.isError) && (
-                                <Alert severity="error" sx={{ mb: 2 }}>
-                                    {error || 'Failed to update parent accounts. Please try again.'}
-                                </Alert>
-                            )}
-
-                            <Autocomplete
-                                multiple
-                                options={accounts}
-                                value={selectedAccounts}
-                                onChange={(_, newValue) => setSelectedAccounts(newValue || [])}
-                                getOptionLabel={(option) => option.name || ''}
-                                loading={loadingAccounts}
-                                renderInput={(params) => (
-                                    <TextField
-                                        {...params}
-                                        label="Parent Accounts"
-                                        variant="outlined"
-                                        InputProps={{
-                                            ...params.InputProps,
-                                            endAdornment: (
-                                                <React.Fragment>
-                                                    {loadingAccounts ? (
-                                                        <CircularProgress color="inherit" size={20} />
-                                                    ) : null}
-                                                    {params.InputProps.endAdornment}
-                                                </React.Fragment>
-                                            ),
-                                        }}
-                                    />
-                                )}
-                                renderTags={(value, getTagProps) =>
-                                    value.map((option, index) => (
-                                        <Chip
-                                            label={option.name}
-                                            {...getTagProps({ index })}
-                                            key={option.account_id}
-                                        />
-                                    ))
-                                }
-                                isOptionEqualToValue={(option, value) => 
-                                    option.account_id === value.account_id
-                                }
-                            />
-                        </Box>
-                    </DialogContent>
-                    <DialogActions>
-                        <Button 
-                            onClick={handleClose}
-                            disabled={updatePropertyMutation.isPending}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleSubmit}
-                            variant="contained"
-                            disabled={updatePropertyMutation.isPending}
-                        >
-                            {updatePropertyMutation.isPending ? (
-                                <CircularProgress size={24} color="inherit" />
-                            ) : (
-                                'Save Changes'
-                            )}
-                        </Button>
-                    </DialogActions>
-                </Dialog>
+            {isLoading ? (
+                <Stack spacing={1}>
+                    <Skeleton variant="rounded" height={32} width={120} />
+                    <Skeleton variant="rounded" height={32} width={150} />
+                </Stack>
+            ) : (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {property.accounts?.map((account) => (
+                        <Chip
+                            key={account.account_id}
+                            label={account.name}
+                            size="small"
+                            sx={{ bgcolor: 'background.default' }}
+                        />
+                    ))}
+                    {(!property.accounts || property.accounts.length === 0) && (
+                        <Typography variant="body2" color="text.secondary">
+                            No parent accounts assigned
+                        </Typography>
+                    )}
+                </Box>
             )}
-        </Box>
+
+            <EditParentAccountsDialog
+                open={isEditing}
+                onClose={handleClose}
+                onSubmit={handleSubmit}
+                selectedAccounts={selectedAccounts}
+                onAccountsChange={setSelectedAccounts}
+                availableAccounts={accounts}
+                isLoading={isLoading}
+                error={error}
+            />
+        </>
     );
 }

@@ -8,10 +8,13 @@ import {
   IconButton, 
   Stack,
   TextField,
-  Button
+  Button,
+  CircularProgress,
+  Skeleton
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
-import type { Address } from '@/app/globalTypes/address';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import type { Address } from '../../../globalTypes/address';
 import { useUpdatePropertyAddress } from '../hooks/usePropertyAddress';
 
 interface InlineAddressEditProps {
@@ -46,33 +49,35 @@ export default function InlineAddressEdit({
   onUpdate 
 }: InlineAddressEditProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState<AddressFormData>(
-    address ? {
-      address1: address.address1,
+  const [formData, setFormData] = useState<AddressFormData>(() => {
+    if (!address) return emptyAddress;
+    return {
+      address1: address.address1 || '',
       address2: address.address2 || '',
-      city: address.city,
-      province: address.province,
-      postal_code: address.postal_code,
-      country: address.country
-    } : emptyAddress
-  );
+      city: address.city || '',
+      province: address.province || '',
+      postal_code: address.postal_code || '',
+      country: address.country || 'Canada'
+    };
+  });
 
   const { mutate: updateAddress, isPending } = useUpdatePropertyAddress();
 
   // Update form data when address prop changes
   useEffect(() => {
-    if (address) {
-      setFormData({
-        address1: address.address1,
-        address2: address.address2 || '',
-        city: address.city,
-        province: address.province,
-        postal_code: address.postal_code,
-        country: address.country
-      });
-    } else {
+    if (!address) {
       setFormData(emptyAddress);
+      return;
     }
+    
+    setFormData({
+      address1: address.address1 || '',
+      address2: address.address2 || '',
+      city: address.city || '',
+      province: address.province || '',
+      postal_code: address.postal_code || '',
+      country: address.country || 'Canada'
+    });
   }, [address]);
 
   const handleEdit = () => {
@@ -80,17 +85,17 @@ export default function InlineAddressEdit({
   };
 
   const handleCancel = () => {
-    if (address) {
-      setFormData({
-        address1: address.address1,
-        address2: address.address2 || '',
-        city: address.city,
-        province: address.province,
-        postal_code: address.postal_code,
-        country: address.country
-      });
-    } else {
+    if (!address) {
       setFormData(emptyAddress);
+    } else {
+      setFormData({
+        address1: address.address1 || '',
+        address2: address.address2 || '',
+        city: address.city || '',
+        province: address.province || '',
+        postal_code: address.postal_code || '',
+        country: address.country || 'Canada'
+      });
     }
     setIsEditing(false);
   };
@@ -103,7 +108,7 @@ export default function InlineAddressEdit({
           type,
           address: {
             ...formData,
-            address2: formData.address2?.trim() || null
+            address2: formData.address2.trim() || ''
           }
         },
         {
@@ -126,19 +131,39 @@ export default function InlineAddressEdit({
   };
 
   return (
-    <Paper sx={{ p: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="subtitle1">
+    <Paper 
+      elevation={1}
+      sx={{ 
+        p: 2,
+        height: '100%',
+        minHeight: '200px',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <LocationOnIcon sx={{ mr: 1, color: 'primary.main' }} />
+        <Typography variant="h6">
           {type === 'service' ? 'Service Address' : 'Billing Address'}
         </Typography>
-        {!isEditing && (
-          <IconButton onClick={handleEdit} size="small">
+        {!isEditing && !isPending && (
+          <IconButton 
+            onClick={handleEdit} 
+            size="small"
+            sx={{ ml: 'auto' }}
+          >
             <EditIcon />
           </IconButton>
         )}
       </Box>
 
-      {isEditing ? (
+      {isPending && !isEditing ? (
+        <Stack spacing={1}>
+          <Skeleton variant="text" width="60%" />
+          <Skeleton variant="text" width="40%" />
+          <Skeleton variant="text" width="50%" />
+        </Stack>
+      ) : isEditing ? (
         <Stack spacing={2}>
           <TextField
             label="Address Line 1"
@@ -187,7 +212,7 @@ export default function InlineAddressEdit({
             fullWidth
             required
           />
-          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 'auto' }}>
             <Button
               onClick={handleCancel}
               disabled={isPending}
@@ -201,7 +226,7 @@ export default function InlineAddressEdit({
               disabled={isPending || !formData.address1.trim()}
               size="small"
             >
-              Save
+              {isPending ? <CircularProgress size={24} /> : 'Save'}
             </Button>
           </Box>
         </Stack>

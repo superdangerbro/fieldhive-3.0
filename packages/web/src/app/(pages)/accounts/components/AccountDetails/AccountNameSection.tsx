@@ -7,7 +7,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useQueryClient } from '@tanstack/react-query';
-import { useUpdateAccount } from '../../hooks/useAccounts';
+import { useUpdateAccount } from '../../hooks';
 import { useActionNotifications } from '@/app/globalHooks/useActionNotifications';
 import type { Account } from '@/app/globalTypes/account';
 

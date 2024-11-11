@@ -18,10 +18,10 @@ import {
     Alert,
     Button
 } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import type { Job, JobStatus } from '../../../globalTypes';
+import type { Job, JobStatus } from '../../../globalTypes/job';
 import { useJobs } from '../hooks/useJobs';
 
 interface JobsTableProps {
@@ -39,25 +39,33 @@ const STATUS_DISPLAY: Record<string, { name: string; color: string }> = {
 };
 
 // Helper function to convert snake_case to Title Case
-const toTitleCase = (str: string): string => {
-    return str.split('_')
-        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(' ');
+const toTitleCase = (str: string | null | undefined): string => {
+    if (!str) return 'N/A';
+    try {
+        return str
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
+    } catch (error) {
+        console.error('Error in toTitleCase:', error);
+        return str;
+    }
 };
 
-const defaultColumns: GridColDef[] = [
+const defaultColumns: GridColDef<Job>[] = [
     {
         field: 'title',
         headerName: 'Title',
         flex: 1,
-        minWidth: 200
+        minWidth: 200,
+        renderCell: (params) => params.row.title || 'N/A'
     },
     {
         field: 'property',
         headerName: 'Property',
         flex: 1,
         minWidth: 200,
-        valueGetter: (params) => params.row.property?.name || 'N/A'
+        renderCell: (params) => params.row.property?.name || 'N/A'
     },
     {
         field: 'accounts',
@@ -66,7 +74,7 @@ const defaultColumns: GridColDef[] = [
         minWidth: 200,
         renderCell: (params) => {
             const accounts = params.row.property?.accounts || [];
-            if (accounts.length === 0) return 'N/A';
+            if (!accounts || accounts.length === 0) return 'N/A';
             
             if (accounts.length === 1) {
                 return accounts[0].name;
@@ -90,17 +98,14 @@ const defaultColumns: GridColDef[] = [
         field: 'job_type_id',
         headerName: 'Type',
         width: 150,
-        valueGetter: (params) => {
-            const type = params.value as string;
-            return type ? toTitleCase(type) : 'N/A';
-        }
+        renderCell: (params) => toTitleCase(params.row.job_type_id)
     },
     {
         field: 'status',
         headerName: 'Status',
         width: 150,
         renderCell: (params) => {
-            const status = params.value as string;
+            const status = params.row.status;
             const displayStatus = STATUS_DISPLAY[status] || { 
                 name: toTitleCase(status),
                 color: '#757575' // Default gray for unknown status
@@ -122,7 +127,10 @@ const defaultColumns: GridColDef[] = [
         field: 'created_at',
         headerName: 'Created',
         width: 120,
-        valueGetter: (params) => params.value ? new Date(params.value).toLocaleDateString() : 'N/A'
+        renderCell: (params) => {
+            const date = params.row.created_at;
+            return date ? new Date(date).toLocaleDateString() : 'N/A';
+        }
     }
 ];
 
@@ -175,7 +183,7 @@ export function JobsTable({ onJobSelect, selectedJob, onJobsLoad }: JobsTablePro
             return (
                 job.title?.toLowerCase().includes(searchText) ||
                 job.property?.name?.toLowerCase().includes(searchText) ||
-                job.property?.accounts?.some(account => 
+                job.property?.accounts?.some((account) => 
                     account.name.toLowerCase().includes(searchText)
                 ) ||
                 job.job_type_id?.toLowerCase().includes(searchText) ||
@@ -270,29 +278,30 @@ export function JobsTable({ onJobSelect, selectedJob, onJobsLoad }: JobsTablePro
                 </Alert>
             )}
 
-            <DataGrid
+            <DataGrid<Job>
                 rows={filterText ? filteredJobs : data.jobs}
                 columns={columns}
                 getRowId={(row) => row.job_id}
                 loading={isLoading}
                 paginationMode="server"
-                page={page}
-                pageSize={pageSize}
                 rowCount={data.total}
-                rowsPerPageOptions={[25, 50, 100]}
-                onPageChange={(newPage) => setPage(newPage)}
-                onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
-                disableSelectionOnClick
+                pageSizeOptions={[25, 50, 100]}
+                onPaginationModelChange={(model) => {
+                    setPage(model.page);
+                    setPageSize(model.pageSize);
+                }}
+                paginationModel={{ page, pageSize }}
+                disableRowSelectionOnClick
                 disableColumnMenu
                 onRowClick={(params) => onJobSelect(params.row)}
-                selectionModel={selectedJob ? [selectedJob.job_id] : []}
+                rowSelectionModel={selectedJob ? [selectedJob.job_id] : []}
                 sx={{
                     '& .MuiDataGrid-row': {
                         cursor: 'pointer'
                     }
                 }}
-                components={{
-                    NoRowsOverlay: () => (
+                slots={{
+                    noRowsOverlay: () => (
                         <Stack height="100%" alignItems="center" justifyContent="center">
                             <Typography color="text.secondary">
                                 {isLoading ? 'Loading...' : 'No jobs found'}

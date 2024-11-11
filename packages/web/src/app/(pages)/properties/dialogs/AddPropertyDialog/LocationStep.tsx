@@ -2,17 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, CircularProgress } from '@mui/material';
-import { Point } from 'geojson';
-import { PropertyFormData } from '../../types';
-import MapDialog from '../MapDialog';
+import type { PropertyFormData, FormErrors } from './types';
+import type { GeoJSONPolygonOrNull } from '../../types/location';
+import MapDialog from '../../components/map/MapDialog';
+import { displayToGeoJson, safeGeoJsonToDisplay } from '../../types/location';
 
 interface LocationStepProps {
   propertyData: PropertyFormData;
   setPropertyData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
-  formErrors: Record<string, string>;
+  formErrors: FormErrors;
 }
 
-const DEFAULT_LOCATION: [number, number] = [49.2827, -123.1207]; // Vancouver
+const DEFAULT_LOCATION: [number, number] = [49.2827, -123.1207]; // [lat, lng] for MapDialog
 
 export const LocationStep: React.FC<LocationStepProps> = ({
   propertyData,
@@ -26,22 +27,13 @@ export const LocationStep: React.FC<LocationStepProps> = ({
   useEffect(() => {
     const geocodeAddress = async () => {
       try {
-        // If we already have coordinates, use them
-        if (propertyData.location?.coordinates) {
-          const [lng, lat] = propertyData.location.coordinates;
-          console.log('Using existing coordinates:', [lat, lng]);
-          setLocation([lat, lng]);
-          setLoading(false);
-          return;
-        }
-
         const { serviceAddress } = propertyData;
         const addressString = [
           serviceAddress.address1,
           serviceAddress.address2,
           serviceAddress.city,
           serviceAddress.province,
-          serviceAddress.postalCode,
+          serviceAddress.postal_code,
           serviceAddress.country
         ].filter(Boolean).join(', ');
 
@@ -59,8 +51,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
         const data = await response.json();
         if (data.features?.[0]?.center) {
           const [lng, lat] = data.features[0].center;
-          console.log('Geocoded coordinates:', [lat, lng]);
-          setLocation([lat, lng]);
+          setLocation([lat, lng]); // Store as [lat, lng] for MapDialog
         } else {
           throw new Error('No results found');
         }
@@ -74,20 +65,26 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     };
 
     geocodeAddress();
-  }, [propertyData.serviceAddress, propertyData.location]);
+  }, [propertyData.serviceAddress]);
 
   const handleLocationSelect = (coordinates: [number, number]) => {
-    console.log('Selected coordinates:', coordinates);
-    const point: Point = {
-      type: 'Point',
-      coordinates: [coordinates[1], coordinates[0]], // Convert [lat, lng] to GeoJSON [lng, lat]
-    };
-    
+    // Convert from MapDialog [lat, lng] to GeoJSON [lng, lat]
+    const geoJsonCoords = displayToGeoJson(coordinates);
     setPropertyData(prev => ({
       ...prev,
-      location: point
+      location: {
+        type: 'Point',
+        coordinates: geoJsonCoords
+      }
     }));
     setMapDialogOpen(false);
+  };
+
+  const getDisplayCoordinates = () => {
+    if (!propertyData.location?.coordinates) return 'Not set';
+    const displayCoords = safeGeoJsonToDisplay(propertyData.location.coordinates);
+    if (!displayCoords) return 'Invalid coordinates';
+    return `${displayCoords[0].toFixed(6)}, ${displayCoords[1].toFixed(6)}`;
   };
 
   if (loading) {
@@ -111,10 +108,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         <Button
           variant="contained"
-          onClick={() => {
-            console.log('Opening map dialog with location:', location);
-            setMapDialogOpen(true);
-          }}
+          onClick={() => setMapDialogOpen(true)}
           sx={{
             backgroundImage: 'linear-gradient(to right, #6366f1, #4f46e5)',
             textTransform: 'none'
@@ -124,11 +118,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
         </Button>
         
         <Typography variant="body2" color="text.secondary">
-          {propertyData.location ? (
-            `${propertyData.location.coordinates[1].toFixed(6)}, ${propertyData.location.coordinates[0].toFixed(6)}`
-          ) : (
-            'Not set'
-          )}
+          {getDisplayCoordinates()}
         </Typography>
       </Box>
 
@@ -140,10 +130,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
 
       <MapDialog
         open={mapDialogOpen}
-        onClose={() => {
-          console.log('Closing map dialog');
-          setMapDialogOpen(false);
-        }}
+        onClose={() => setMapDialogOpen(false)}
         initialLocation={location}
         onLocationSelect={handleLocationSelect}
         mode="marker"

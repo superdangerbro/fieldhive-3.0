@@ -17,7 +17,7 @@ import {
     CircularProgress,
     Alert
 } from '@mui/material';
-import { useAccountSettings, useCreateAccount } from '../hooks/useAccounts';
+import { useAccountSettings, useCreateAccount } from '../hooks';
 import { useCreateAddress } from '../hooks/useAddresses';
 import { useSelectedAccount } from '../hooks/useSelectedAccount';
 import { useQueryClient } from '@tanstack/react-query';

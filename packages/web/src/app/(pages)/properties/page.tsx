@@ -2,136 +2,108 @@
 
 import { useState, useEffect } from 'react';
 import { Box, CircularProgress, Alert, Button } from '@mui/material';
-import type { Property } from '@/app/globalTypes/property';
-import { useProperties, useProperty } from './hooks/usePropertyList';
+import type { Property } from '../../globalTypes/property';
+import { useProperties } from './hooks/usePropertyList';
 import { useSelectedProperty } from './hooks/useSelectedProperty';
 import { useSearchParams } from 'next/navigation';
-
-// Import all components from their new locations
 import PropertyDetails from './components/PropertyDetails';
 import PropertiesTable from './components/PropertiesTable';
 import AddPropertyDialog from './dialogs/AddPropertyDialog';
 import EditPropertyDialog from './dialogs/EditPropertyDialog';
 
 export default function PropertiesPage() {
-  // Dialog state
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editProperty, setEditProperty] = useState<Property | null>(null);
-  const searchParams = useSearchParams();
+    const searchParams = useSearchParams();
+    
+    // Dialog state
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [editProperty, setEditProperty] = useState<Property | null>(null);
 
-  // Get properties data from React Query
-  const { 
-    data: properties = [], 
-    isLoading: propertiesLoading,
-    error: propertiesError,
-    refetch: refetchProperties
-  } = useProperties();
+    // Get properties data from React Query
+    const { 
+        data: properties = [], 
+        isLoading: propertiesLoading,
+        error: propertiesError,
+        refetch: refetchProperties
+    } = useProperties();
 
-  const { selectedProperty, setSelectedProperty } = useSelectedProperty();
+    // Get selected property state
+    const { selectedProperty, setSelectedProperty } = useSelectedProperty();
 
-  // Fetch full property data when selected
-  const { 
-    data: propertyDetails,
-    isLoading: propertyLoading,
-    error: propertyError,
-    refetch: refetchProperty
-  } = useProperty(selectedProperty?.property_id || null);
+    // Handle URL-based property selection on initial load
+    useEffect(() => {
+        const propertyId = searchParams.get('property_id');
+        if (propertyId && properties.length > 0 && !selectedProperty) {
+            const property = properties.find(p => p.property_id === propertyId);
+            if (property) {
+                setSelectedProperty(property);
+            }
+        }
+    }, [searchParams, properties, selectedProperty, setSelectedProperty]);
 
-  // Handle URL-based property selection
-  useEffect(() => {
-    const propertyId = searchParams.get('property_id');
-    if (propertyId && properties.length > 0 && !selectedProperty) {
-      console.log('Selecting property from URL:', propertyId);
-      const property = properties.find((p: Property) => p.property_id === propertyId);
-      if (property) {
-        handlePropertySelect(property);
-      }
+    // Handle property selection
+    const handlePropertySelect = (property: Property | null) => {
+        console.log('handlePropertySelect called with:', property);
+        // First update local state
+        setSelectedProperty(property);
+    };
+
+    if (propertiesLoading) {
+        return (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight={400}>
+                <CircularProgress />
+            </Box>
+        );
     }
-  }, [searchParams, properties, selectedProperty]);
 
-  const handlePropertySelect = async (property: Property | null) => {
-    console.log('Property selected:', property?.property_id);
-    if (property) {
-      // If we already have the property in our list, use that data
-      const existingProperty = properties.find((p: Property) => p.property_id === property.property_id);
-      setSelectedProperty(existingProperty || property);
-      
-      // Fetch full property details
-      if (existingProperty?.property_id) {
-        await refetchProperty();
-      }
-    } else {
-      setSelectedProperty(null);
+    if (propertiesError) {
+        return (
+            <Box p={3}>
+                <Alert 
+                    severity="error" 
+                    action={
+                        <Button 
+                            color="inherit" 
+                            size="small" 
+                            onClick={() => refetchProperties()}
+                        >
+                            Try Again
+                        </Button>
+                    }
+                >
+                    Failed to load properties: {propertiesError instanceof Error ? propertiesError.message : 'Unknown error'}
+                </Alert>
+            </Box>
+        );
     }
-  };
 
-  const isLoading = propertiesLoading || propertyLoading;
-  const error = propertiesError || propertyError;
-
-  if (isLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight={400}>
-        <CircularProgress />
-      </Box>
+        <Box p={3}>
+            {selectedProperty && (
+                <PropertyDetails
+                    property={selectedProperty}
+                    onEdit={setEditProperty}
+                    onPropertySelect={handlePropertySelect}
+                />
+            )}
+
+            <PropertiesTable 
+                onPropertySelect={handlePropertySelect}
+                selectedProperty={selectedProperty}
+                onAddClick={() => setIsAddDialogOpen(true)}
+            />
+
+            <AddPropertyDialog
+                open={isAddDialogOpen}
+                onClose={() => setIsAddDialogOpen(false)}
+            />
+
+            {editProperty && (
+                <EditPropertyDialog
+                    open={true}
+                    property={editProperty}
+                    onClose={() => setEditProperty(null)}
+                />
+            )}
+        </Box>
     );
-  }
-
-  if (error) {
-    return (
-      <Box p={3}>
-        <Alert 
-          severity="error" 
-          action={
-            <Button 
-              color="inherit" 
-              size="small" 
-              onClick={() => {
-                refetchProperties();
-                if (selectedProperty?.property_id) {
-                  refetchProperty();
-                }
-              }}
-            >
-              Try Again
-            </Button>
-          }
-        >
-          Failed to load properties: {error instanceof Error ? error.message : 'Unknown error'}
-        </Alert>
-      </Box>
-    );
-  }
-
-  // Use propertyDetails if available, otherwise fall back to selectedProperty
-  const currentProperty = propertyDetails || selectedProperty;
-
-  return (
-    <Box p={3}>
-      {currentProperty && (
-        <PropertyDetails
-          property={currentProperty}
-          onEdit={setEditProperty}
-          onPropertySelect={handlePropertySelect}
-        />
-      )}
-
-      <PropertiesTable 
-        onPropertySelect={handlePropertySelect}
-        onAddClick={() => setIsAddDialogOpen(true)}
-      />
-
-      <AddPropertyDialog
-        open={isAddDialogOpen}
-        onClose={() => setIsAddDialogOpen(false)}
-      />
-
-      {editProperty && (
-        <EditPropertyDialog
-          open={true}
-          property={editProperty}
-          onClose={() => setEditProperty(null)}
-        />
-      )}
-    </Box>
-  );
 }

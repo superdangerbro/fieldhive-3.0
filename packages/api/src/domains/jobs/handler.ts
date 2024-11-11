@@ -12,6 +12,7 @@ export async function getJobs(req: Request, res: Response) {
         const queryBuilder = jobRepository
             .createQueryBuilder('job')
             .leftJoinAndSelect('job.property', 'property')
+            .leftJoinAndSelect('property.accounts', 'accounts', 'accounts.status != :status', { status: 'deleted' })
             .leftJoinAndSelect('job.service_address', 'service_address')
             .leftJoinAndSelect('job.billing_address', 'billing_address');
 
@@ -44,7 +45,7 @@ export async function getJob(req: Request, res: Response) {
     try {
         const job = await jobRepository.findOne({ 
             where: { job_id: req.params.id },
-            relations: ['property', 'service_address', 'billing_address']
+            relations: ['property', 'property.accounts', 'service_address', 'billing_address']
         });
 
         if (!job) {
@@ -91,7 +92,7 @@ export async function createJob(req: Request, res: Response) {
         // Return job with all relations
         const fullJob = await jobRepository.findOne({
             where: { job_id: savedJob.job_id },
-            relations: ['property', 'service_address', 'billing_address']
+            relations: ['property', 'property.accounts', 'service_address', 'billing_address']
         });
 
         return res.status(201).json(fullJob);
@@ -108,7 +109,8 @@ export async function createJob(req: Request, res: Response) {
 export async function updateJob(req: Request, res: Response) {
     try {
         const job = await jobRepository.findOne({ 
-            where: { job_id: req.params.id }
+            where: { job_id: req.params.id },
+            relations: ['property', 'property.accounts', 'service_address', 'billing_address']
         });
 
         if (!job) {
@@ -134,13 +136,7 @@ export async function updateJob(req: Request, res: Response) {
         const updatedJob = await jobRepository.save(job);
         logger.info('Job updated:', updatedJob);
 
-        // Return job with all relations
-        const fullJob = await jobRepository.findOne({
-            where: { job_id: updatedJob.job_id },
-            relations: ['property', 'service_address', 'billing_address']
-        });
-
-        return res.json(fullJob);
+        return res.json(updatedJob);
     } catch (error) {
         logger.error('Error updating job:', error);
         return res.status(500).json({ 
@@ -154,7 +150,8 @@ export async function updateJob(req: Request, res: Response) {
 export async function archiveJob(req: Request, res: Response) {
     try {
         const job = await jobRepository.findOne({ 
-            where: { job_id: req.params.id } 
+            where: { job_id: req.params.id },
+            relations: ['property', 'property.accounts', 'service_address', 'billing_address']
         });
 
         if (!job) {
@@ -165,7 +162,7 @@ export async function archiveJob(req: Request, res: Response) {
         const archivedJob = await jobRepository.save(job);
         logger.info('Job archived:', archivedJob);
 
-        return res.json({ success: true });
+        return res.json(archivedJob);
     } catch (error) {
         logger.error('Error archiving job:', error);
         return res.status(500).json({ 

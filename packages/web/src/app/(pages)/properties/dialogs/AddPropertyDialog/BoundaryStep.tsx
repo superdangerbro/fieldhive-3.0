@@ -2,17 +2,18 @@
 
 import React, { useState } from 'react';
 import { Box, Typography, Button } from '@mui/material';
-import { Polygon } from 'geojson';
-import { PropertyFormData } from '../../types';
-import MapDialog from '../MapDialog';
+import type { PropertyFormData, FormErrors } from './types';
+import type { GeoJSONPolygonOrNull } from '../../types/location';
+import MapDialog from '../../components/map/MapDialog';
+import { safeGeoJsonToDisplay } from '../../types/location';
 
 interface BoundaryStepProps {
   propertyData: PropertyFormData;
   setPropertyData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
-  formErrors: Record<string, string>;
+  formErrors: FormErrors;
 }
 
-const DEFAULT_LOCATION: [number, number] = [49.2827, -123.1207]; // Vancouver
+const DEFAULT_LOCATION: [number, number] = [49.2827, -123.1207]; // Vancouver [lat, lng]
 
 export const BoundaryStep: React.FC<BoundaryStepProps> = ({
   propertyData,
@@ -21,11 +22,14 @@ export const BoundaryStep: React.FC<BoundaryStepProps> = ({
 }) => {
   const [mapDialogOpen, setMapDialogOpen] = useState(false);
 
-  const handleBoundarySelect = (polygon: Polygon) => {
-    setPropertyData(prev => ({
-      ...prev,
-      boundary: polygon
-    }));
+  const handleBoundarySelect = (polygon: { type: 'Polygon', coordinates: Array<Array<[number, number]>> }) => {
+    if (polygon) {
+      // Polygon coordinates are already in GeoJSON format [lng, lat]
+      setPropertyData(prev => ({
+        ...prev,
+        boundary: polygon
+      }));
+    }
     setMapDialogOpen(false);
   };
 
@@ -33,12 +37,12 @@ export const BoundaryStep: React.FC<BoundaryStepProps> = ({
     // Use the property location as the initial center point for the boundary drawing
     if (propertyData.location?.coordinates) {
       // Convert GeoJSON [lng, lat] to [lat, lng] for the map
-      return [propertyData.location.coordinates[1], propertyData.location.coordinates[0]];
+      return safeGeoJsonToDisplay(propertyData.location.coordinates) || DEFAULT_LOCATION;
     }
     return DEFAULT_LOCATION;
   };
 
-  const formatBoundaryStatus = (boundary: Polygon | null) => {
+  const formatBoundaryStatus = (boundary: PropertyFormData['boundary'] | null) => {
     if (!boundary) return 'Not drawn';
     const points = boundary.coordinates[0].length - 1; // Subtract 1 because the first and last points are the same
     return `${points} points drawn`;
@@ -46,9 +50,10 @@ export const BoundaryStep: React.FC<BoundaryStepProps> = ({
 
   const getBoundaryForMap = () => {
     if (!propertyData.boundary) return undefined;
+    // Boundary is already in GeoJSON format [lng, lat], which is what MapDialog expects
     return {
       type: propertyData.boundary.type,
-      coordinates: propertyData.boundary.coordinates as [number, number][][]
+      coordinates: propertyData.boundary.coordinates
     };
   };
 

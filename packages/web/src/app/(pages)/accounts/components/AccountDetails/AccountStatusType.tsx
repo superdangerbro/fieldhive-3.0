@@ -16,7 +16,7 @@ import {
     Alert
 } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
-import { useUpdateAccount, useAccountSettings } from '../../hooks/useAccounts';
+import { useUpdateAccount, useAccountSettings } from '../../hooks';
 import { useActionNotifications } from '@/app/globalHooks/useActionNotifications';
 import type { Account, AccountType, AccountStatus } from '@/app/globalTypes/account';
 

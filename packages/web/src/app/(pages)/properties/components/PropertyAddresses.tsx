@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Grid } from '@mui/material';
-import type { Address } from '@fieldhive/shared';
+import { Grid, Box, Paper } from '@mui/material';
+import type { Address } from '../../../globalTypes/address';
 import InlineAddressEdit from './InlineAddressEdit';
 
 interface PropertyAddressesProps {
@@ -19,26 +19,28 @@ export default function PropertyAddresses({
   onUpdate
 }: PropertyAddressesProps) {
   return (
-    <Grid container spacing={3}>
-      {/* Left side: Service Address */}
-      <Grid item xs={12} md={6}>
-        <InlineAddressEdit
-          propertyId={propertyId}
-          address={serviceAddress}
-          type="service"
-          onUpdate={onUpdate}
-        />
-      </Grid>
+    <Paper sx={{ p: 2 }}>
+      <Grid container spacing={3}>
+        {/* Left side: Service Address */}
+        <Grid item xs={12} md={6}>
+          <InlineAddressEdit
+            propertyId={propertyId}
+            address={serviceAddress}
+            type="service"
+            onUpdate={onUpdate}
+          />
+        </Grid>
 
-      {/* Right side: Billing Address */}
-      <Grid item xs={12} md={6}>
-        <InlineAddressEdit
-          propertyId={propertyId}
-          address={billingAddress}
-          type="billing"
-          onUpdate={onUpdate}
-        />
+        {/* Right side: Billing Address */}
+        <Grid item xs={12} md={6}>
+          <InlineAddressEdit
+            propertyId={propertyId}
+            address={billingAddress}
+            type="billing"
+            onUpdate={onUpdate}
+          />
+        </Grid>
       </Grid>
-    </Grid>
+    </Paper>
   );
 }

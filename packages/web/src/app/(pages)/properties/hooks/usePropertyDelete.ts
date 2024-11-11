@@ -1,9 +1,9 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ENV_CONFIG } from '@/config/environment';
-import type { Property } from '@/app/globalTypes/property';
-import { handleApiError } from './utils';
+import { ENV_CONFIG } from '../../../../config/environment';
+import type { Property } from '../../../globalTypes/property';
+import { handleApiError, buildApiRequest, retryWithBackoff } from './utils';
 
 const buildUrl = (endpoint: string) => `${ENV_CONFIG.api.baseUrl}${endpoint}`;
 
@@ -16,19 +16,19 @@ export const useDeleteProperty = () => {
             const url = buildUrl(`/properties/${id}`);
             console.log('API Request:', { method: 'DELETE', url });
 
-            const response = await fetch(url, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+            return retryWithBackoff(async () => {
+                const response = await fetch(url, buildApiRequest({
+                    method: 'DELETE'
+                }));
+
+                if (!response.ok) {
+                    await handleApiError(response);
+                }
+
+                const result = await response.json();
+                console.log('API Response:', result);
+                return result;
             });
-
-            if (!response.ok) {
-                await handleApiError(response);
-            }
-
-            const result = await response.json();
-            console.log('API Response:', result);
-            return result;
         },
         onSuccess: (_, id) => {
             console.log('Delete successful, updating cache');
@@ -50,20 +50,20 @@ export const useBulkDeleteProperties = () => {
             const url = buildUrl('/properties/bulk-delete');
             console.log('API Request:', { method: 'POST', url, data: { propertyIds } });
 
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ propertyIds }),
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+            return retryWithBackoff(async () => {
+                const response = await fetch(url, buildApiRequest({
+                    method: 'POST',
+                    body: JSON.stringify({ propertyIds })
+                }));
+
+                if (!response.ok) {
+                    await handleApiError(response);
+                }
+
+                const result = await response.json();
+                console.log('API Response:', result);
+                return result;
             });
-
-            if (!response.ok) {
-                await handleApiError(response);
-            }
-
-            const result = await response.json();
-            console.log('API Response:', result);
-            return result;
         },
         onSuccess: (_, propertyIds) => {
             console.log('Bulk delete successful, updating cache');

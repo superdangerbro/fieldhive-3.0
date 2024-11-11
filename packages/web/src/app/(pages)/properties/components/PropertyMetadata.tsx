@@ -12,10 +12,11 @@ import {
     CircularProgress,
     Box,
     Paper,
-    Stack
+    Stack,
+    Skeleton
 } from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
-import type { Property } from '@/app/globalTypes/property';
+import type { Property } from '../../../globalTypes/property';
 import { StatusChip, formatStatus } from './PropertyStatus';
 import PropertyParentAccounts from './PropertyParentAccounts';
 
@@ -44,11 +45,22 @@ export default function PropertyMetadata({
         return null;
     }
 
+    const isLoading = typeLoading || statusLoading;
+
     return (
         <Grid container spacing={3}>
             {/* Left Column - Parent Accounts */}
-            <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
-                <Paper sx={{ p: 2, width: '100%', height: '100%' }}>
+            <Grid item xs={12} md={6}>
+                <Paper 
+                    elevation={1}
+                    sx={{ 
+                        p: 2, 
+                        height: '100%',
+                        minHeight: '300px',
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}
+                >
                     <PropertyParentAccounts 
                         property={property}
                         onUpdate={onUpdate}
@@ -57,59 +69,67 @@ export default function PropertyMetadata({
             </Grid>
 
             {/* Right Column - Property Details and Timestamps */}
-            <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
-                <Paper sx={{ p: 2, width: '100%', height: '100%' }}>
+            <Grid item xs={12} md={6}>
+                <Paper 
+                    elevation={1}
+                    sx={{ 
+                        p: 2, 
+                        height: '100%',
+                        minHeight: '300px',
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}
+                >
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                         <InfoIcon sx={{ mr: 1, color: 'primary.main' }} />
                         <Typography variant="h6">
                             Property Details
                         </Typography>
                     </Box>
-                    <Stack spacing={2}>
-                        <FormControl size="small" fullWidth>
-                            <InputLabel>Type</InputLabel>
-                            <Select
-                                value={property.type || ''}
-                                onChange={onTypeChange}
-                                label="Type"
-                                disabled={typeLoading}
-                                sx={{ '& .MuiSelect-select': { py: 1 } }}
-                                endAdornment={typeLoading ? (
-                                    <Box sx={{ position: 'absolute', right: 32, top: '50%', transform: 'translateY(-50%)' }}>
-                                        <CircularProgress size={20} />
-                                    </Box>
-                                ) : null}
-                            >
-                                {propertyTypes.map((type) => (
-                                    <MenuItem key={type.value} value={type.value}>
-                                        {type.label}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <FormControl size="small" fullWidth>
-                            <InputLabel>Status</InputLabel>
-                            <Select
-                                value={property.status || ''}
-                                onChange={onStatusChange}
-                                label="Status"
-                                disabled={statusLoading}
-                                sx={{ '& .MuiSelect-select': { py: 1 } }}
-                                endAdornment={statusLoading ? (
-                                    <Box sx={{ position: 'absolute', right: 32, top: '50%', transform: 'translateY(-50%)' }}>
-                                        <CircularProgress size={20} />
-                                    </Box>
-                                ) : null}
-                            >
-                                {statusOptions.map((status) => (
-                                    <MenuItem key={status.value} value={status.value}>
-                                        <StatusChip status={formatStatus(status.value)} />
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
+                    <Stack spacing={2} sx={{ flex: 1 }}>
+                        {isLoading ? (
+                            <>
+                                <Skeleton height={56} />
+                                <Skeleton height={56} />
+                            </>
+                        ) : (
+                            <>
+                                <FormControl size="small" fullWidth>
+                                    <InputLabel>Type</InputLabel>
+                                    <Select
+                                        value={property.type || ''}
+                                        onChange={onTypeChange}
+                                        label="Type"
+                                        disabled={typeLoading}
+                                        sx={{ '& .MuiSelect-select': { py: 1 } }}
+                                    >
+                                        {propertyTypes.map((type) => (
+                                            <MenuItem key={type.value} value={type.value}>
+                                                {type.label}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                <FormControl size="small" fullWidth>
+                                    <InputLabel>Status</InputLabel>
+                                    <Select
+                                        value={property.status || ''}
+                                        onChange={onStatusChange}
+                                        label="Status"
+                                        disabled={statusLoading}
+                                        sx={{ '& .MuiSelect-select': { py: 1 } }}
+                                    >
+                                        {statusOptions.map((status) => (
+                                            <MenuItem key={status.value} value={status.value}>
+                                                <StatusChip status={formatStatus(status.value)} />
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </>
+                        )}
 
-                        <Box sx={{ mt: 2 }}>
+                        <Box sx={{ mt: 'auto', pt: 2 }}>
                             <Typography variant="body2" color="text.secondary">
                                 Created At
                             </Typography>

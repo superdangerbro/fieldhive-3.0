@@ -7,7 +7,7 @@ import {
   Alert,
   TextField,
 } from '@mui/material';
-import type { Account } from '@/app/globalTypes';
+import type { Account } from '../../../../globalTypes/account';
 import AccountSelector from '../../components/AccountSelector';
 
 interface AccountStepProps {
@@ -17,6 +17,18 @@ interface AccountStepProps {
   showAddAccount: boolean;
   setShowAddAccount: (show: boolean) => void;
 }
+
+const createNewAccount = (name: string): Account => ({
+  account_id: 'new',
+  name,
+  type: 'customer',
+  status: 'active',
+  contact_name: '',
+  contact_email: '',
+  contact_phone: '',
+  created_at: new Date(),
+  updated_at: new Date()
+});
 
 export const AccountStep: React.FC<AccountStepProps> = ({
   selectedAccounts,
@@ -50,12 +62,7 @@ export const AccountStep: React.FC<AccountStepProps> = ({
           <TextField
             label="Account Name"
             value={selectedAccounts.length === 1 ? selectedAccounts[0].name : ''}
-            onChange={(e) => setSelectedAccounts([{ 
-              account_id: 'new', 
-              name: e.target.value,
-              type: 'customer',
-              status: 'active'
-            }])}
+            onChange={(e) => setSelectedAccounts([createNewAccount(e.target.value)])}
             fullWidth
             size="small"
             required

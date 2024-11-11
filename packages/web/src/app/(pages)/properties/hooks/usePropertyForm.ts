@@ -1,50 +1,17 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { Account } from '@/app/globalTypes/account';
-import type { CreatePropertyDto } from '@/app/globalTypes/property';
+import type { Account } from '../../../globalTypes/account';
+import type { CreatePropertyDto } from '../../../globalTypes/property';
+import type { PropertyFormData, FormErrors } from '../dialogs/AddPropertyDialog/types';
+import type { CreateAddressDto } from '../../../globalTypes/address';
 
-interface Address {
-    address1: string;
-    address2?: string;
-    city: string;
-    province: string;
-    postalCode: string;
-    country?: string;
-}
-
-interface PropertyFormData {
-    useCustomName: boolean;
-    customName: string;
-    type: string;
-    serviceAddress: Address;
-    useDifferentBillingAddress: boolean;
-    billingAddress: Address;
-    location?: {
-        type: 'Point';
-        coordinates: [number, number];
-    };
-    boundary?: {
-        type: 'Polygon';
-        coordinates: [number, number][][];
-    };
-}
-
-interface FormErrors {
-    name?: string;
-    type?: string;
-    serviceAddress?: string;
-    billingAddress?: string;
-    location?: string;
-    accounts?: string;
-}
-
-const initialAddress = {
+const initialAddress: CreateAddressDto = {
     address1: '',
     address2: '',
     city: '',
     province: '',
-    postalCode: '',
+    postal_code: '',
     country: 'Canada'
 };
 
@@ -52,11 +19,37 @@ const initialFormData: PropertyFormData = {
     useCustomName: false,
     customName: '',
     type: '',
-    serviceAddress: initialAddress,
+    serviceAddress: { ...initialAddress },
     useDifferentBillingAddress: false,
-    billingAddress: initialAddress,
+    billingAddress: { ...initialAddress },
     location: undefined,
     boundary: undefined
+};
+
+const validateAddressFields = (
+    address: CreateAddressDto,
+    prefix: 'serviceAddress' | 'billingAddress',
+    errors: FormErrors
+): boolean => {
+    let isValid = true;
+
+    // Helper to check and set error
+    const validateField = (field: keyof CreateAddressDto, label: string) => {
+        if (!address[field]) {
+            errors[`${prefix}.${field}`] = `${label} is required`;
+            isValid = false;
+        }
+    };
+
+    validateField('address1', 'Street address');
+    validateField('city', 'City');
+    validateField('province', 'Province');
+    validateField('postal_code', 'Postal code');
+
+    // Log validation results
+    console.log(`Validating ${prefix}:`, { address, isValid, errors });
+
+    return isValid;
 };
 
 export function usePropertyForm() {
@@ -68,11 +61,22 @@ export function usePropertyForm() {
     const [propertyData, setPropertyData] = useState<PropertyFormData>(initialFormData);
 
     const handleFieldChange = useCallback((field: string, value: any) => {
-        setPropertyData(prev => ({
-            ...prev,
-            [field]: value
-        }));
-        // Clear error when field is updated
+        setPropertyData(prev => {
+            const parts = field.split('.');
+            if (parts.length === 2 && (parts[0] === 'serviceAddress' || parts[0] === 'billingAddress')) {
+                const [addressType, fieldName] = parts;
+                return {
+                    ...prev,
+                    [addressType]: {
+                        ...prev[addressType],
+                        [fieldName]: value
+                    }
+                };
+            }
+            return { ...prev, [field]: value };
+        });
+        
+        // Clear error for this field
         setFormErrors(prev => ({
             ...prev,
             [field]: undefined
@@ -81,34 +85,52 @@ export function usePropertyForm() {
 
     const validateStep = useCallback((step: number): boolean => {
         const errors: FormErrors = {};
+        let isValid = true;
 
         switch (step) {
-            case 0: // Address Information
-                if (!propertyData.serviceAddress.address1) {
-                    errors.serviceAddress = 'Service address is required';
+            case 0: {
+                // Validate property type
+                if (!propertyData.type) {
+                    errors.type = 'Property type is required';
+                    isValid = false;
                 }
-                if (propertyData.useDifferentBillingAddress && !propertyData.billingAddress.address1) {
-                    errors.billingAddress = 'Billing address is required';
+
+                // Always validate service address
+                if (!validateAddressFields(propertyData.serviceAddress, 'serviceAddress', errors)) {
+                    isValid = false;
+                }
+
+                // Validate billing address if using different one
+                if (propertyData.useDifferentBillingAddress) {
+                    if (!validateAddressFields(propertyData.billingAddress, 'billingAddress', errors)) {
+                        isValid = false;
+                    }
                 }
                 break;
+            }
 
-            case 1: // Account Selection
+            case 1: {
                 if (selectedAccounts.length === 0) {
                     errors.accounts = 'Please select at least one account';
+                    isValid = false;
                 }
                 break;
+            }
 
-            case 2: // Location
+            case 2: {
                 if (!propertyData.location) {
                     errors.location = 'Please select a property location';
+                    isValid = false;
                 }
                 break;
-
-            // Add more validation for other steps as needed
+            }
         }
 
+        // Log validation results
+        console.log('Step validation:', { step, isValid, errors });
+
         setFormErrors(errors);
-        return Object.keys(errors).length === 0;
+        return isValid;
     }, [propertyData, selectedAccounts]);
 
     const handleNext = useCallback(() => {

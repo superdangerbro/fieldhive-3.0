@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import { AccountDetails, AccountSearch, AccountsTable } from './components';
 import { AddAccountDialog } from './dialogs';
 import type { Account } from '@/app/globalTypes/account';
-import { useAccounts, useAccountSettings } from './hooks/useAccounts';
+import { useAccounts, useAccountSettings } from './hooks';
 import { useSelectedAccount } from './hooks/useSelectedAccount';
 
 export default function AccountsPage() {

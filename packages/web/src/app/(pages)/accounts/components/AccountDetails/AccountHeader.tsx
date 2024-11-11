@@ -2,24 +2,20 @@
 
 import React from 'react';
 import { Box } from '@mui/material';
-import { useCrudDialogs } from '@/app/globalHooks/useCrudDialogs';
+import { useCrudDialogs } from '../../../../globalHooks/useCrudDialogs';
 import { AccountNameSection } from './AccountNameSection';
 import { AccountBillingAddress } from './AccountBillingAddress';
-import { AccountContacts } from './AccountContacts';
 import { AccountStatusType } from './AccountStatusType';
-import type { Account } from '@/app/globalTypes/account';
+import type { Account } from '../../../../globalTypes/account';
 
 interface AccountHeaderProps {
     account: Account;
     onUpdate: () => void;
+    onDeleteClick: () => void;
 }
 
-export function AccountHeader({ account, onUpdate }: AccountHeaderProps) {
+export function AccountHeader({ account, onUpdate, onDeleteClick }: AccountHeaderProps) {
     const { openDeleteDialog } = useCrudDialogs();
-
-    const handleDeleteClick = () => {
-        openDeleteDialog(account);
-    };
 
     const handleUpdate = () => {
         // Force a refetch when any child component updates
@@ -31,18 +27,12 @@ export function AccountHeader({ account, onUpdate }: AccountHeaderProps) {
             <AccountNameSection 
                 account={account} 
                 onUpdate={handleUpdate}
-                onDeleteClick={handleDeleteClick}
+                onDeleteClick={onDeleteClick}
             />
 
             <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                 <Box sx={{ flex: '1 1 300px', minWidth: 0 }}>
                     <AccountBillingAddress 
-                        account={account}
-                        onUpdate={handleUpdate}
-                    />
-                </Box>
-                <Box sx={{ flex: '1 1 300px', minWidth: 0 }}>
-                    <AccountContacts 
                         account={account}
                         onUpdate={handleUpdate}
                     />

@@ -1,5 +1,5 @@
-import { Address } from './address';
-import { Account } from './account';
+import type { Address } from './address';
+import type { Account } from './account';
 
 export interface PropertyType {
     value: string;
@@ -37,9 +37,10 @@ export interface Property {
 export interface CreatePropertyDto {
     name: string;
     type: string;
-    status?: string;
-    service_address_id?: string;
-    billing_address_id?: string;
+    status: string;
+    service_address_id: string; // Required
+    billing_address_id: string; // Required
+    account_id: string; // Required
     location?: {
         type: 'Point';
         coordinates: [number, number];
@@ -48,7 +49,6 @@ export interface CreatePropertyDto {
         type: 'Polygon';
         coordinates: [number, number][][];
     };
-    account_id?: string; // Singular for create
 }
 
 export interface UpdatePropertyDto {

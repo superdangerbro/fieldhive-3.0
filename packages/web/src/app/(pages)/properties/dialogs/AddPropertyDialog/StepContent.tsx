@@ -6,25 +6,9 @@ import { AddressFormStep } from './AddressFormStep';
 import { AccountStep } from './AccountStep';
 import { LocationStep } from './LocationStep';
 import { BoundaryStep } from './BoundaryStep';
-import type { Account } from '../../../../globalTypes/account';
-import type { PropertyFormData } from '../../hooks/usePropertyForm';
+import type { StepProps, FormErrors } from './types';
 
-interface StepContentProps {
-  step: number;
-  setActiveStep: (step: number) => void;
-  propertyData: PropertyFormData;
-  setPropertyData: React.Dispatch<React.SetStateAction<PropertyFormData>>;
-  formErrors: Record<string, string>;
-  setFormErrors: (errors: Record<string, string>) => void;
-  handleFieldChange: (path: string, value: string) => void;
-  selectedAccounts: Account[];
-  setSelectedAccounts: (accounts: Account[]) => void;
-  accounts: Account[];
-  showAddAccount: boolean;
-  setShowAddAccount: (show: boolean) => void;
-}
-
-export const StepContent: React.FC<StepContentProps> = ({
+export const StepContent: React.FC<StepProps> = ({
   step,
   setActiveStep,
   propertyData,
@@ -38,9 +22,7 @@ export const StepContent: React.FC<StepContentProps> = ({
   showAddAccount,
   setShowAddAccount,
 }) => {
-  const handleEditLocation = () => {
-    setActiveStep(2); // Jump to Location step
-  };
+  const errors: FormErrors = formErrors;
 
   switch (step) {
     case 0:
@@ -48,7 +30,7 @@ export const StepContent: React.FC<StepContentProps> = ({
         <AddressFormStep
           propertyData={propertyData}
           setPropertyData={setPropertyData}
-          formErrors={formErrors}
+          formErrors={errors}
           handleFieldChange={handleFieldChange}
         />
       );
@@ -67,7 +49,7 @@ export const StepContent: React.FC<StepContentProps> = ({
         <LocationStep
           propertyData={propertyData}
           setPropertyData={setPropertyData}
-          formErrors={formErrors}
+          formErrors={errors}
         />
       );
     case 3:
@@ -75,7 +57,7 @@ export const StepContent: React.FC<StepContentProps> = ({
         <BoundaryStep
           propertyData={propertyData}
           setPropertyData={setPropertyData}
-          formErrors={formErrors}
+          formErrors={errors}
         />
       );
     default:

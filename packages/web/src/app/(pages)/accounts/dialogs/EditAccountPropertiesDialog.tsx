@@ -14,7 +14,7 @@ import {
     TextField,
     Chip
 } from '@mui/material';
-import { useUpdateAccount } from '../hooks/useAccounts';
+import { useUpdateAccount } from '../hooks';
 import { useProperties } from '@/app/(pages)/properties/hooks/useProperties';
 import { useActionNotifications } from '@/app/globalHooks/useActionNotifications';
 import { useQueryClient } from '@tanstack/react-query';

@@ -1,13 +1,13 @@
 'use client';
 
 import React from 'react';
-import { Box, Card, CardContent, Grid, Typography, Divider, Chip, Avatar } from '@mui/material';
+import { Box, Card, CardContent, Grid, Typography, Divider, Chip, Avatar, Paper } from '@mui/material';
 import { AccountHeader } from './AccountHeader';
 import { AccountSummary } from './AccountSummary';
-import ContactsIcon from '@mui/icons-material/Contacts';
 import GroupIcon from '@mui/icons-material/Group';
-import { useDeleteAccount } from '../../hooks/useAccounts';
-import type { Account } from '@/app/globalTypes/account';
+import ContactsIcon from '@mui/icons-material/Contacts';
+import { useDeleteAccount } from '../../hooks';
+import type { Account } from '../../../../globalTypes/account';
 
 interface AccountDetailsProps {
     account: Account;
@@ -33,56 +33,77 @@ export function AccountDetails({ account, onUpdate }: AccountDetailsProps) {
                     <AccountHeader
                         account={account}
                         onUpdate={onUpdate}
+                        onDeleteClick={handleDelete}
                     />
                     <Divider sx={{ my: 3 }} />
                     
                     <Grid container spacing={3}>
                         {/* Contact Information */}
                         <Grid item xs={12} md={6}>
-                            <Box>
+                            <Paper 
+                                elevation={1} 
+                                sx={{ 
+                                    p: 2, 
+                                    height: '100%',
+                                    minHeight: '200px',
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                }}
+                            >
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                    <ContactsIcon sx={{ mr: 1, color: '#6B46C1' }} />
+                                    <ContactsIcon sx={{ mr: 1, color: 'primary.main' }} />
                                     <Typography variant="h6">
                                         Contact Information
                                     </Typography>
                                 </Box>
-                                <Box sx={{ mb: 2 }}>
-                                    <Typography variant="subtitle2" color="text.secondary">
-                                        Contact Name
-                                    </Typography>
-                                    <Typography>
-                                        {account.contact_name || 'No contact name provided'}
-                                    </Typography>
+                                <Box sx={{ flex: 1 }}>
+                                    <Box sx={{ mb: 2 }}>
+                                        <Typography variant="subtitle2" color="text.secondary">
+                                            Contact Name
+                                        </Typography>
+                                        <Typography>
+                                            {account.contact_name || 'No contact name provided'}
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ mb: 2 }}>
+                                        <Typography variant="subtitle2" color="text.secondary">
+                                            Contact Email
+                                        </Typography>
+                                        <Typography>
+                                            {account.contact_email || 'No email provided'}
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ mb: 2 }}>
+                                        <Typography variant="subtitle2" color="text.secondary">
+                                            Contact Phone
+                                        </Typography>
+                                        <Typography>
+                                            {account.contact_phone || 'No phone number provided'}
+                                        </Typography>
+                                    </Box>
                                 </Box>
-                                <Box sx={{ mb: 2 }}>
-                                    <Typography variant="subtitle2" color="text.secondary">
-                                        Contact Email
-                                    </Typography>
-                                    <Typography>
-                                        {account.contact_email || 'No email provided'}
-                                    </Typography>
-                                </Box>
-                                <Box sx={{ mb: 2 }}>
-                                    <Typography variant="subtitle2" color="text.secondary">
-                                        Contact Phone
-                                    </Typography>
-                                    <Typography>
-                                        {account.contact_phone || 'No phone number provided'}
-                                    </Typography>
-                                </Box>
-                            </Box>
+                            </Paper>
                         </Grid>
 
                         {/* Associated Users */}
                         <Grid item xs={12} md={6}>
-                            <Box>
+                            <Paper 
+                                elevation={1} 
+                                sx={{ 
+                                    p: 2,
+                                    height: '100%',
+                                    minHeight: '200px',
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                }}
+                            >
                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                    <GroupIcon sx={{ mr: 1, color: '#6B46C1' }} />
+                                    <GroupIcon sx={{ mr: 1, color: 'primary.main' }} />
                                     <Typography variant="h6">
                                         Associated Users
                                     </Typography>
                                 </Box>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                <Box sx={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: 1, alignContent: 'flex-start' }}>
                                     {account.users && account.users.length > 0 ? (
                                         account.users.map((user) => (
                                             <Chip
@@ -99,7 +120,7 @@ export function AccountDetails({ account, onUpdate }: AccountDetailsProps) {
                                         </Typography>
                                     )}
                                 </Box>
-                            </Box>
+                            </Paper>
                         </Grid>
                     </Grid>
 

@@ -10,7 +10,7 @@ import {
     Button,
     CircularProgress
 } from '@mui/material';
-import { useDeleteAccount, useArchiveAccount } from '../hooks/useAccounts';
+import { useDeleteAccount, useArchiveAccount } from '../hooks';
 
 interface DeleteAccountDialogProps {
     open: boolean;

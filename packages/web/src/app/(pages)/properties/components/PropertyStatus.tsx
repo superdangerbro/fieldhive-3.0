@@ -2,14 +2,14 @@
 
 import React from 'react';
 import { Chip } from '@mui/material';
-import type { PropertyStatus } from '@fieldhive/shared';
+import type { PropertyStatus as PropertyStatusType } from '../../../globalTypes/property';
 
 interface StatusChipProps {
   status: string;
 }
 
 export function StatusChip({ status }: StatusChipProps) {
-  const normalizedStatus = status.toLowerCase() as PropertyStatus;
+  const normalizedStatus = status.toLowerCase();
   return (
     <Chip 
       label={status}

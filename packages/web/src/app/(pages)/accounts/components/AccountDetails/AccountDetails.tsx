@@ -13,9 +13,9 @@ import {
     Typography,
     CircularProgress
 } from '@mui/material';
-import { AccountHeader } from './AccountDetails/AccountHeader';
-import { AccountSummary } from './AccountDetails/AccountSummary';
-import { useDeleteAccount } from '../hooks/useAccounts';
+import { AccountHeader } from './AccountHeader';
+import { AccountSummary } from './AccountSummary';
+import { useDeleteAccount } from '../../hooks';
 import { useActionNotifications } from '@/app/globalHooks/useActionNotifications';
 import { useCrudDialogs } from '@/app/globalHooks/useCrudDialogs';
 import type { Account } from '@/app/globalTypes/account';
@@ -38,8 +38,8 @@ export function AccountDetails({ account, onUpdate }: AccountDetailsProps) {
             notifySuccess('Account deleted successfully');
             onUpdate();
         } catch (error) {
-            notifyError('Failed to delete account');
             console.error('Failed to delete account:', error);
+            notifyError('Failed to delete account');
         }
     };
 

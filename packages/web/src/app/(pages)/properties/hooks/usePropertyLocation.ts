@@ -1,106 +1,71 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ENV_CONFIG } from '@/config/environment';
+import { ENV_CONFIG } from '../../../../config/environment';
+import { 
+    GeoJSONPoint, 
+    GeoJSONPolygon, 
+    LocationData,
+    Coordinate,
+    validateGeoJsonCoordinates
+} from '../types/location';
+import { handleApiError, buildApiRequest } from './utils';
 
-interface GeoJSONPoint {
-    type: 'Point';
-    coordinates: [number, number];
+const buildUrl = (endpoint: string) => `${ENV_CONFIG.api.baseUrl}${endpoint}`;
+
+// Validate GeoJSON coordinates
+function validateGeoJsonPoint(point: GeoJSONPoint | null): GeoJSONPoint | null {
+    if (!point) return null;
+    const [lng, lat] = point.coordinates;
+    if (!validateGeoJsonCoordinates(lng, lat)) {
+        console.error('Invalid GeoJSON point coordinates:', point.coordinates);
+        return null;
+    }
+    return point;
 }
 
-interface GeoJSONPolygon {
-    type: 'Polygon';
-    coordinates: [number, number][][];
-}
-
-interface LocationData {
-    location?: {
-        geometry: GeoJSONPoint;
-    } | null;
-    boundary?: {
-        geometry: GeoJSONPolygon;
-    } | null;
-}
-
-type Coordinate = [number, number];
-
-const ENDPOINTS = {
-    location: (id: string) => `/properties/${id}/location`,
-    boundary: (id: string) => `/properties/${id}/boundary`
-};
-
-const buildUrl = (endpoint: string) => {
-    const url = `${ENV_CONFIG.api.baseUrl}${endpoint}`;
-    console.log('Building location URL:', url);
-    return url;
-};
-
-// Helper function to validate coordinates
-function validateCoordinates(coords: unknown): coords is Coordinate {
-    if (!Array.isArray(coords) || coords.length !== 2) {
-        console.warn('Invalid coordinates array:', coords);
-        return false;
+function validateGeoJsonPolygon(polygon: GeoJSONPolygon | null): GeoJSONPolygon | null {
+    if (!polygon) return null;
+    
+    // Check if all coordinates in the polygon are valid
+    const allValid = polygon.coordinates[0].every(([lng, lat]) => 
+        validateGeoJsonCoordinates(lng, lat)
+    );
+    
+    if (!allValid) {
+        console.error('Invalid GeoJSON polygon coordinates:', polygon.coordinates);
+        return null;
     }
-    const [lng, lat] = coords;
-    if (typeof lng !== 'number' || typeof lat !== 'number') {
-        console.warn('Invalid coordinate values:', { lng, lat });
-        return false;
-    }
-    if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
-        console.warn('Coordinates out of range:', { lng, lat });
-        return false;
-    }
-    return true;
+    
+    return polygon;
 }
 
 // Get property location data
 export const usePropertyLocation = (propertyId: string) => {
-    return useQuery<LocationData>({
+    return useQuery<LocationData, Error, LocationData>({
         queryKey: ['propertyLocation', propertyId],
         queryFn: async () => {
-            console.log('Fetching property location:', { propertyId });
-            const url = buildUrl(ENDPOINTS.location(propertyId));
-            console.log('API Request:', { method: 'GET', url });
+            const response = await fetch(
+                buildUrl(`/properties/${propertyId}/location`),
+                buildApiRequest()
+            );
 
-            try {
-                const response = await fetch(url, {
-                    headers: { 'Content-Type': 'application/json' },
-                    signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to fetch property location');
-                }
-
-                const data = await response.json();
-                console.log('Location API Response:', data);
-
-                // Validate location data
-                if (data.location?.geometry?.coordinates) {
-                    if (!validateCoordinates(data.location.geometry.coordinates)) {
-                        console.warn('Invalid location coordinates, setting to null');
-                        data.location = null;
-                    }
-                }
-
-                // Validate boundary data
-                if (data.boundary?.geometry?.coordinates?.[0]) {
-                    const isValid = data.boundary.geometry.coordinates[0].every(validateCoordinates);
-                    if (!isValid) {
-                        console.warn('Invalid boundary coordinates, setting to null');
-                        data.boundary = null;
-                    }
-                }
-
-                return data;
-            } catch (error) {
-                console.error('Failed to fetch location data:', error);
-                throw error;
+            if (!response.ok) {
+                await handleApiError(response);
             }
+
+            const data = await response.json();
+            
+            // Validate coordinates and return null if invalid
+            return {
+                location: validateGeoJsonPoint(data.location),
+                boundary: validateGeoJsonPolygon(data.boundary)
+            };
         },
         enabled: !!propertyId,
-        staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
-        gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
+        staleTime: 30000,
+        gcTime: 60000,
+        refetchOnWindowFocus: false
     });
 };
 
@@ -108,39 +73,30 @@ export const usePropertyLocation = (propertyId: string) => {
 export const useUpdatePropertyLocation = () => {
     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: async ({ propertyId, coordinates }: { propertyId: string; coordinates: Coordinate }) => {
-            console.log('Updating property location:', { propertyId, coordinates });
-
-            if (!validateCoordinates(coordinates)) {
-                throw new Error('Invalid coordinates provided');
+    return useMutation<LocationData, Error, { propertyId: string; coordinates: Coordinate }>({
+        mutationFn: async ({ propertyId, coordinates }) => {
+            const [lng, lat] = coordinates;
+            if (!validateGeoJsonCoordinates(lng, lat)) {
+                throw new Error('Invalid coordinates: longitude must be between -180 and 180, latitude must be between -90 and 90');
             }
 
-            const url = buildUrl(ENDPOINTS.location(propertyId));
-            console.log('API Request:', { method: 'PUT', url, data: { coordinates } });
-
-            const response = await fetch(url, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ coordinates }),
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-            });
+            const response = await fetch(
+                buildUrl(`/properties/${propertyId}/location`),
+                buildApiRequest({
+                    method: 'PUT',
+                    body: JSON.stringify({ coordinates })
+                })
+            );
 
             if (!response.ok) {
-                throw new Error('Failed to update property location');
+                await handleApiError(response);
             }
 
-            const data = await response.json();
-            console.log('Update Response:', data);
-            return data;
+            return response.json();
         },
         onSuccess: (_, { propertyId }) => {
-            console.log('Location update successful, invalidating queries');
             queryClient.invalidateQueries({ queryKey: ['propertyLocation', propertyId] });
             queryClient.invalidateQueries({ queryKey: ['property', propertyId] });
-        },
-        onError: (error) => {
-            console.error('Location update failed:', error);
         }
     });
 };
@@ -149,41 +105,50 @@ export const useUpdatePropertyLocation = () => {
 export const useUpdatePropertyBoundary = () => {
     const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: async ({ propertyId, coordinates }: { propertyId: string; coordinates: Coordinate[] }) => {
-            console.log('Updating property boundary:', { propertyId, coordinates });
+    return useMutation<LocationData, Error, { propertyId: string; coordinates: Array<[number, number]> | null }>({
+        mutationFn: async ({ propertyId, coordinates }) => {
+            // If coordinates is null, remove the boundary
+            if (coordinates === null) {
+                const response = await fetch(
+                    buildUrl(`/properties/${propertyId}/boundary`),
+                    buildApiRequest({
+                        method: 'DELETE'
+                    })
+                );
 
-            // Validate all boundary coordinates
-            const isValid = coordinates.every(validateCoordinates);
-            if (!isValid) {
-                throw new Error('Invalid boundary coordinates provided');
+                if (!response.ok) {
+                    await handleApiError(response);
+                }
+
+                return response.json();
             }
 
-            const url = buildUrl(ENDPOINTS.boundary(propertyId));
-            console.log('API Request:', { method: 'PUT', url, data: { coordinates } });
+            // Validate all coordinates in the boundary
+            const allValid = coordinates.every(([lng, lat]) => 
+                validateGeoJsonCoordinates(lng, lat)
+            );
 
-            const response = await fetch(url, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ coordinates }),
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-            });
+            if (!allValid) {
+                throw new Error('Invalid coordinates: longitude must be between -180 and 180, latitude must be between -90 and 90');
+            }
+
+            const response = await fetch(
+                buildUrl(`/properties/${propertyId}/boundary`),
+                buildApiRequest({
+                    method: 'PUT',
+                    body: JSON.stringify({ coordinates })
+                })
+            );
 
             if (!response.ok) {
-                throw new Error('Failed to update property boundary');
+                await handleApiError(response);
             }
 
-            const data = await response.json();
-            console.log('Update Response:', data);
-            return data;
+            return response.json();
         },
         onSuccess: (_, { propertyId }) => {
-            console.log('Boundary update successful, invalidating queries');
             queryClient.invalidateQueries({ queryKey: ['propertyLocation', propertyId] });
             queryClient.invalidateQueries({ queryKey: ['property', propertyId] });
-        },
-        onError: (error) => {
-            console.error('Boundary update failed:', error);
         }
     });
 };

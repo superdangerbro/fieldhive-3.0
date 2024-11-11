@@ -56,6 +56,19 @@ export async function getAccounts(req: Request, res: Response) {
             .orderBy('accounts.name', 'ASC')
             .getMany();
 
+        // Log the first account's data for debugging
+        if (accounts.length > 0) {
+            logger.info('First account data:', {
+                account_id: accounts[0].account_id,
+                name: accounts[0].name,
+                billing_address: accounts[0].billingAddress,
+                properties: accounts[0].properties?.map(p => ({
+                    property_id: p.property_id,
+                    name: p.name
+                }))
+            });
+        }
+
         res.json({ accounts, total });
     } catch (error) {
         logger.error('Error getting accounts:', error);

@@ -1,11 +1,18 @@
 'use client';
 
 import { useQuery, QueryClient } from '@tanstack/react-query';
-import { ENV_CONFIG } from '@/config/environment';
-import type { Property } from '@/app/globalTypes/property';
-import { handleApiError } from './utils';
+import { ENV_CONFIG } from '../../../../config/environment';
+import type { Property } from '../../../globalTypes/property';
+import { handleApiError, buildApiRequest } from './utils';
 
 const buildUrl = (endpoint: string) => `${ENV_CONFIG.api.baseUrl}${endpoint}`;
+
+interface ApiResponse {
+    properties: Property[];
+    total: number;
+    limit: number;
+    offset: number;
+}
 
 export const useProperties = (params?: { limit?: number; offset?: number; search?: string }) => {
     return useQuery({
@@ -20,24 +27,33 @@ export const useProperties = (params?: { limit?: number; offset?: number; search
             const url = `${buildUrl('/properties')}?${searchParams.toString()}`;
             console.log('API Request:', { method: 'GET', url });
 
-            const response = await fetch(url, {
-                headers: { 'Content-Type': 'application/json' },
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-            });
+            try {
+                const response = await fetch(url, buildApiRequest());
 
-            if (!response.ok) {
-                await handleApiError(response);
+                if (!response.ok) {
+                    await handleApiError(response);
+                }
+
+                const data: ApiResponse = await response.json();
+                console.log('Properties API Response:', {
+                    count: data.properties?.length || 0,
+                    firstProperty: data.properties?.[0]
+                });
+
+                // Ensure all required fields are present
+                return data.properties.map(property => ({
+                    ...property,
+                    accounts: property.accounts || [],
+                    type: property.type || '',
+                    status: property.status || '',
+                    created_at: property.created_at,
+                    updated_at: property.updated_at
+                }));
+            } catch (error) {
+                console.error('Failed to fetch properties:', error);
+                throw error;
             }
-
-            const data = await response.json();
-            console.log('Properties API Response:', {
-                count: data.properties?.length || 0,
-                firstProperty: data.properties?.[0]
-            });
-
-            return data.properties || [];
-        },
-        staleTime: 0 // Always fetch fresh data
+        }
     });
 };
 
@@ -51,21 +67,27 @@ export const useProperty = (propertyId: string | null) => {
             const url = buildUrl(`/properties/${propertyId}`);
             console.log('API Request:', { method: 'GET', url });
 
-            const response = await fetch(url, {
-                headers: { 'Content-Type': 'application/json' },
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-            });
+            try {
+                const response = await fetch(url, buildApiRequest());
 
-            if (!response.ok) {
-                await handleApiError(response);
+                if (!response.ok) {
+                    await handleApiError(response);
+                }
+
+                const data = await response.json();
+                console.log('Property API Response:', data);
+                return {
+                    ...data,
+                    accounts: data.accounts || [],
+                    type: data.type || '',
+                    status: data.status || ''
+                };
+            } catch (error) {
+                console.error('Failed to fetch property:', error);
+                throw error;
             }
-
-            const data = await response.json();
-            console.log('Property API Response:', data);
-            return data;
         },
-        enabled: !!propertyId,
-        staleTime: 0 // Always fetch fresh data
+        enabled: !!propertyId
     });
 };
 
@@ -74,16 +96,19 @@ export const prefetchProperty = async (queryClient: QueryClient, id: string) => 
         await queryClient.prefetchQuery({
             queryKey: ['property', id],
             queryFn: async () => {
-                const response = await fetch(buildUrl(`/properties/${id}`), {
-                    headers: { 'Content-Type': 'application/json' },
-                    signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-                });
+                const response = await fetch(buildUrl(`/properties/${id}`), buildApiRequest());
 
                 if (!response.ok) {
                     await handleApiError(response);
                 }
 
-                return await response.json();
+                const data = await response.json();
+                return {
+                    ...data,
+                    accounts: data.accounts || [],
+                    type: data.type || '',
+                    status: data.status || ''
+                };
             }
         });
     } catch (error) {

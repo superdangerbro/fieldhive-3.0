@@ -8,7 +8,8 @@ import {
     bulkDeleteProperties,
     getPropertyLocation,
     updatePropertyLocation,
-    updatePropertyBoundary
+    updatePropertyBoundary,
+    deletePropertyBoundary
 } from './handlers';
 
 const router = Router();
@@ -35,7 +36,8 @@ router.post('/bulk-delete', bulkDeleteProperties);
 router.get('/:id/location', getPropertyLocation);
 router.put('/:id/location', updatePropertyLocation);
 
-// Property boundary endpoint
+// Property boundary endpoints
 router.put('/:id/boundary', updatePropertyBoundary);
+router.delete('/:id/boundary', deletePropertyBoundary);
 
 export default router;

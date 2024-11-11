@@ -1,43 +1,72 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ENV_CONFIG } from '@/config/environment';
-import type { Property } from '@/app/globalTypes/property';
-import { handleApiError } from './utils';
+import { ENV_CONFIG } from '../../../config/environment';
+import type { CreatePropertyDto, Property } from '../../../globalTypes/property';
+import type { CreateAddressDto } from '../../../globalTypes/address';
 
-const buildUrl = (endpoint: string) => `${ENV_CONFIG.api.baseUrl}${endpoint}`;
+interface PropertyLocation {
+    type: 'Point';
+    coordinates: [number, number]; // [longitude, latitude]
+}
+
+interface PropertyBoundary {
+    type: 'Polygon';
+    coordinates: Array<Array<[number, number]>>;
+}
+
+interface PropertyCreatePayload {
+    name: string;
+    type: string;
+    status: string;
+    service_address: CreateAddressDto;
+    billing_address?: CreateAddressDto;
+    account_id: string;
+    location?: PropertyLocation;
+    boundary?: PropertyBoundary;
+}
 
 export const useCreateProperty = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (data: Partial<Property>) => {
-            console.log('Creating property:', data);
-            const url = buildUrl('/properties');
-            console.log('API Request:', { method: 'POST', url, data });
+        mutationFn: async (data: PropertyCreatePayload): Promise<Property> => {
+            const url = `${ENV_CONFIG.api.baseUrl}/properties`;
+            
+            try {
+                // Log the exact request
+                console.log('Property creation request:', {
+                    url,
+                    method: 'POST',
+                    payload: JSON.stringify(data, null, 2)
+                });
 
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-            });
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
 
-            if (!response.ok) {
-                await handleApiError(response);
+                const responseData = await response.json();
+                console.log('Property creation response:', responseData);
+
+                if (!response.ok) {
+                    throw new Error(responseData.message || 'Failed to create property');
+                }
+
+                return responseData;
+            } catch (error) {
+                console.error('Property creation error:', error);
+                throw error instanceof Error 
+                    ? error 
+                    : new Error('Failed to create property');
             }
-
-            const result = await response.json();
-            console.log('API Response:', { newProperty: result });
-            return result;
         },
         onSuccess: (newProperty) => {
-            console.log('Create successful, updating cache');
             queryClient.setQueryData(['property', newProperty.property_id], newProperty);
             queryClient.invalidateQueries({ queryKey: ['properties'] });
-        },
-        onError: (error) => {
-            console.error('Create failed:', error);
         }
     });
 };
+
+export type { PropertyCreatePayload, PropertyLocation, PropertyBoundary };
