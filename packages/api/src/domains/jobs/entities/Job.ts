@@ -17,7 +17,7 @@ export class Job {
     property_id: string;
 
     @ManyToOne(() => Property)
-    @JoinColumn({ name: 'property_id' })
+    @JoinColumn({ name: 'property_id', referencedColumnName: 'property_id' })
     property: Property;
 
     @Column({ name: 'job_type_id', type: 'text' })
@@ -33,15 +33,15 @@ export class Job {
     service_address_id: string | null;
 
     @ManyToOne(() => Address)
-    @JoinColumn({ name: 'service_address_id' })
-    service_address: Address;
+    @JoinColumn({ name: 'service_address_id', referencedColumnName: 'address_id' })
+    serviceAddress: Address;
 
     @Column({ name: 'billing_address_id', nullable: true })
     billing_address_id: string | null;
 
     @ManyToOne(() => Address)
-    @JoinColumn({ name: 'billing_address_id' })
-    billing_address: Address;
+    @JoinColumn({ name: 'billing_address_id', referencedColumnName: 'address_id' })
+    billingAddress: Address;
 
     @CreateDateColumn({ name: 'created_at' })
     created_at: Date;

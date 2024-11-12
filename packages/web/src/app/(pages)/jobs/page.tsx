@@ -1,14 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { Box, Alert, Snackbar } from '@mui/material';
+import { Box, Alert, Snackbar, CircularProgress } from '@mui/material';
 import { JobSearch, JobDetails, JobsTable, JobsHeader } from './components';
 import { AddJobDialog, EditJobDialog } from './dialogs';
-import type { Job } from '@/app/globalTypes';
+import type { Job } from '../../globalTypes/job';
 import { useJobs, useCreateJob, useUpdateJob } from './hooks/useJobs';
+import { useSelectedJob } from './hooks/useSelectedJob';
 
 export default function JobsPage() {
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const { selectedJob, setSelectedJob, isLoading: isLoadingSelected } = useSelectedJob();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editJob, setEditJob] = useState<Job | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -30,27 +31,19 @@ export default function JobsPage() {
       onSuccess: () => {
         setIsAddDialogOpen(false);
         showSuccess('Job created successfully');
+        refetch();
       }
     });
   };
 
   const handleEditSuccess = () => {
     refetch();
-    
-    // If we were editing the currently selected job, refresh it
-    if (selectedJob && editJob && selectedJob.jobId === editJob.jobId) {
-      const updatedJob = data.jobs.find(job => job.jobId === selectedJob.jobId);
-      if (updatedJob) {
-        setSelectedJob(updatedJob);
-      }
-    }
-    
     setEditJob(null);
     showSuccess('Job updated successfully');
   };
 
   const handleJobSelect = (job: Job | null) => {
-    setSelectedJob(job);
+    setSelectedJob(job?.job_id || null);
   };
 
   const handleEdit = (job: Job) => {
@@ -65,6 +58,17 @@ export default function JobsPage() {
   const handleCloseError = () => {
     // Error state is managed by React Query
   };
+
+  if (isLoadingSelected) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // Find the full job object for the selected job
+  const selectedJobObject = selectedJob ? data.jobs.find(job => job.job_id === selectedJob.job_id) || null : null;
 
   return (
     <Box p={3}>
@@ -85,23 +89,33 @@ export default function JobsPage() {
         </Alert>
       </Snackbar>
 
-      <JobDetails
-        job={selectedJob}
-        onEdit={handleEdit}
-        onUpdate={handleUpdate}
-        onJobSelect={handleJobSelect}
-      />
+      {selectedJobObject && (
+        <JobDetails
+          job={selectedJobObject}
+          onEdit={handleEdit}
+          onUpdate={handleUpdate}
+          onJobSelect={handleJobSelect}
+        />
+      )}
       <JobsHeader />
       <JobSearch
         jobs={data.jobs}
-        selectedJob={selectedJob}
+        selectedJob={selectedJobObject}
         onJobSelect={handleJobSelect}
         onAddClick={() => setIsAddDialogOpen(true)}
       />
       <JobsTable 
         onJobSelect={handleJobSelect}
-        selectedJob={selectedJob}
-        onJobsLoad={() => {}} // No longer needed with React Query
+        selectedJob={selectedJobObject}
+        onJobsLoad={() => {
+          // If we have a selected job, ensure it's up to date
+          if (selectedJob) {
+            const updatedJob = data.jobs.find(job => job.job_id === selectedJob.job_id);
+            if (updatedJob && JSON.stringify(updatedJob) !== JSON.stringify(selectedJob)) {
+              setSelectedJob(updatedJob.job_id);
+            }
+          }
+        }}
       />
       <AddJobDialog
         open={isAddDialogOpen}

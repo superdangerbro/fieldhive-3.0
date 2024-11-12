@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getJobs, getJob, createJob, updateJob, archiveJob } from './handler';
+import { getJobs, getJob, createJob, updateJob, archiveJob, getJobAddresses } from './handler';
 
 const router = Router();
 
@@ -8,6 +8,9 @@ router.get('/', getJobs);
 
 // Get job by ID
 router.get('/:id', getJob);
+
+// Get job addresses
+router.get('/:id/addresses', getJobAddresses);
 
 // Create new job
 router.post('/', createJob);

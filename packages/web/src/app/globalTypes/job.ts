@@ -57,11 +57,12 @@ export interface UpdateJobDto {
     name?: string;
     type?: string;
     status?: string;
-    propertyId?: string;
+    property_id?: string; // Changed to match API field
     accountId?: string;
     useCustomAddresses?: boolean;
     serviceAddress?: Address;
     billingAddress?: Address;
+    job_type_id?: string;
 }
 
 export interface JobResponse {

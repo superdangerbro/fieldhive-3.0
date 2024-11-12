@@ -1,8 +1,8 @@
 'use client';
 
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { ENV_CONFIG } from '@/config/environment';
-import type { JobType, JobStatus } from '@/app/globalTypes';
+import { ENV_CONFIG } from '../../../config/environment';
+import type { JobType, JobStatus } from '../../../globalTypes/job';
 
 type SettingKey = 'job_types' | 'job_statuses';
 
@@ -12,7 +12,7 @@ const SETTINGS_ENDPOINT = '/settings/jobs';
 const buildUrl = (key: SettingKey) => 
     `${ENV_CONFIG.api.baseUrl}${SETTINGS_ENDPOINT}/${key.replace('job_', '')}`;
 
-export const useSetting = <T>(key: SettingKey): UseQueryResult<T[], Error> => {
+export const useSetting = <T>(key: SettingKey): UseQueryResult<T, Error> => {
     return useQuery({
         queryKey: ['settings', key],
         queryFn: async () => {
@@ -27,10 +27,6 @@ export const useSetting = <T>(key: SettingKey): UseQueryResult<T[], Error> => {
             }
 
             const data = await response.json();
-            if (!Array.isArray(data)) {
-                throw new Error(`Invalid response format for setting: ${key}`);
-            }
-
             return data;
         },
         staleTime: ENV_CONFIG.queryClient.defaultStaleTime,

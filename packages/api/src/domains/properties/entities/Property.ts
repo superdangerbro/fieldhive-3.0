@@ -30,11 +30,11 @@ export class Property {
     billing_address_id: string | null;
 
     @ManyToOne(() => Address, { nullable: true })
-    @JoinColumn({ name: 'service_address_id' })
+    @JoinColumn({ name: 'service_address_id', referencedColumnName: 'address_id' })
     serviceAddress: Address | null;
 
     @ManyToOne(() => Address, { nullable: true })
-    @JoinColumn({ name: 'billing_address_id' })
+    @JoinColumn({ name: 'billing_address_id', referencedColumnName: 'address_id' })
     billingAddress: Address | null;
 
     @ManyToMany(() => Account, account => account.properties)

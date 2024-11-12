@@ -13,23 +13,35 @@ import {
   CircularProgress, 
   Typography, 
   Paper, 
-  Stack 
+  Stack,
+  IconButton,
+  Autocomplete,
+  TextField
 } from '@mui/material';
-import type { Job, Address, JobStatus, JobType } from '@/app/globalTypes';
+import type { Job, JobStatus } from '../../../globalTypes/job';
+import type { Property } from '../../../globalTypes/property';
 import { useSetting } from '../hooks/useSettings';
 import { useUpdateJob } from '../hooks/useJobs';
+import { useProperties } from '../hooks/useProperties';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import BusinessIcon from '@mui/icons-material/Business';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import WorkIcon from '@mui/icons-material/Work';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import CancelIcon from '@mui/icons-material/Close';
+import { JobTypeSelect } from './JobTypeSelect';
 
 interface JobMetadataProps {
   job: Job;
   onUpdate?: () => void;
 }
 
-function formatAddress(address?: Address | null): string {
+interface JobStatusResponse {
+  statuses: JobStatus[];
+}
+
+function formatAddress(address?: any): string {
   if (!address) return 'N/A';
 
   const parts = [
@@ -45,18 +57,21 @@ function formatAddress(address?: Address | null): string {
 }
 
 export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
-  const [currentStatus, setCurrentStatus] = useState<JobStatus>(
-    typeof job.status === 'string' 
-      ? { name: job.status, color: '#94a3b8' } 
-      : job.status
-  );
+  const [currentStatus, setCurrentStatus] = useState(job.status);
+  const [isEditingProperty, setIsEditingProperty] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(job.property || null);
+
+  // Fetch properties for dropdown
+  const { data: properties = [], isLoading: isLoadingProperties } = useProperties();
 
   // Use React Query hooks
   const { 
-    data: statusOptions = [], 
+    data: response, 
     isLoading: isLoadingSettings,
     error: settingsError 
-  } = useSetting<JobStatus[]>('job_statuses');
+  } = useSetting<JobStatusResponse>('job_statuses');
+
+  const statusOptions = response?.statuses || [];
 
   const {
     mutate: updateJob,
@@ -66,25 +81,19 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
   } = useUpdateJob();
 
   useEffect(() => {
-    setCurrentStatus(
-      typeof job.status === 'string'
-        ? { name: job.status, color: '#94a3b8' }
-        : job.status
-    );
+    setCurrentStatus(job.status);
+    setSelectedProperty(job.property || null);
   }, [job]);
 
   const handleStatusChange = (event: SelectChangeEvent<string>) => {
-    const newStatusName = event.target.value;
-    const newStatus = statusOptions.find(s => s.name === newStatusName);
-    if (!newStatus) return;
-
+    const newStatus = event.target.value;
     const previousStatus = currentStatus;
     setCurrentStatus(newStatus);
     
     updateJob(
       { 
         id: job.job_id, 
-        data: { status: newStatus.name }
+        data: { status: newStatus }
       },
       {
         onSuccess: () => {
@@ -99,8 +108,64 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
     );
   };
 
-  const serviceAddress = job.use_custom_addresses ? job.service_address : job.property?.service_address;
-  const billingAddress = job.use_custom_addresses ? job.billing_address : job.property?.billing_address;
+  const handlePropertySave = () => {
+    if (selectedProperty?.property_id !== job.property?.property_id) {
+      console.log('Updating job property:', {
+        jobId: job.job_id,
+        property_id: selectedProperty?.property_id
+      });
+      
+      updateJob(
+        {
+          id: job.job_id,
+          data: { property_id: selectedProperty?.property_id }
+        },
+        {
+          onSuccess: () => {
+            console.log('Property update successful');
+            setIsEditingProperty(false);
+            // Ensure we call onUpdate to refresh the job data
+            if (onUpdate) {
+              onUpdate();
+            }
+          },
+          onError: (error: Error) => {
+            console.error('Failed to update property:', error);
+            // Reset to previous property on error
+            setSelectedProperty(job.property || null);
+          }
+        }
+      );
+    } else {
+      setIsEditingProperty(false);
+    }
+  };
+
+  const handlePropertyCancel = () => {
+    setSelectedProperty(job.property || null);
+    setIsEditingProperty(false);
+  };
+
+  // Debug logging for address selection
+  console.log('Job data:', {
+    jobId: job.job_id,
+    useCustomAddresses: job.useCustomAddresses,
+    jobServiceAddress: job.serviceAddress,
+    jobBillingAddress: job.billingAddress,
+    propertyServiceAddress: job.property?.serviceAddress,
+    propertyBillingAddress: job.property?.billingAddress
+  });
+
+  const serviceAddress = job.useCustomAddresses ? job.serviceAddress : job.property?.serviceAddress;
+  const billingAddress = job.useCustomAddresses ? job.billingAddress : job.property?.billingAddress;
+
+  // Debug logging for selected addresses
+  console.log('Selected addresses:', {
+    serviceAddress,
+    billingAddress,
+    formattedServiceAddress: formatAddress(serviceAddress),
+    formattedBillingAddress: formatAddress(billingAddress)
+  });
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -126,7 +191,7 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
               </Typography>
               <FormControl fullWidth size="small">
                 <Select
-                  value={currentStatus.name}
+                  value={currentStatus}
                   onChange={handleStatusChange}
                   disabled={isUpdating || isLoadingSettings}
                   startAdornment={
@@ -136,7 +201,7 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
                   }
                 >
                   {statusOptions.map((status) => (
-                    <MenuItem key={status.name} value={status.name}>
+                    <MenuItem key={status.value} value={status.value}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Box
                           sx={{
@@ -147,7 +212,7 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
                             mr: 1
                           }}
                         />
-                        {status.name}
+                        {status.label}
                       </Box>
                     </MenuItem>
                   ))}
@@ -160,10 +225,11 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
               <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
                 Job Type
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <WorkIcon color="action" sx={{ fontSize: '1.2rem' }} />
-                <Typography>{job.job_type?.name || 'N/A'}</Typography>
-              </Box>
+              <JobTypeSelect 
+                jobId={job.job_id} 
+                currentType={job.job_type_id} 
+                onUpdate={onUpdate}
+              />
             </Box>
           </Grid>
         </Grid>
@@ -173,24 +239,81 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
       <Paper elevation={2} sx={{ p: 3 }}>
         <Grid container spacing={3}>
           <Grid item xs={6}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-              <BusinessIcon color="primary" />
-              <Typography variant="h6">Property</Typography>
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                <BusinessIcon color="primary" />
+                <Typography variant="h6">Property</Typography>
+                {!isEditingProperty ? (
+                  <IconButton 
+                    onClick={() => setIsEditingProperty(true)}
+                    color="primary"
+                    size="small"
+                  >
+                    <EditIcon />
+                  </IconButton>
+                ) : null}
+              </Box>
+              {isEditingProperty ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Autocomplete
+                    value={selectedProperty}
+                    onChange={(_, newValue) => setSelectedProperty(newValue)}
+                    options={properties}
+                    getOptionLabel={(option) => option.name}
+                    isOptionEqualToValue={(option, value) => option.property_id === value.property_id}
+                    loading={isLoadingProperties}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        size="small"
+                        placeholder="Select property..."
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: (
+                            <>
+                              {isLoadingProperties ? <CircularProgress size={20} /> : null}
+                              {params.InputProps.endAdornment}
+                            </>
+                          ),
+                        }}
+                      />
+                    )}
+                    fullWidth
+                    size="small"
+                  />
+                  <IconButton 
+                    onClick={handlePropertySave}
+                    color="primary"
+                    disabled={isUpdating}
+                  >
+                    <SaveIcon />
+                  </IconButton>
+                  <IconButton 
+                    onClick={handlePropertyCancel}
+                    disabled={isUpdating}
+                  >
+                    <CancelIcon />
+                  </IconButton>
+                </Box>
+              ) : (
+                <Typography variant="body1">{job.property?.name || 'N/A'}</Typography>
+              )}
             </Box>
-            <Typography variant="body1">{job.property?.name || 'N/A'}</Typography>
           </Grid>
           <Grid item xs={6}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-              <AccountBalanceIcon color="primary" />
-              <Typography variant="h6">Accounts</Typography>
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                <AccountBalanceIcon color="primary" />
+                <Typography variant="h6">Accounts</Typography>
+              </Box>
+              <Stack spacing={1}>
+                {job.property?.accounts?.map((account) => (
+                  <Typography key={account.account_id} variant="body1">
+                    {account.name}
+                  </Typography>
+                )) || <Typography variant="body1">N/A</Typography>}
+              </Stack>
             </Box>
-            <Stack spacing={1}>
-              {job.property?.accounts?.map((account) => (
-                <Typography key={account.account_id} variant="body1">
-                  {account.name}
-                </Typography>
-              )) || <Typography variant="body1">N/A</Typography>}
-            </Stack>
           </Grid>
         </Grid>
       </Paper>
@@ -200,7 +323,7 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
           <LocationOnIcon color="primary" />
           <Typography variant="h6">Addresses</Typography>
-          {job.use_custom_addresses && (
+          {job.useCustomAddresses && (
             <Chip 
               label="Using Custom Addresses" 
               size="small" 
@@ -214,7 +337,7 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
             <Box>
               <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 1 }}>
                 Service Address
-                {!job.use_custom_addresses && (
+                {!job.useCustomAddresses && (
                   <Chip 
                     label="From Property" 
                     size="small" 
@@ -230,7 +353,7 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
             <Box>
               <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 1 }}>
                 Billing Address
-                {!job.use_custom_addresses && (
+                {!job.useCustomAddresses && (
                   <Chip 
                     label="From Property" 
                     size="small" 

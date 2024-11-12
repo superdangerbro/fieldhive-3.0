@@ -50,10 +50,13 @@ const transformJob = (job: any): Job => {
             boundary: job.property.boundary || job.property_boundary,
             accounts: job.property.accounts || [],
             created_at: job.property.created_at || job.property_created_at,
-            updated_at: job.property.updated_at || job.property_updated_at
+            updated_at: job.property.updated_at || job.property_updated_at,
+            serviceAddress: job.property.serviceAddress || null,
+            billingAddress: job.property.billingAddress || null
         } : undefined,
-        serviceAddress: job.service_address || job.service_address_id,
-        billingAddress: job.billing_address || job.billing_address_id
+        // Use the full address objects, not just IDs
+        serviceAddress: job.serviceAddress || null,
+        billingAddress: job.billingAddress || null
     };
     console.log('Transformed job:', transformed);
     return transformed;
@@ -120,6 +123,7 @@ export const useUpdateJob = () => {
 
     return useMutation({
         mutationFn: async ({ id, data }: { id: string; data: UpdateJobDto }) => {
+            console.log('Updating job:', { id, data });
             const response = await fetch(buildUrl(ENDPOINTS.jobDetails(id)), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -131,11 +135,30 @@ export const useUpdateJob = () => {
                 await handleApiError(response);
             }
 
-            return response.json();
+            const updatedJob = await response.json();
+            console.log('Update response:', updatedJob);
+            return updatedJob;
         },
-        onSuccess: (data, { id }) => {
-            queryClient.setQueryData(['job', id], data);
-            queryClient.invalidateQueries({ queryKey: ['jobs'] });
+        onSuccess: async (updatedJob, { id }) => {
+            console.log('Update successful, invalidating queries');
+            // First invalidate the queries to trigger a refetch
+            await queryClient.invalidateQueries({ queryKey: ['jobs'] });
+            await queryClient.invalidateQueries({ queryKey: ['job', id] });
+            
+            // Then update the cache with the latest data
+            queryClient.setQueryData(['job', id], updatedJob);
+            
+            // Update the job in the jobs list cache
+            const jobsData = queryClient.getQueryData<JobsResponse>(['jobs']);
+            if (jobsData) {
+                const updatedJobs = jobsData.jobs.map(job => 
+                    job.job_id === id ? updatedJob : job
+                );
+                queryClient.setQueryData(['jobs'], {
+                    ...jobsData,
+                    jobs: updatedJobs
+                });
+            }
         },
     });
 };
