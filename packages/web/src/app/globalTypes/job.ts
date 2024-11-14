@@ -1,6 +1,6 @@
 import type { Property } from './property';
 import type { Account } from './account';
-import type { Address } from './address';
+import type { Address, CreateAddressDto } from './address';
 
 export interface JobStatus {
     value: string;    // Used as identifier
@@ -48,21 +48,25 @@ export interface CreateJobDto {
     status?: string;
     propertyId?: string;
     accountId?: string;
-    useCustomAddresses?: boolean;
-    serviceAddress?: Address;
-    billingAddress?: Address;
+    use_custom_addresses?: boolean;
+    serviceAddress?: CreateAddressDto;
+    billingAddress?: CreateAddressDto;
 }
 
 export interface UpdateJobDto {
     name?: string;
+    title?: string;  // Added title field
     type?: string;
     status?: string;
-    property_id?: string; // Changed to match API field
+    property_id?: string;
     accountId?: string;
-    useCustomAddresses?: boolean;
-    serviceAddress?: Address;
-    billingAddress?: Address;
+    use_custom_addresses?: boolean;
+    service_address_id?: string;
+    billing_address_id?: string;
+    serviceAddress?: CreateAddressDto;
+    billingAddress?: CreateAddressDto;
     job_type_id?: string;
+    delete_custom_addresses?: boolean;
 }
 
 export interface JobResponse {

@@ -30,7 +30,9 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Close';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { JobTypeSelect } from './JobTypeSelect';
+import { JobAddressDialog } from './JobAddressDialog';
 
 interface JobMetadataProps {
   job: Job;
@@ -60,6 +62,9 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
   const [currentStatus, setCurrentStatus] = useState(job.status);
   const [isEditingProperty, setIsEditingProperty] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(job.property || null);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(job.title);
+  const [isEditingAddresses, setIsEditingAddresses] = useState(false);
 
   // Fetch properties for dropdown
   const { data: properties = [], isLoading: isLoadingProperties } = useProperties();
@@ -83,6 +88,7 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
   useEffect(() => {
     setCurrentStatus(job.status);
     setSelectedProperty(job.property || null);
+    setEditedTitle(job.title);
   }, [job]);
 
   const handleStatusChange = (event: SelectChangeEvent<string>) => {
@@ -146,26 +152,34 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
     setIsEditingProperty(false);
   };
 
-  // Debug logging for address selection
-  console.log('Job data:', {
-    jobId: job.job_id,
-    useCustomAddresses: job.useCustomAddresses,
-    jobServiceAddress: job.serviceAddress,
-    jobBillingAddress: job.billingAddress,
-    propertyServiceAddress: job.property?.serviceAddress,
-    propertyBillingAddress: job.property?.billingAddress
-  });
+  const handleTitleSave = () => {
+    if (editedTitle.trim() !== job.title) {
+      updateJob(
+        {
+          id: job.job_id,
+          data: { title: editedTitle.trim() }
+        },
+        {
+          onSuccess: () => {
+            setIsEditingTitle(false);
+            if (onUpdate) {
+              onUpdate();
+            }
+          }
+        }
+      );
+    } else {
+      setIsEditingTitle(false);
+    }
+  };
+
+  const handleTitleCancel = () => {
+    setEditedTitle(job.title);
+    setIsEditingTitle(false);
+  };
 
   const serviceAddress = job.useCustomAddresses ? job.serviceAddress : job.property?.serviceAddress;
   const billingAddress = job.useCustomAddresses ? job.billingAddress : job.property?.billingAddress;
-
-  // Debug logging for selected addresses
-  console.log('Selected addresses:', {
-    serviceAddress,
-    billingAddress,
-    formattedServiceAddress: formatAddress(serviceAddress),
-    formattedBillingAddress: formatAddress(billingAddress)
-  });
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -176,6 +190,47 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
            'An error occurred'}
         </Alert>
       )}
+
+      {/* Title Section */}
+      <Stack direction="row" spacing={2} alignItems="center">
+        {isEditingTitle ? (
+          <>
+            <TextField
+              value={editedTitle}
+              onChange={(e) => setEditedTitle(e.target.value)}
+              size="small"
+              fullWidth
+              autoFocus
+              disabled={isUpdating}
+            />
+            <IconButton 
+              onClick={handleTitleSave}
+              disabled={isUpdating}
+              color="primary"
+            >
+              <SaveIcon />
+            </IconButton>
+            <IconButton 
+              onClick={handleTitleCancel}
+              disabled={isUpdating}
+            >
+              <CancelIcon />
+            </IconButton>
+          </>
+        ) : (
+          <>
+            <Box sx={{ typography: 'h5', flexGrow: 1 }}>
+              {job.title}
+            </Box>
+            <IconButton 
+              onClick={() => setIsEditingTitle(true)}
+              color="primary"
+            >
+              <EditIcon />
+            </IconButton>
+          </>
+        )}
+      </Stack>
 
       {/* Status & Job Type Section */}
       <Paper elevation={2} sx={{ p: 3 }}>
@@ -323,7 +378,14 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
           <LocationOnIcon color="primary" />
           <Typography variant="h6">Addresses</Typography>
-          {job.useCustomAddresses && (
+          <IconButton 
+            onClick={() => setIsEditingAddresses(true)}
+            color="primary"
+            size="small"
+          >
+            <EditIcon />
+          </IconButton>
+          {job.use_custom_addresses && (
             <Chip 
               label="Using Custom Addresses" 
               size="small" 
@@ -337,7 +399,7 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
             <Box>
               <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 1 }}>
                 Service Address
-                {!job.useCustomAddresses && (
+                {!job.use_custom_addresses && (
                   <Chip 
                     label="From Property" 
                     size="small" 
@@ -353,7 +415,7 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
             <Box>
               <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 1 }}>
                 Billing Address
-                {!job.useCustomAddresses && (
+                {!job.use_custom_addresses && (
                   <Chip 
                     label="From Property" 
                     size="small" 
@@ -367,6 +429,14 @@ export function JobMetadata({ job, onUpdate }: JobMetadataProps) {
           </Grid>
         </Grid>
       </Paper>
+
+      {/* Address Edit Dialog */}
+      <JobAddressDialog
+        open={isEditingAddresses}
+        onClose={() => setIsEditingAddresses(false)}
+        job={job}
+        onUpdate={onUpdate}
+      />
     </Box>
   );
 }

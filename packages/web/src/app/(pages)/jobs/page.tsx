@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { Box, Alert, Snackbar, CircularProgress } from '@mui/material';
-import { JobSearch, JobDetails, JobsTable, JobsHeader } from './components';
-import { AddJobDialog, EditJobDialog } from './dialogs';
+import { JobSearch, JobDetails, JobsTable } from './components';
+import { AddJobDialog } from './dialogs';
 import type { Job } from '../../globalTypes/job';
 import { useJobs, useCreateJob, useUpdateJob } from './hooks/useJobs';
 import { useSelectedJob } from './hooks/useSelectedJob';
@@ -11,13 +11,12 @@ import { useSelectedJob } from './hooks/useSelectedJob';
 export default function JobsPage() {
   const { selectedJob, setSelectedJob, isLoading: isLoadingSelected } = useSelectedJob();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editJob, setEditJob] = useState<Job | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Use React Query hooks
   const { data = { jobs: [], total: 0 }, refetch } = useJobs();
   const { mutate: createJob, error: createError } = useCreateJob();
-  const { mutate: updateJob, error: updateError } = useUpdateJob();
+  const { error: updateError } = useUpdateJob();
 
   const error = createError || updateError;
 
@@ -36,18 +35,8 @@ export default function JobsPage() {
     });
   };
 
-  const handleEditSuccess = () => {
-    refetch();
-    setEditJob(null);
-    showSuccess('Job updated successfully');
-  };
-
   const handleJobSelect = (job: Job | null) => {
     setSelectedJob(job?.job_id || null);
-  };
-
-  const handleEdit = (job: Job) => {
-    setEditJob(job);
   };
 
   const handleUpdate = () => {
@@ -92,12 +81,10 @@ export default function JobsPage() {
       {selectedJobObject && (
         <JobDetails
           job={selectedJobObject}
-          onEdit={handleEdit}
           onUpdate={handleUpdate}
           onJobSelect={handleJobSelect}
         />
       )}
-      <JobsHeader />
       <JobSearch
         jobs={data.jobs}
         selectedJob={selectedJobObject}
@@ -122,14 +109,6 @@ export default function JobsPage() {
         onClose={() => setIsAddDialogOpen(false)}
         onSubmit={handleAddJob}
       />
-      {editJob && (
-        <EditJobDialog
-          open={!!editJob}
-          job={editJob}
-          onClose={() => setEditJob(null)}
-          onSuccess={handleEditSuccess}
-        />
-      )}
     </Box>
   );
 }

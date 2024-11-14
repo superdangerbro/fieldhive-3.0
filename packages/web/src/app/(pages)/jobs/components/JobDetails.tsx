@@ -15,7 +15,7 @@ import {
   Divider,
   CircularProgress
 } from '@mui/material';
-import type { Job } from '@/app/globalTypes';
+import type { Job } from '../../../globalTypes/job';
 import { useDeleteJob } from '../hooks/useJobs';
 import { JobHeader } from './JobHeader';
 import { JobMetadata } from './JobMetadata';
@@ -23,12 +23,11 @@ import { JobTabs } from './JobTabs';
 
 interface JobDetailsProps {
   job: Job | null;
-  onEdit: (job: Job) => void;
   onUpdate?: () => void;
   onJobSelect: (job: Job | null) => void;
 }
 
-export function JobDetails({ job, onEdit, onUpdate, onJobSelect }: JobDetailsProps) {
+export function JobDetails({ job, onUpdate, onJobSelect }: JobDetailsProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [tabValue, setTabValue] = useState(0);
 
@@ -76,7 +75,6 @@ export function JobDetails({ job, onEdit, onUpdate, onJobSelect }: JobDetailsPro
         <CardContent>
           <JobHeader 
             job={job}
-            onEdit={onEdit}
             onDelete={() => setDeleteDialogOpen(true)}
           />
 
