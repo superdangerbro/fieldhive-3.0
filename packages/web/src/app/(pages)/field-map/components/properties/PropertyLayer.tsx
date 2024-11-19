@@ -3,9 +3,8 @@
 import React, { useCallback, useEffect } from 'react';
 import { Marker } from 'react-map-gl';
 import { Box, Tooltip, useTheme } from '@mui/material';
-import { useFieldMap } from '@/app/globalHooks/useFieldMap';
+import { useFieldMap } from '../../../../../app/globalHooks/useFieldMap';
 import { PropertyMarker } from '../markers/PropertyMarker';
-import { toPointLocation } from '../../utils/location';
 import type { MapProperty } from '../../types';
 
 interface PropertyLayerProps {
@@ -65,6 +64,17 @@ export function PropertyLayer({
     onPropertyClick?.(property);
   }, [flyToProperty, onPropertyClick]);
 
+  // Function to parse WKT string to coordinates
+  const parseWKT = (wkt: string) => {
+    const match = wkt.match(/POINT\s*\(\s*([\d.]+)\s+([\d.]+)\s*\)/);
+    if (!match) {
+      throw new Error(`Invalid WKT format: ${wkt}`);
+    }
+    const longitude = parseFloat(match[1]);
+    const latitude = parseFloat(match[2]);
+    return { latitude, longitude };
+  };
+
   return (
     <>
       {/* Regular property markers */}
@@ -74,9 +84,9 @@ export function PropertyLayer({
         // Convert property to MapProperty if needed
         const mapProperty: MapProperty = {
           ...property,
-          location: 'coordinates' in property.location
-            ? property.location
-            : toPointLocation(property.location)
+          location: typeof property.location === 'string'
+            ? parseWKT(property.location)
+            : property.location
         };
 
         return (

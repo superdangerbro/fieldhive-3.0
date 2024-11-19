@@ -9,13 +9,17 @@ import {
     getPropertyLocation,
     updatePropertyLocation,
     updatePropertyBoundary,
-    deletePropertyBoundary
+    deletePropertyBoundary,
+    getPropertiesWithActiveJobs
 } from './handlers';
 
 const router = Router();
 
 // Get all properties with pagination and filtering
 router.get('/', getProperties as any);
+
+// Get properties with active jobs within bounds
+router.get('/with-active-jobs', getPropertiesWithActiveJobs);
 
 // Get property by ID
 router.get('/:id', getProperty as any);

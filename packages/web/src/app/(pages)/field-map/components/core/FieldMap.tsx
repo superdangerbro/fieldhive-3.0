@@ -1,40 +1,26 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { FormControlLabel, Switch, useTheme } from '@mui/material';
+import { useTheme, Box } from '@mui/material';
 import { MapRef } from 'react-map-gl';
-import { useFieldMap } from '@/app/globalHooks/useFieldMap';
+import { useFieldMap } from '../../../../../app/globalHooks/useFieldMap';
 import { BaseMap, MapControls } from '.';
 import { PropertyLayer } from '../properties';
 import { EquipmentLayer } from '../equipment';
-import { FloorPlanLayer } from '../overlays';
+import { FloorPlanLayer, ModeSelector, LayersControl } from '../overlays';
+import { JobsLayer } from '../jobs/JobsLayer';
 import type { MapProperty } from '../../types';
+import type { Mode } from '../overlays/ModeSelector';
 
-/**
- * FieldMap is the main map component that orchestrates all map-related functionality.
- * It manages the interaction between different layers and controls.
- * 
- * Features:
- * - Core map functionality (pan, zoom, style)
- * - Property management
- * - Equipment management
- * - Floor plan management
- * - Layer visibility controls
- * 
- * Architecture:
- * - Uses BaseMap for core map functionality
- * - Separate layers for properties, equipment, and floor plans
- * - Centralized state management via React Query
- * - Modular component structure for maintainability
- */
 export function FieldMap() {
   const theme = useTheme();
   const mapRef = useRef<MapRef>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [showFieldEquipment, setShowFieldEquipment] = useState(false);
+  const [showActiveJobs, setShowActiveJobs] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [currentMode, setCurrentMode] = useState<Mode>(null);
 
-  // Get state and actions from hooks
   const { 
     selectedProperty,
     setSelectedProperty,
@@ -42,29 +28,23 @@ export function FieldMap() {
     setCurrentBounds
   } = useFieldMap();
 
-  // Debug component state
   useEffect(() => {
     console.log('FieldMap state:', {
       isTracking,
       showFieldEquipment,
+      showActiveJobs,
       selectedProperty: selectedProperty?.id,
       isDarkMode,
-      mapInstance: !!mapRef.current
+      mapInstance: !!mapRef.current,
+      currentMode
     });
-  }, [isTracking, showFieldEquipment, selectedProperty, isDarkMode]);
+  }, [isTracking, showFieldEquipment, showActiveJobs, selectedProperty, isDarkMode, currentMode]);
 
-  /**
-   * Handle map bounds changes
-   * Updates both property and equipment data based on new bounds
-   */
   const handleMoveEnd = useCallback(async (bounds: [number, number, number, number]) => {
     console.log('Map bounds updated:', bounds);
     setCurrentBounds(bounds);
   }, [setCurrentBounds]);
 
-  /**
-   * Handle property selection
-   */
   const handlePropertyClick = useCallback((property: MapProperty) => {
     if (!property.location?.coordinates) return;
 
@@ -79,17 +59,21 @@ export function FieldMap() {
     });
   }, [setSelectedProperty]);
 
-  /**
-   * Handle equipment visibility toggle
-   */
   const handleToggleFieldEquipment = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     console.log('Equipment visibility toggled:', event.target.checked);
     setShowFieldEquipment(event.target.checked);
   }, []);
 
-  /**
-   * Map control handlers
-   */
+  const handleToggleActiveJobs = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('Active jobs visibility toggled:', event.target.checked);
+    setShowActiveJobs(event.target.checked);
+  }, []);
+
+  const handleModeChange = useCallback((mode: Mode) => {
+    console.log('Mode changed:', mode);
+    setCurrentMode(mode);
+  }, []);
+
   const handleStyleChange = useCallback(() => {
     const map = mapRef.current?.getMap();
     if (!map) return;
@@ -112,65 +96,64 @@ export function FieldMap() {
   }, []);
 
   return (
-    <BaseMap
-      ref={mapRef}
-      onMoveEnd={handleMoveEnd}
-      onTrackingStart={() => {
-        console.log('Location tracking started');
-        setIsTracking(true);
-      }}
-      onTrackingEnd={() => {
-        console.log('Location tracking ended');
-        setIsTracking(false);
+    <Box
+      sx={{
+        position: 'fixed',
+        top: '64px', // Header height
+        left: '240px', // Sidebar width
+        right: 0,
+        bottom: 0,
+        bgcolor: 'background.default',
+        overflow: 'hidden',
       }}
     >
-      {/* Layer visibility controls */}
-      <FormControlLabel
-        control={
-          <Switch
-            checked={showFieldEquipment}
-            onChange={handleToggleFieldEquipment}
-            name="showFieldEquipment"
-          />
-        }
-        label="Show Field Equipment"
-        sx={{
-          position: 'absolute',
-          top: 24,
-          left: 16,
-          backgroundColor: theme.palette.background.paper,
-          padding: '4px 8px',
-          borderRadius: 1,
-          boxShadow: theme.shadows[2],
-          zIndex: 1000,
+      <BaseMap
+        ref={mapRef}
+        onMoveEnd={handleMoveEnd}
+        onTrackingStart={() => {
+          console.log('Location tracking started');
+          setIsTracking(true);
         }}
-      />
+        onTrackingEnd={() => {
+          console.log('Location tracking ended');
+          setIsTracking(false);
+        }}
+      >
+        <LayersControl
+          showFieldEquipment={showFieldEquipment}
+          onToggleFieldEquipment={handleToggleFieldEquipment}
+          showActiveJobs={showActiveJobs}
+          onToggleActiveJobs={handleToggleActiveJobs}
+        />
 
-      {/* Map controls */}
-      <MapControls
-        isTracking={isTracking}
-        onStyleChange={handleStyleChange}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-      />
+        <MapControls
+          isTracking={isTracking}
+          onStyleChange={handleStyleChange}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+        />
 
-      {/* Property markers and interactions */}
-      <PropertyLayer
-        onPropertyClick={handlePropertyClick}
-      />
+        <ModeSelector onModeChange={handleModeChange} />
 
-      {/* Equipment markers and interactions */}
-      <EquipmentLayer
-        visible={showFieldEquipment}
-        selectedPropertyId={selectedProperty?.id}
-        bounds={currentBounds || undefined}
-      />
+        <PropertyLayer
+          onPropertyClick={handlePropertyClick}
+        />
 
-      {/* Floor plan overlay and controls */}
-      <FloorPlanLayer
-        mapRef={mapRef}
-        selectedPropertyId={selectedProperty?.id}
-      />
-    </BaseMap>
+        <EquipmentLayer
+          visible={showFieldEquipment}
+          selectedPropertyId={selectedProperty?.id}
+          bounds={currentBounds || undefined}
+        />
+
+        {showActiveJobs && currentBounds && (
+          <JobsLayer bounds={currentBounds} />
+        )}
+
+        <FloorPlanLayer
+          mapRef={mapRef}
+          selectedPropertyId={selectedProperty?.id}
+        />
+      </BaseMap>
+    </Box>
   );
 }

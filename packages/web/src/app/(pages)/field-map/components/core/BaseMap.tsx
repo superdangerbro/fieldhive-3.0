@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useCallback, useEffect, forwardRef } from 'react';
+import React, { useCallback, useEffect, forwardRef, useRef, useState } from 'react';
 import Map, { MapRef, GeolocateControl } from 'react-map-gl';
 import { Box, useTheme } from '@mui/material';
 import mapboxgl from 'mapbox-gl';
-import { useFieldMap } from '@/app/globalHooks/useFieldMap';
+import { useFieldMap } from '@/app/globalHooks/useFieldMap'; // Corrected the import path
 
 // Initialize Mapbox token
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -32,7 +32,7 @@ interface BaseMapProps {
  * - Map initialization with Mapbox GL
  * - View state management
  * - Bounds tracking
- * - Geolocation control
+ * - Automatic geolocation tracking
  * - Child component rendering (markers, overlays, etc.)
  */
 export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
@@ -43,10 +43,23 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
 }, ref) => {
   const theme = useTheme();
   const { viewState, setViewState } = useFieldMap();
+  const geolocateControlRef = useRef<mapboxgl.GeolocateControl>(null);
+  const [isTracking, setIsTracking] = useState(false);
+
+  // Automatically start tracking on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (geolocateControlRef.current) {
+        console.log('Automatically triggering location tracking');
+        geolocateControlRef.current.trigger();
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   // Debug map initialization
   useEffect(() => {
-    // Type assertion since we know ref.current will be MapRef when available
     const map = (ref as React.RefObject<MapRef>)?.current?.getMap();
     if (map) {
       const style = map.getStyle();
@@ -56,11 +69,7 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
     }
   }, [ref]);
 
-  /**
-   * Handles map movement end, calculating and providing new bounds
-   */
   const handleMoveEnd = useCallback(() => {
-    // Type assertion for ref access
     const map = (ref as React.RefObject<MapRef>)?.current;
     if (!map || !onMoveEnd) return;
     
@@ -81,13 +90,34 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
     onMoveEnd(boundsArray);
   }, [onMoveEnd, ref]);
 
-  /**
-   * Handles view state changes from map interactions
-   */
   const handleMove = useCallback((evt: { viewState: typeof viewState }) => {
     console.log('View state updated:', evt.viewState);
     setViewState(evt.viewState);
   }, [setViewState]);
+
+  useEffect(() => {
+    const onGeolocate = () => {
+      setIsTracking(true);
+      onTrackingStart?.();
+    };
+
+    const onGeolocateEnd = () => {
+      setIsTracking(false);
+      onTrackingEnd?.();
+    };
+
+    if (geolocateControlRef.current) {
+      geolocateControlRef.current.on('geolocate', onGeolocate);
+      geolocateControlRef.current.on('trackuserlocationend', onGeolocateEnd);
+    }
+
+    return () => {
+      if (geolocateControlRef.current) {
+        geolocateControlRef.current.off('geolocate', onGeolocate);
+        geolocateControlRef.current.off('trackuserlocationend', onGeolocateEnd);
+      }
+    };
+  }, [onTrackingStart, onTrackingEnd]);
 
   return (
     <Box 
@@ -96,9 +126,45 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
         width: '100%',
         bgcolor: theme.palette.background.default,
         position: 'relative',
-        // Hide Mapbox logo as in original
         '& .mapboxgl-ctrl-logo': {
           display: 'none'
+        },
+        '& .mapboxgl-ctrl-group': {
+          background: 'none !important',
+          border: 'none !important',
+          boxShadow: 'none !important'
+        },
+        '& button.mapboxgl-ctrl-geolocate': {
+          width: '40px !important',
+          height: '40px !important',
+          borderRadius: '50% !important',
+          backgroundColor: 'blue !important', // Changed to blue
+          border: 'none !important',
+          margin: '3px !important',
+          padding: '8px !important',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        '& button.mapboxgl-ctrl-geolocate .mapboxgl-ctrl-icon': {
+          filter: 'brightness(0) invert(1) !important',
+          width: '24px !important',
+          height: '24px !important',
+        },
+        '& button.mapboxgl-ctrl-geolocate-active': {
+          backgroundColor: 'blue !important', // Changed to blue
+          animation: isTracking ? 'pulse 2s infinite !important' : 'none !important', // Added condition for pulse
+          '@keyframes pulse': {
+            '0%': {
+              boxShadow: '0 0 0 0 rgba(33, 150, 243, 0.4)'
+            },
+            '70%': {
+              boxShadow: '0 0 0 10px rgba(33, 150, 243, 0)'
+            },
+            '100%': {
+              boxShadow: '0 0 0 0 rgba(33, 150, 243, 0)'
+            }
+          }
         }
       }}
     >
@@ -115,8 +181,8 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
           height: '100%'
         }}
       >
-        {/* Geolocation control with tracking */}
         <GeolocateControl
+          ref={geolocateControlRef}
           position="top-right"
           trackUserLocation
           showUserHeading
@@ -124,15 +190,15 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
           positionOptions={{ enableHighAccuracy: true }}
           onTrackUserLocationStart={() => {
             console.log('Location tracking started');
+            setIsTracking(true);
             onTrackingStart?.();
           }}
           onTrackUserLocationEnd={() => {
             console.log('Location tracking ended');
+            setIsTracking(false);
             onTrackingEnd?.();
           }}
         />
-
-        {/* Render child components (markers, overlays, etc.) */}
         {children}
       </Map>
     </Box>

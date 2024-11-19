@@ -2,7 +2,7 @@
   "name": "fieldhive",
   "version": "0.1.0",
   "private": true,
- "scripts": {
+  "scripts": {
     "dev": "pnpm build:infrastructure && pnpm run --parallel dev",
     "build": "pnpm run build:infrastructure && pnpm run --parallel build",
     "build:infrastructure": "pnpm --filter @fieldhive/infrastructure build",
@@ -30,5 +30,8 @@
   "packageManager": "pnpm@8.8.0",
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@heroicons/react": "^2.2.0"
   }
 }

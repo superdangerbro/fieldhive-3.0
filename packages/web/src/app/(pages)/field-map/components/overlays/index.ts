@@ -5,3 +5,5 @@ export * from './FloorPlanLayer';
 export * from './FloorPlanPlacement';
 export * from './ImageOverlay';
 export * from './RoughPlacement';
+export * from './ModeSelector';
+export * from './LayersControl';
