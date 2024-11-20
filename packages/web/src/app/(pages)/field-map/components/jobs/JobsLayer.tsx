@@ -5,8 +5,14 @@ import { Layer, Source } from 'react-map-gl';
 import { useQuery } from '@tanstack/react-query';
 import { ENV_CONFIG } from '../../../../../app/config/environment';
 
+interface JobFilters {
+  statuses: string[];
+  types: string[];
+}
+
 interface JobsLayerProps {
   bounds: [number, number, number, number];
+  filters: JobFilters;
 }
 
 interface PropertyWithJob {
@@ -14,21 +20,35 @@ interface PropertyWithJob {
   boundary: GeoJSON.Feature;
 }
 
-export function JobsLayer({ bounds }: JobsLayerProps) {
+export function JobsLayer({ bounds, filters }: JobsLayerProps) {
   const [geojson, setGeojson] = useState<GeoJSON.FeatureCollection>({
     type: 'FeatureCollection',
     features: []
   });
 
-  // Query properties with active jobs within bounds
+  // Query properties with filtered jobs within bounds
   const { data: propertiesWithJobs } = useQuery({
-    queryKey: ['propertiesWithActiveJobs', bounds],
+    queryKey: ['propertiesWithJobs', bounds, filters],
     queryFn: async () => {
       const [minLng, minLat, maxLng, maxLat] = bounds;
-      const response = await fetch(`${ENV_CONFIG.api.baseUrl}/properties/with-active-jobs?bounds=${minLng},${minLat},${maxLng},${maxLat}`);
-      if (!response.ok) throw new Error('Failed to fetch properties with active jobs');
+      const params = new URLSearchParams({
+        bounds: `${minLng},${minLat},${maxLng},${maxLat}`
+      });
+
+      // Only add non-empty filters
+      if (filters.statuses.length > 0) {
+        params.append('statuses', filters.statuses.join(','));
+      }
+      if (filters.types.length > 0) {
+        params.append('types', filters.types.join(','));
+      }
+
+      const response = await fetch(`${ENV_CONFIG.api.baseUrl}/properties/with-active-jobs?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch properties with jobs');
       return response.json() as Promise<PropertyWithJob[]>;
-    }
+    },
+    // Only run query if we have filters selected
+    enabled: (filters.statuses.length > 0 || filters.types.length > 0) && bounds.length === 4
   });
 
   // Update GeoJSON when properties data changes
@@ -52,10 +72,10 @@ export function JobsLayer({ bounds }: JobsLayerProps) {
   if (!propertiesWithJobs?.length) return null;
 
   return (
-    <Source id="active-jobs-source" type="geojson" data={geojson}>
+    <Source id="jobs-source" type="geojson" data={geojson}>
       {/* Polygon fill layer */}
       <Layer
-        id="active-jobs-fill"
+        id="jobs-fill"
         type="fill"
         paint={{
           'fill-color': '#ff9800',
@@ -64,7 +84,7 @@ export function JobsLayer({ bounds }: JobsLayerProps) {
       />
       {/* Polygon outline layer */}
       <Layer
-        id="active-jobs-outline"
+        id="jobs-outline"
         type="line"
         paint={{
           'line-color': '#ff9800',

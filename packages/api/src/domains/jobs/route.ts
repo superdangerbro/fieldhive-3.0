@@ -1,10 +1,21 @@
 import { Router } from 'express';
-import { getJobs, getJob, createJob, updateJob, archiveJob, getJobAddresses } from './handler';
+import {
+    getJobs,
+    getJob,
+    createJob,
+    updateJob,
+    archiveJob,
+    getJobAddresses,
+    getJobOptions
+} from './handlers';
 
 const router = Router();
 
 // Get all jobs with optional filters
 router.get('/', getJobs);
+
+// Get job options (statuses and types)
+router.get('/options', getJobOptions);
 
 // Get job by ID
 router.get('/:id', getJob);

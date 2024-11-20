@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useFieldMap } from '@/app/globalHooks/useFieldMap';
-import { FloorControls } from './FloorControls';
+import React, { useState, useEffect } from 'react';
+import { useFieldMap } from '../../../../../app/globalHooks/useFieldMap';
 import { FloorPlanDialog } from './FloorPlanDialog';
 import { ImageOverlay } from './ImageOverlay';
 import type { MapRef } from 'react-map-gl';
@@ -18,7 +17,6 @@ interface FloorPlanLayerProps {
  * FloorPlanLayer handles all floor plan related functionality
  * Features:
  * - Floor plan overlay rendering
- * - Floor plan controls
  * - Floor plan dialog for adding/editing
  * - Floor plan visibility management
  * 
@@ -36,7 +34,6 @@ export function FloorPlanLayer({
   selectedPropertyId
 }: FloorPlanLayerProps) {
   const [showFloorPlanDialog, setShowFloorPlanDialog] = useState(false);
-  const [isFloorPlansOpen, setIsFloorPlansOpen] = useState(false);
 
   const { 
     selectedProperty,
@@ -44,29 +41,30 @@ export function FloorPlanLayer({
     activeFloorPlan
   } = useFieldMap();
 
+  // Listen for add floor plan event from LayersControl
+  useEffect(() => {
+    const handleAddFloorPlan = () => {
+      console.log('Opening floor plan dialog from event');
+      setShowFloorPlanDialog(true);
+    };
+
+    document.addEventListener('add-floor-plan', handleAddFloorPlan);
+    return () => document.removeEventListener('add-floor-plan', handleAddFloorPlan);
+  }, []);
+
   // Debug floor plan state
   React.useEffect(() => {
     console.log('FloorPlan layer state:', {
       showDialog: showFloorPlanDialog,
-      isOpen: isFloorPlansOpen,
       activeFloorPlan,
       floorPlansCount: floorPlans.length
     });
-  }, [showFloorPlanDialog, isFloorPlansOpen, activeFloorPlan, floorPlans]);
+  }, [showFloorPlanDialog, activeFloorPlan, floorPlans]);
 
   if (!selectedProperty) return null;
 
   return (
     <>
-      {/* Floor plan controls */}
-      <FloorControls
-        isFloorPlansOpen={isFloorPlansOpen}
-        onAddFloorPlan={() => {
-          console.log('Opening floor plan dialog');
-          setShowFloorPlanDialog(true);
-        }}
-      />
-
       {/* Floor plan dialog */}
       {showFloorPlanDialog && selectedPropertyId && (
         <FloorPlanDialog

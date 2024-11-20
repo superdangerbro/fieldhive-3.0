@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, forwardRef, useRef, useState } from 'rea
 import Map, { MapRef, GeolocateControl } from 'react-map-gl';
 import { Box, useTheme } from '@mui/material';
 import mapboxgl from 'mapbox-gl';
-import { useFieldMap } from '@/app/globalHooks/useFieldMap'; // Corrected the import path
+import { useFieldMap } from '../../../../../app/globalHooks/useFieldMap';
 
 // Initialize Mapbox token
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -45,6 +45,26 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
   const { viewState, setViewState } = useFieldMap();
   const geolocateControlRef = useRef<mapboxgl.GeolocateControl>(null);
   const [isTracking, setIsTracking] = useState(false);
+  const mapInitializedRef = useRef(false);
+
+  // Set initial bounds when map loads
+  useEffect(() => {
+    const map = (ref as React.RefObject<MapRef>)?.current;
+    if (map && !mapInitializedRef.current && onMoveEnd) {
+      mapInitializedRef.current = true;
+      const bounds = map.getBounds();
+      if (bounds) {
+        const boundsArray: [number, number, number, number] = [
+          bounds.getWest(),
+          bounds.getSouth(),
+          bounds.getEast(),
+          bounds.getNorth()
+        ];
+        console.log('Setting initial bounds:', boundsArray);
+        onMoveEnd(boundsArray);
+      }
+    }
+  }, [ref, onMoveEnd]);
 
   // Automatically start tracking on mount
   useEffect(() => {
@@ -138,7 +158,7 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
           width: '40px !important',
           height: '40px !important',
           borderRadius: '50% !important',
-          backgroundColor: 'blue !important', // Changed to blue
+          backgroundColor: 'blue !important',
           border: 'none !important',
           margin: '3px !important',
           padding: '8px !important',
@@ -152,8 +172,8 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
           height: '24px !important',
         },
         '& button.mapboxgl-ctrl-geolocate-active': {
-          backgroundColor: 'blue !important', // Changed to blue
-          animation: isTracking ? 'pulse 2s infinite !important' : 'none !important', // Added condition for pulse
+          backgroundColor: 'blue !important',
+          animation: isTracking ? 'pulse 2s infinite !important' : 'none !important',
           '@keyframes pulse': {
             '0%': {
               boxShadow: '0 0 0 0 rgba(33, 150, 243, 0.4)'
@@ -175,6 +195,7 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
         mapStyle="mapbox://styles/mapbox/dark-v10"
         onMove={handleMove}
         onMoveEnd={handleMoveEnd}
+        onLoad={handleMoveEnd}
         attributionControl={false}
         style={{
           width: '100%',

@@ -12,12 +12,20 @@ import { JobsLayer } from '../jobs/JobsLayer';
 import type { MapProperty } from '../../types';
 import type { Mode } from '../overlays/ModeSelector';
 
+interface JobFilters {
+  statuses: string[];
+  types: string[];
+}
+
 export function FieldMap() {
   const theme = useTheme();
   const mapRef = useRef<MapRef>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [showFieldEquipment, setShowFieldEquipment] = useState(false);
-  const [showActiveJobs, setShowActiveJobs] = useState(false);
+  const [jobFilters, setJobFilters] = useState<JobFilters>({
+    statuses: [],
+    types: []
+  });
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [currentMode, setCurrentMode] = useState<Mode>(null);
 
@@ -32,13 +40,13 @@ export function FieldMap() {
     console.log('FieldMap state:', {
       isTracking,
       showFieldEquipment,
-      showActiveJobs,
+      jobFilters,
       selectedProperty: selectedProperty?.id,
       isDarkMode,
       mapInstance: !!mapRef.current,
       currentMode
     });
-  }, [isTracking, showFieldEquipment, showActiveJobs, selectedProperty, isDarkMode, currentMode]);
+  }, [isTracking, showFieldEquipment, jobFilters, selectedProperty, isDarkMode, currentMode]);
 
   const handleMoveEnd = useCallback(async (bounds: [number, number, number, number]) => {
     console.log('Map bounds updated:', bounds);
@@ -64,9 +72,9 @@ export function FieldMap() {
     setShowFieldEquipment(event.target.checked);
   }, []);
 
-  const handleToggleActiveJobs = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('Active jobs visibility toggled:', event.target.checked);
-    setShowActiveJobs(event.target.checked);
+  const handleJobFiltersChange = useCallback((filters: JobFilters) => {
+    console.log('Job filters updated:', filters);
+    setJobFilters(filters);
   }, []);
 
   const handleModeChange = useCallback((mode: Mode) => {
@@ -122,8 +130,8 @@ export function FieldMap() {
         <LayersControl
           showFieldEquipment={showFieldEquipment}
           onToggleFieldEquipment={handleToggleFieldEquipment}
-          showActiveJobs={showActiveJobs}
-          onToggleActiveJobs={handleToggleActiveJobs}
+          jobFilters={jobFilters}
+          onJobFiltersChange={handleJobFiltersChange}
         />
 
         <MapControls
@@ -145,8 +153,11 @@ export function FieldMap() {
           bounds={currentBounds || undefined}
         />
 
-        {showActiveJobs && currentBounds && (
-          <JobsLayer bounds={currentBounds} />
+        {currentBounds && jobFilters.statuses.length > 0 && (
+          <JobsLayer 
+            bounds={currentBounds}
+            filters={jobFilters}
+          />
         )}
 
         <FloorPlanLayer
