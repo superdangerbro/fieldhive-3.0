@@ -34,6 +34,8 @@ interface PropertyQueryParams {
     offset?: string;
     search?: string;
     accountId?: string;
+    type?: string;
+    status?: string;
 }
 
 interface PropertyParams {
@@ -50,10 +52,12 @@ export async function getProperties(
             limit = '25', 
             offset = '0',
             search,
-            accountId
+            accountId,
+            type,
+            status
         } = req.query;
 
-        logger.info('Getting properties with params:', { limit, offset, search, accountId });
+        logger.info('Getting properties with params:', { limit, offset, search, accountId, type, status });
 
         const queryBuilder = repositories.propertyRepository
             .createQueryBuilder('property')
@@ -74,6 +78,16 @@ export async function getProperties(
             queryBuilder.andWhere('accounts.account_id = :accountId', { accountId });
         }
 
+        // Filter by type (case insensitive)
+        if (type) {
+            queryBuilder.andWhere('LOWER(property.type) = LOWER(:type)', { type });
+        }
+
+        // Filter by status (case insensitive)
+        if (status) {
+            queryBuilder.andWhere('LOWER(property.status) = LOWER(:status)', { status });
+        }
+
         // Apply pagination
         const [properties, total] = await queryBuilder
             .skip(parseInt(offset))
@@ -81,8 +95,19 @@ export async function getProperties(
             .getManyAndCount();
 
         logger.info(`Found ${properties.length} properties`);
+
+        // Format response to match frontend expectations
+        const formattedProperties = properties.map(property => ({
+            ...property,
+            accounts: property.accounts || [],
+            type: property.type || '',
+            status: property.status || '',
+            created_at: property.created_at,
+            updated_at: property.updated_at
+        }));
+
         res.json({
-            properties,
+            properties: formattedProperties,
             total,
             limit: parseInt(limit),
             offset: parseInt(offset)
@@ -194,7 +219,7 @@ export async function createProperty(
             const property = queryRunner.manager.create(Property, {
                 name,
                 type,
-                status: req.body.status || 'Active',
+                status: req.body.status || 'active',
                 service_address_id: savedServiceAddress.address_id,
                 billing_address_id: savedBillingAddress?.address_id || savedServiceAddress.address_id,
                 serviceAddress: savedServiceAddress,

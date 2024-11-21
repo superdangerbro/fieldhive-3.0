@@ -5,14 +5,14 @@ import { useTheme, Box } from '@mui/material';
 import { MapRef } from 'react-map-gl';
 import { useFieldMap } from '../../../../../app/globalHooks/useFieldMap';
 import { BaseMap, MapControls } from '.';
-import { PropertyLayer } from '../properties';
+import { PropertyLayer, PropertyBoundaryLayer } from '../properties';
 import { EquipmentLayer } from '../equipment';
 import { FloorPlanLayer, ModeSelector, LayersControl } from '../overlays';
 import { JobsLayer } from '../jobs/JobsLayer';
 import type { MapProperty } from '../../types';
 import type { Mode } from '../overlays/ModeSelector';
 
-interface JobFilters {
+interface Filters {
   statuses: string[];
   types: string[];
 }
@@ -22,7 +22,11 @@ export function FieldMap() {
   const mapRef = useRef<MapRef>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [showFieldEquipment, setShowFieldEquipment] = useState(false);
-  const [jobFilters, setJobFilters] = useState<JobFilters>({
+  const [jobFilters, setJobFilters] = useState<Filters>({
+    statuses: [],
+    types: []
+  });
+  const [propertyFilters, setPropertyFilters] = useState<Filters>({
     statuses: [],
     types: []
   });
@@ -33,7 +37,8 @@ export function FieldMap() {
     selectedProperty,
     setSelectedProperty,
     currentBounds,
-    setCurrentBounds
+    setCurrentBounds,
+    properties
   } = useFieldMap();
 
   useEffect(() => {
@@ -41,12 +46,13 @@ export function FieldMap() {
       isTracking,
       showFieldEquipment,
       jobFilters,
+      propertyFilters,
       selectedProperty: selectedProperty?.id,
       isDarkMode,
       mapInstance: !!mapRef.current,
       currentMode
     });
-  }, [isTracking, showFieldEquipment, jobFilters, selectedProperty, isDarkMode, currentMode]);
+  }, [isTracking, showFieldEquipment, jobFilters, propertyFilters, selectedProperty, isDarkMode, currentMode]);
 
   const handleMoveEnd = useCallback(async (bounds: [number, number, number, number]) => {
     console.log('Map bounds updated:', bounds);
@@ -67,14 +73,34 @@ export function FieldMap() {
     });
   }, [setSelectedProperty]);
 
+  const handlePropertyBoundaryClick = useCallback((propertyId: string) => {
+    const property = properties.find((p: MapProperty) => p.property_id === propertyId);
+    if (!property || !property.location?.coordinates) return;
+
+    console.log('Property selected from boundary:', propertyId);
+    setSelectedProperty({
+      id: property.property_id,
+      name: property.name,
+      location: {
+        latitude: property.location.coordinates[1],
+        longitude: property.location.coordinates[0]
+      }
+    });
+  }, [properties, setSelectedProperty]);
+
   const handleToggleFieldEquipment = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     console.log('Equipment visibility toggled:', event.target.checked);
     setShowFieldEquipment(event.target.checked);
   }, []);
 
-  const handleJobFiltersChange = useCallback((filters: JobFilters) => {
+  const handleJobFiltersChange = useCallback((filters: Filters) => {
     console.log('Job filters updated:', filters);
     setJobFilters(filters);
+  }, []);
+
+  const handlePropertyFiltersChange = useCallback((filters: Filters) => {
+    console.log('Property filters updated:', filters);
+    setPropertyFilters(filters);
   }, []);
 
   const handleModeChange = useCallback((mode: Mode) => {
@@ -132,6 +158,8 @@ export function FieldMap() {
           onToggleFieldEquipment={handleToggleFieldEquipment}
           jobFilters={jobFilters}
           onJobFiltersChange={handleJobFiltersChange}
+          propertyFilters={propertyFilters}
+          onPropertyFiltersChange={handlePropertyFiltersChange}
         />
 
         <MapControls
@@ -143,9 +171,19 @@ export function FieldMap() {
 
         <ModeSelector onModeChange={handleModeChange} />
 
+        {/* Regular property markers */}
         <PropertyLayer
           onPropertyClick={handlePropertyClick}
         />
+
+        {/* Filtered property boundaries */}
+        {currentBounds && propertyFilters.statuses.length > 0 && (
+          <PropertyBoundaryLayer
+            bounds={currentBounds}
+            filters={propertyFilters}
+            onPropertyClick={handlePropertyBoundaryClick}
+          />
+        )}
 
         <EquipmentLayer
           visible={showFieldEquipment}
@@ -153,6 +191,7 @@ export function FieldMap() {
           bounds={currentBounds || undefined}
         />
 
+        {/* Filtered jobs */}
         {currentBounds && jobFilters.statuses.length > 0 && (
           <JobsLayer 
             bounds={currentBounds}

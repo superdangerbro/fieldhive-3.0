@@ -9,8 +9,21 @@ import { fieldsRouter } from './domains/fields';
 import { sensorsRouter } from './domains/sensors';
 import { healthRouter } from './domains/health';
 import settingsRouter from './domains/settings/mainRouter';
+import { logger } from './utils/logger';
 
 const router = Router();
+
+// Debug middleware to log all routes
+router.use((req, res, next) => {
+    logger.info('Route accessed:', {
+        path: req.path,
+        method: req.method,
+        params: req.params,
+        query: req.query,
+        body: req.body
+    });
+    next();
+});
 
 // Mount domain routes
 if (accountsRouter) router.use('/accounts', accountsRouter);
@@ -23,5 +36,17 @@ if (fieldsRouter) router.use('/fields', fieldsRouter);
 if (sensorsRouter) router.use('/sensors', sensorsRouter);
 if (healthRouter) router.use('/health', healthRouter);
 if (settingsRouter) router.use('/settings', settingsRouter);
+
+// Catch-all route for debugging
+router.use('*', (req, res) => {
+    logger.warn('No route matched:', {
+        path: req.path,
+        method: req.method
+    });
+    res.status(404).json({
+        error: 'Not found',
+        message: `No route found for ${req.method} ${req.path}`
+    });
+});
 
 export default router;

@@ -1,82 +1,33 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
 
-export interface ApiError extends Error {
-    statusCode?: number;
-    details?: any;
-}
-
-export function errorHandler(
-    err: ApiError,
-    req: Request,
-    res: Response,
-    next: NextFunction
-) {
-    logger.error('API Error:', {
-        error: err.message,
+export function errorHandler(err: any, req: Request, res: Response, next: NextFunction) {
+    logger.error('Error handler caught:', {
+        error: err,
         stack: err.stack,
-        details: err.details,
-        path: req.path,
-        method: req.method
+        url: req.url,
+        method: req.method,
+        body: req.body
     });
 
-    // Default to 500 server error
-    const statusCode = err.statusCode || 500;
-    const message = err.message || 'Internal server error';
+    if (res.headersSent) {
+        return next(err);
+    }
 
-    res.status(statusCode).json({
-        error: {
-            message,
-            ...(process.env.NODE_ENV === 'development' && {
-                stack: err.stack,
-                details: err.details
-            })
-        }
+    res.status(500).json({
+        error: 'Internal server error',
+        message: err.message || 'An unexpected error occurred',
+        details: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
 }
 
-export class HttpError extends Error implements ApiError {
-    constructor(
-        public statusCode: number,
-        message: string,
-        public details?: any
-    ) {
-        super(message);
-        this.name = 'HttpError';
-    }
-}
-
-export class ValidationError extends HttpError {
-    constructor(message: string, details?: any) {
-        super(400, message, details);
-        this.name = 'ValidationError';
-    }
-}
-
-export class NotFoundError extends HttpError {
-    constructor(message: string = 'Resource not found', details?: any) {
-        super(404, message, details);
-        this.name = 'NotFoundError';
-    }
-}
-
-export class UnauthorizedError extends HttpError {
-    constructor(message: string = 'Unauthorized', details?: any) {
-        super(401, message, details);
-        this.name = 'UnauthorizedError';
-    }
-}
-
-export class ForbiddenError extends HttpError {
-    constructor(message: string = 'Forbidden', details?: any) {
-        super(403, message, details);
-        this.name = 'ForbiddenError';
-    }
-}
-
-export class ConflictError extends HttpError {
-    constructor(message: string, details?: any) {
-        super(409, message, details);
-        this.name = 'ConflictError';
-    }
+// Add request logging middleware
+export function requestLogger(req: Request, res: Response, next: NextFunction) {
+    logger.info('Incoming request:', {
+        method: req.method,
+        url: req.url,
+        query: req.query,
+        body: req.body
+    });
+    next();
 }

@@ -14,11 +14,7 @@ interface PropertyResult {
     } | null;
 }
 
-interface JobResult {
-    property_id: string;
-}
-
-export async function getPropertiesWithActiveJobs(req: Request, res: Response) {
+export async function getPropertyBoundaries(req: Request, res: Response) {
     try {
         const boundsStr = req.query.bounds as string;
         const statuses = (req.query.statuses as string || '').split(',').filter(Boolean);
@@ -47,42 +43,8 @@ export async function getPropertiesWithActiveJobs(req: Request, res: Response) {
         }
 
         try {
-            // Step 1: Get property IDs with active jobs
-            let jobQuery = `
-                SELECT DISTINCT j.property_id
-                FROM jobs j
-                WHERE FALSE
-            `;
-            const jobParams: any[] = [];
-
-            // Build OR conditions for filters
-            const conditions = [];
-            
-            if (statuses.length > 0) {
-                jobParams.push(statuses);
-                conditions.push(`j.status = ANY($${jobParams.length})`);
-            }
-            if (types.length > 0) {
-                jobParams.push(types);
-                conditions.push(`j.job_type_id = ANY($${jobParams.length})`);
-            }
-
-            // Add OR conditions if any exist
-            if (conditions.length > 0) {
-                jobQuery = jobQuery.replace('WHERE FALSE', `WHERE ${conditions.join(' OR ')}`);
-            }
-
-            logger.info('Executing job query:', { jobQuery, jobParams });
-            const jobResults = await AppDataSource.query(jobQuery, jobParams);
-            logger.info('Job query results:', { count: jobResults.length });
-
-            if (jobResults.length === 0) {
-                return res.json([]);
-            }
-
-            // Step 2: Get property boundaries and locations
-            const propertyIds = jobResults.map((r: JobResult) => r.property_id);
-            const propertyQuery = `
+            // Build the query with OR conditions for filters
+            let query = `
                 SELECT 
                     p.property_id,
                     CASE 
@@ -94,24 +56,47 @@ export async function getPropertiesWithActiveJobs(req: Request, res: Response) {
                         ELSE NULL
                     END as location
                 FROM properties p
-                WHERE p.property_id = ANY($1)
+                WHERE FALSE
+            `;
+            const queryParams: any[] = [];
+            const conditions = [];
+
+            // Add status filter
+            if (statuses.length > 0) {
+                queryParams.push(statuses);
+                conditions.push(`p.status = ANY($${queryParams.length})`);
+            }
+
+            // Add type filter
+            if (types.length > 0) {
+                queryParams.push(types);
+                conditions.push(`p.property_type_id = ANY($${queryParams.length})`);
+            }
+
+            // Add OR conditions if any exist
+            if (conditions.length > 0) {
+                query = query.replace('WHERE FALSE', `WHERE (${conditions.join(' OR ')})`);
+            }
+
+            // Add bounds condition
+            queryParams.push(minLng, minLat, maxLng, maxLat);
+            const boundsCondition = `
                 AND (
                     (p.boundary IS NOT NULL AND ST_IsValid(p.boundary) AND 
-                     ST_Intersects(p.boundary, ST_MakeEnvelope($2, $3, $4, $5, 4326)))
+                     ST_Intersects(p.boundary, ST_MakeEnvelope($${queryParams.length - 3}, $${queryParams.length - 2}, $${queryParams.length - 1}, $${queryParams.length}, 4326)))
                     OR
                     (p.location IS NOT NULL AND ST_IsValid(p.location) AND 
-                     ST_Intersects(p.location, ST_MakeEnvelope($2, $3, $4, $5, 4326)))
+                     ST_Intersects(p.location, ST_MakeEnvelope($${queryParams.length - 3}, $${queryParams.length - 2}, $${queryParams.length - 1}, $${queryParams.length}, 4326)))
                 )
             `;
-            const propertyParams = [propertyIds, minLng, minLat, maxLng, maxLat];
+            query += boundsCondition;
 
             logger.info('Executing property query:', { 
-                propertyQuery, 
-                paramCount: propertyParams.length,
-                propertyCount: propertyIds.length
+                query, 
+                paramCount: queryParams.length
             });
 
-            const result = await AppDataSource.query(propertyQuery, propertyParams);
+            const result = await AppDataSource.query(query, queryParams);
             logger.info('Property query results:', { 
                 count: result.length,
                 sample: result[0]
@@ -152,16 +137,14 @@ export async function getPropertiesWithActiveJobs(req: Request, res: Response) {
             throw queryError;
         }
     } catch (error) {
-        logger.error('Error in getPropertiesWithActiveJobs:', {
+        logger.error('Error in getPropertyBoundaries:', {
             error,
-            name: error instanceof Error ? error.name : 'Unknown',
-            message: error instanceof Error ? error.message : String(error),
-            stack: error instanceof Error ? error.stack : undefined
+            message: error instanceof Error ? error.message : String(error)
         });
 
         res.status(500).json({
             error: 'Internal server error',
-            message: 'Failed to fetch properties with jobs',
+            message: 'Failed to fetch property boundaries',
             details: error instanceof Error ? error.message : String(error)
         });
     }

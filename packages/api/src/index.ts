@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { AppDataSource } from './config/database';
 import router from './mainRouter';
-import { errorHandler } from './middleware/errorHandler';
+import { errorHandler, requestLogger } from './middleware/errorHandler';
 import { createWebSocketServer } from './websocket';
 
 const app = express();
@@ -11,6 +11,7 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(requestLogger);  // Add request logging
 
 // Routes
 app.use('/api', router);
