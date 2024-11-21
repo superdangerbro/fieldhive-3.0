@@ -42,7 +42,7 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
   children
 }, ref) => {
   const theme = useTheme();
-  const { viewState, setViewState } = useFieldMap();
+  const { viewState, setViewState, mapRef } = useFieldMap();
   const geolocateControlRef = useRef<mapboxgl.GeolocateControl>(null);
   const [isTracking, setIsTracking] = useState(false);
   const mapInitializedRef = useRef(false);
@@ -66,6 +66,14 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
     }
   }, [ref, onMoveEnd]);
 
+  // Store map instance in ref
+  useEffect(() => {
+    const map = (ref as React.RefObject<MapRef>)?.current?.getMap();
+    if (map) {
+      mapRef.current = map;
+    }
+  }, [ref, mapRef]);
+
   // Automatically start tracking on mount
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -77,17 +85,6 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
 
     return () => clearTimeout(timer);
   }, []);
-
-  // Debug map initialization
-  useEffect(() => {
-    const map = (ref as React.RefObject<MapRef>)?.current?.getMap();
-    if (map) {
-      const style = map.getStyle();
-      console.log('Map initialized with style:', style?.name || 'unknown');
-      console.log('Initial center:', [map.getCenter().lng, map.getCenter().lat]);
-      console.log('Initial zoom:', map.getZoom());
-    }
-  }, [ref]);
 
   const handleMoveEnd = useCallback(() => {
     const map = (ref as React.RefObject<MapRef>)?.current;

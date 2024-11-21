@@ -13,7 +13,7 @@ interface PropertyFilters {
 interface PropertyBoundaryLayerProps {
   bounds: [number, number, number, number];
   filters: PropertyFilters;
-  onPropertyClick?: (propertyId: string) => void;
+  onPropertyClick?: (propertyId: string, location: [number, number]) => void;
 }
 
 interface PropertyWithBoundary {
@@ -25,8 +25,15 @@ interface PropertyWithBoundary {
   } | null;
 }
 
+const LAYER_IDS = {
+  fill: 'property-boundary-fill',
+  outline: 'property-boundary-outline',
+  marker: 'property-boundary-marker'
+};
+
 export function PropertyBoundaryLayer({ bounds, filters, onPropertyClick }: PropertyBoundaryLayerProps) {
   const { current: map } = useMap();
+  const [layersLoaded, setLayersLoaded] = useState(false);
   const [polygonGeojson, setPolygonGeojson] = useState<GeoJSON.FeatureCollection>({
     type: 'FeatureCollection',
     features: []
@@ -46,7 +53,7 @@ export function PropertyBoundaryLayer({ bounds, filters, onPropertyClick }: Prop
         bounds: `${minLng},${minLat},${maxLng},${maxLat}`
       });
 
-      // Only add non-empty filters
+      // Add filters if they exist
       if (filters.statuses.length > 0) {
         params.append('statuses', filters.statuses.join(','));
       }
@@ -55,11 +62,13 @@ export function PropertyBoundaryLayer({ bounds, filters, onPropertyClick }: Prop
       }
 
       const response = await fetch(`${ENV_CONFIG.api.baseUrl}/properties/boundaries?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch property boundaries');
+      if (!response.ok) {
+        console.error('Failed to fetch property boundaries:', response.statusText);
+        throw new Error('Failed to fetch property boundaries');
+      }
       return response.json() as Promise<PropertyWithBoundary[]>;
     },
-    // Only run query if we have filters selected
-    enabled: (filters.statuses.length > 0 || filters.types.length > 0) && bounds.length === 4
+    enabled: bounds.length === 4
   });
 
   // Update GeoJSON when properties data changes
@@ -73,18 +82,20 @@ export function PropertyBoundaryLayer({ bounds, filters, onPropertyClick }: Prop
         ...property.boundary,
         properties: {
           ...property.boundary.properties,
-          property_id: property.property_id
+          property_id: property.property_id,
+          location: property.location?.coordinates || null
         }
       }));
 
     // Create point features
     const pointFeatures: GeoJSON.Feature[] = propertiesWithBoundaries
-      .filter(property => property.location)
+      .filter(property => property.location !== null)
       .map(property => ({
         type: 'Feature',
         geometry: property.location!,
         properties: {
-          property_id: property.property_id
+          property_id: property.property_id,
+          location: property.location!.coordinates
         }
       }));
 
@@ -99,39 +110,91 @@ export function PropertyBoundaryLayer({ bounds, filters, onPropertyClick }: Prop
     });
   }, [propertiesWithBoundaries]);
 
+  // Monitor layer loading
+  useEffect(() => {
+    if (!map) return;
+
+    const checkLayers = () => {
+      const hasLayers = [LAYER_IDS.fill, LAYER_IDS.marker].every(id => {
+        try {
+          return map.getLayer(id);
+        } catch {
+          return false;
+        }
+      });
+      console.log('Checking layers:', hasLayers);
+      setLayersLoaded(hasLayers);
+    };
+
+    map.on('styledata', checkLayers);
+    checkLayers();
+
+    return () => {
+      map.off('styledata', checkLayers);
+    };
+  }, [map]);
+
   // Set up click handler
   useEffect(() => {
-    if (!map || !onPropertyClick) return;
+    if (!map || !onPropertyClick || !layersLoaded) return;
 
-    const handleClick = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+    const handleClick = (e: mapboxgl.MapMouseEvent) => {
       const features = map.queryRenderedFeatures(e.point, {
-        layers: ['property-boundary-fill', 'property-boundary-marker']
+        layers: [LAYER_IDS.fill, LAYER_IDS.marker]
       });
 
       if (features.length > 0) {
-        const propertyId = features[0].properties?.property_id;
-        if (propertyId) {
-          onPropertyClick(propertyId);
+        const feature = features[0];
+        const propertyId = feature.properties?.property_id;
+        const location = feature.properties?.location;
+
+        if (propertyId && location) {
+          console.log('Property boundary clicked:', propertyId, 'with location:', location);
+          // Parse location if it's a string (GeoJSON properties are serialized)
+          const coordinates = Array.isArray(location) ? location : JSON.parse(location);
+          onPropertyClick(propertyId, coordinates);
         }
       }
     };
 
-    map.on('click', handleClick);
+    // Add cursor style changes
+    const handleMouseEnter = () => {
+      map.getCanvas().style.cursor = 'pointer';
+    };
+
+    const handleMouseLeave = () => {
+      map.getCanvas().style.cursor = '';
+    };
+
+    // Add event listeners
+    map.on('click', LAYER_IDS.fill, handleClick);
+    map.on('click', LAYER_IDS.marker, handleClick);
+    map.on('mouseenter', LAYER_IDS.fill, handleMouseEnter);
+    map.on('mouseleave', LAYER_IDS.fill, handleMouseLeave);
+    map.on('mouseenter', LAYER_IDS.marker, handleMouseEnter);
+    map.on('mouseleave', LAYER_IDS.marker, handleMouseLeave);
 
     return () => {
-      map.off('click', handleClick);
+      map.off('click', LAYER_IDS.fill, handleClick);
+      map.off('click', LAYER_IDS.marker, handleClick);
+      map.off('mouseenter', LAYER_IDS.fill, handleMouseEnter);
+      map.off('mouseleave', LAYER_IDS.fill, handleMouseLeave);
+      map.off('mouseenter', LAYER_IDS.marker, handleMouseEnter);
+      map.off('mouseleave', LAYER_IDS.marker, handleMouseLeave);
     };
-  }, [map, onPropertyClick]);
-
-  if (!propertiesWithBoundaries?.length) return null;
+  }, [map, onPropertyClick, layersLoaded]);
 
   return (
     <>
       {/* Polygon Source */}
-      <Source id="property-boundary-source" type="geojson" data={polygonGeojson}>
+      <Source 
+        id="property-boundary-source" 
+        type="geojson" 
+        data={polygonGeojson}
+      >
         {/* Polygon fill layer */}
         <Layer
-          id="property-boundary-fill"
+          id={LAYER_IDS.fill}
           type="fill"
           paint={{
             'fill-color': '#4caf50',
@@ -140,7 +203,7 @@ export function PropertyBoundaryLayer({ bounds, filters, onPropertyClick }: Prop
         />
         {/* Polygon outline layer */}
         <Layer
-          id="property-boundary-outline"
+          id={LAYER_IDS.outline}
           type="line"
           paint={{
             'line-color': '#4caf50',
@@ -150,10 +213,14 @@ export function PropertyBoundaryLayer({ bounds, filters, onPropertyClick }: Prop
       </Source>
 
       {/* Point Source */}
-      <Source id="property-boundary-point-source" type="geojson" data={pointGeojson}>
+      <Source 
+        id="property-boundary-point-source" 
+        type="geojson" 
+        data={pointGeojson}
+      >
         {/* Marker layer */}
         <Layer
-          id="property-boundary-marker"
+          id={LAYER_IDS.marker}
           type="circle"
           paint={{
             'circle-radius': 6,

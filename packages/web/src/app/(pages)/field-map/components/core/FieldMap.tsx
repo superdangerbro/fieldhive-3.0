@@ -3,12 +3,15 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useTheme, Box } from '@mui/material';
 import { MapRef } from 'react-map-gl';
+import { useQuery } from '@tanstack/react-query';
 import { useFieldMap } from '../../../../../app/globalHooks/useFieldMap';
 import { BaseMap, MapControls } from '.';
 import { PropertyLayer, PropertyBoundaryLayer } from '../properties';
+import { PropertyDetailsDialog } from '../properties/PropertyDetailsDialog';
 import { EquipmentLayer } from '../equipment';
 import { FloorPlanLayer, ModeSelector, LayersControl } from '../overlays';
 import { JobsLayer } from '../jobs/JobsLayer';
+import { ENV_CONFIG } from '../../../../../app/config/environment';
 import type { MapProperty } from '../../types';
 import type { Mode } from '../overlays/ModeSelector';
 
@@ -38,21 +41,9 @@ export function FieldMap() {
     setSelectedProperty,
     currentBounds,
     setCurrentBounds,
-    properties
+    properties,
+    isLoading
   } = useFieldMap();
-
-  useEffect(() => {
-    console.log('FieldMap state:', {
-      isTracking,
-      showFieldEquipment,
-      jobFilters,
-      propertyFilters,
-      selectedProperty: selectedProperty?.id,
-      isDarkMode,
-      mapInstance: !!mapRef.current,
-      currentMode
-    });
-  }, [isTracking, showFieldEquipment, jobFilters, propertyFilters, selectedProperty, isDarkMode, currentMode]);
 
   const handleMoveEnd = useCallback(async (bounds: [number, number, number, number]) => {
     console.log('Map bounds updated:', bounds);
@@ -63,30 +54,87 @@ export function FieldMap() {
     if (!property.location?.coordinates) return;
 
     console.log('Property selected:', property.property_id);
-    setSelectedProperty({
+    const selectedProp = {
       id: property.property_id,
       name: property.name,
       location: {
         latitude: property.location.coordinates[1],
         longitude: property.location.coordinates[0]
       }
+    };
+
+    // Get map instance
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+
+    // Zoom to property
+    map.easeTo({
+      center: [selectedProp.location.longitude, selectedProp.location.latitude],
+      zoom: 18,
+      duration: 1500
     });
+
+    setSelectedProperty(selectedProp);
   }, [setSelectedProperty]);
 
-  const handlePropertyBoundaryClick = useCallback((propertyId: string) => {
-    const property = properties.find((p: MapProperty) => p.property_id === propertyId);
-    if (!property || !property.location?.coordinates) return;
+  const handlePropertyBoundaryClick = useCallback(async (propertyId: string, coordinates: [number, number]) => {
+    console.log('Property boundary clicked:', propertyId, 'at coordinates:', coordinates);
 
-    console.log('Property selected from boundary:', propertyId);
-    setSelectedProperty({
-      id: property.property_id,
-      name: property.name,
-      location: {
-        latitude: property.location.coordinates[1],
-        longitude: property.location.coordinates[0]
+    try {
+      // Fetch property details to get the name
+      const response = await fetch(`${ENV_CONFIG.api.baseUrl}/properties/${propertyId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch property details');
       }
-    });
-  }, [properties, setSelectedProperty]);
+      const propertyData = await response.json();
+
+      const selectedProp = {
+        id: propertyId,
+        name: propertyData.name,
+        location: {
+          longitude: coordinates[0],
+          latitude: coordinates[1]
+        }
+      };
+
+      // Get map instance
+      const map = mapRef.current?.getMap();
+      if (!map) return;
+
+      // Zoom to property
+      map.easeTo({
+        center: [coordinates[0], coordinates[1]],
+        zoom: 18,
+        duration: 1500
+      });
+      
+      setSelectedProperty(selectedProp);
+    } catch (error) {
+      console.error('Error fetching property details:', error);
+      // Still select the property even if we can't get the name
+      const selectedProp = {
+        id: propertyId,
+        name: 'Property ' + propertyId,
+        location: {
+          longitude: coordinates[0],
+          latitude: coordinates[1]
+        }
+      };
+
+      // Get map instance
+      const map = mapRef.current?.getMap();
+      if (!map) return;
+
+      // Zoom to property
+      map.easeTo({
+        center: [coordinates[0], coordinates[1]],
+        zoom: 18,
+        duration: 1500
+      });
+
+      setSelectedProperty(selectedProp);
+    }
+  }, [setSelectedProperty]);
 
   const handleToggleFieldEquipment = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     console.log('Equipment visibility toggled:', event.target.checked);
@@ -128,6 +176,10 @@ export function FieldMap() {
     console.log('Zooming out');
     mapRef.current?.getMap()?.zoomOut();
   }, []);
+
+  const handleClosePropertyDetails = useCallback(() => {
+    setSelectedProperty(null);
+  }, [setSelectedProperty]);
 
   return (
     <Box
@@ -176,8 +228,8 @@ export function FieldMap() {
           onPropertyClick={handlePropertyClick}
         />
 
-        {/* Filtered property boundaries */}
-        {currentBounds && propertyFilters.statuses.length > 0 && (
+        {/* Property boundaries */}
+        {currentBounds && (
           <PropertyBoundaryLayer
             bounds={currentBounds}
             filters={propertyFilters}
@@ -204,6 +256,12 @@ export function FieldMap() {
           selectedPropertyId={selectedProperty?.id}
         />
       </BaseMap>
+
+      {/* Property Details Dialog */}
+      <PropertyDetailsDialog
+        propertyId={selectedProperty?.id || null}
+        onClose={handleClosePropertyDetails}
+      />
     </Box>
   );
 }

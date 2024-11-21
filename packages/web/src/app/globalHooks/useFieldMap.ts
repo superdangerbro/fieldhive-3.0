@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ViewState } from 'react-map-gl';
-import { ENV_CONFIG } from '@/config/environment';
-import type { Property } from '@/app/globalTypes/property';
+import { ENV_CONFIG } from '../config/environment';
+import type { Property } from '../globalTypes/property';
 
 interface SelectedProperty {
   id: string;
@@ -102,16 +102,6 @@ export function useFieldMap() {
     setPlacementState(null);
   }, [placementState]);
 
-  // View state management
-  const flyToProperty = useCallback((property: SelectedProperty) => {
-    setViewState(current => ({
-      ...current,
-      latitude: property.location.latitude,
-      longitude: property.location.longitude,
-      zoom: 18,
-    }));
-  }, []);
-
   return {
     // Properties data
     properties,
@@ -125,7 +115,6 @@ export function useFieldMap() {
     // Selected property state
     selectedProperty,
     setSelectedProperty,
-    flyToProperty,
 
     // Bounds state
     currentBounds,
