@@ -1,45 +1,47 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, AfterLoad } from 'typeorm';
 import { Point } from 'geojson';
-import { Equipment as IEquipment } from '@fieldhive/shared';
+
+interface IEquipment {
+    equipment_id: string;
+    job_id: string;
+    equipment_type_id: string;
+    location?: { latitude: number; longitude: number };
+    is_georeferenced: boolean;
+    status: string;
+    created_at: string;
+    updated_at: string;
+}
 
 @Entity('field_equipment')
 export class Equipment implements Omit<IEquipment, 'location'> {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+    @PrimaryGeneratedColumn('uuid', { name: 'equipment_id' })
+    equipment_id: string;
 
-    @Column()
-    name: string;
+    @Column({ name: 'job_id' })
+    job_id: string;
 
-    @Column({ type: 'text' })
-    type: string;
-
-    @Column({ nullable: true })
-    description?: string;
-
-    @Column({ type: 'text' })
-    status: string;
+    @Column({ name: 'equipment_type_id' })
+    equipment_type_id: string;
 
     @Column('geometry', {
         spatialFeatureType: 'Point',
         srid: 4326,
-        nullable: true
+        nullable: true,
+        name: 'location'
     })
     private locationPoint?: Point;
 
-    @Column({ type: 'timestamp', nullable: true })
-    lastMaintenance?: string;
+    @Column({ name: 'is_georeferenced', default: true })
+    is_georeferenced: boolean;
 
-    @Column({ type: 'timestamp', nullable: true })
-    nextMaintenance?: string;
+    @Column({ type: 'varchar', name: 'status', default: 'active' })
+    status: string;
 
-    @Column('jsonb')
-    properties: Record<string, any>;
+    @CreateDateColumn({ name: 'created_at' })
+    created_at: string;
 
-    @CreateDateColumn()
-    createdAt: string;
-
-    @UpdateDateColumn()
-    updatedAt: string;
+    @UpdateDateColumn({ name: 'updated_at' })
+    updated_at: string;
 
     // Virtual property to match the shared interface
     location?: { latitude: number; longitude: number };
@@ -69,8 +71,22 @@ export class Equipment implements Omit<IEquipment, 'location'> {
         this.location = undefined;
     }
 
-    toJSON(): IEquipment {
+    // Transform data for frontend
+    toJSON() {
         const { locationPoint, ...rest } = this;
-        return rest;
+        return {
+            equipment_id: this.equipment_id,
+            name: `Equipment ${this.equipment_id.slice(0, 8)}`, // Generate a name since we don't store it
+            type: this.equipment_type_id,
+            status: this.status,
+            property_id: '', // This will be derived from the job
+            job_id: this.job_id,
+            data: {},
+            created_at: this.created_at,
+            updated_at: this.updated_at,
+            location: this.locationPoint ? {
+                coordinates: this.locationPoint.coordinates
+            } : undefined
+        };
     }
 }

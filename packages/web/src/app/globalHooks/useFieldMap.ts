@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ViewState } from 'react-map-gl';
 import { ENV_CONFIG } from '../config/environment';
 import type { Property } from '../globalTypes/property';
+import mapboxgl from 'mapbox-gl';
 
 interface SelectedProperty {
   id: string;
@@ -46,6 +47,7 @@ export function useFieldMap() {
   const [floorPlans, setFloorPlans] = useState<FloorPlan[]>([]);
   const [activeFloorPlan, setActiveFloorPlan] = useState<string | null>(null);
   const [placementState, setPlacementState] = useState<PlacementState | null>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
 
   // Fetch properties within bounds
   const {
@@ -111,6 +113,9 @@ export function useFieldMap() {
     // View state
     viewState,
     setViewState,
+
+    // Map ref
+    mapRef,
 
     // Selected property state
     selectedProperty,

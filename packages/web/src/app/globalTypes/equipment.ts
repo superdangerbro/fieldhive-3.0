@@ -3,6 +3,8 @@ export interface Equipment {
     name: string;
     type: string;
     status: string;
+    property_id: string;
+    job_id: string;
     data?: Record<string, any>;
     created_at?: Date;
     updated_at?: Date;
@@ -27,7 +29,12 @@ export interface CreateEquipmentDto {
     name: string;
     type: string;
     status?: string;
+    property_id: string;
+    job_id: string;
     data?: Record<string, any>;
+    location: {
+        coordinates: [number, number];
+    };
 }
 
 export interface UpdateEquipmentDto {

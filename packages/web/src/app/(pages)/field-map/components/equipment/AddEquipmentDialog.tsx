@@ -23,21 +23,22 @@ import {
   TextareaAutosize
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { useEquipment } from '@/app/globalHooks/useEquipment';
+import { useEquipment } from '../../../../../app/globalHooks/useEquipment';
 import type { 
   Field, 
   FormData, 
   FieldCondition, 
   EquipmentType, 
   EquipmentStatus 
-} from '@/app/globalTypes/equipment';
+} from '../../../../../app/globalTypes/equipment';
 
 interface AddEquipmentDialogProps {
   open: boolean;
   location: [number, number];
   onClose: () => void;
   onSubmit: (data: { 
-    equipment_type_id: string;
+    name: string;
+    type: string;
     status: string;
     data: Record<string, any>;
   }) => Promise<void>;
@@ -60,6 +61,7 @@ export function AddEquipmentDialog({
   const { equipmentTypes, equipmentStatuses, isLoading } = useEquipment();
   const [selectedType, setSelectedType] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [equipmentName, setEquipmentName] = useState('');
   const [formData, setFormData] = useState<FormData>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +71,7 @@ export function AddEquipmentDialog({
     if (open) {
       setSelectedType('');
       setSelectedStatus('');
+      setEquipmentName('');
       setFormData({});
       setError(null);
     }
@@ -105,7 +108,10 @@ export function AddEquipmentDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedType || !selectedStatus) return;
+    if (!selectedType || !selectedStatus || !equipmentName.trim()) {
+      setError('Equipment name, type, and status are required');
+      return;
+    }
 
     // Validate required fields
     const visibleFields = getVisibleFields();
@@ -123,12 +129,14 @@ export function AddEquipmentDialog({
 
     try {
       await onSubmit({
-        equipment_type_id: selectedType,
+        name: equipmentName.trim(),
+        type: selectedType,
         status: selectedStatus,
         data: formData
       });
       setSelectedType('');
       setSelectedStatus('');
+      setEquipmentName('');
       setFormData({});
     } catch (err) {
       console.error('Failed to add equipment:', err);
@@ -280,6 +288,14 @@ export function AddEquipmentDialog({
               {error}
             </Alert>
           )}
+
+          <TextField
+            fullWidth
+            label="Equipment Name"
+            value={equipmentName}
+            onChange={(e) => setEquipmentName(e.target.value)}
+            required
+          />
           
           <FormControl fullWidth>
             <InputLabel>Equipment Type</InputLabel>
@@ -345,7 +361,7 @@ export function AddEquipmentDialog({
           onClick={handleSubmit}
           variant="contained"
           fullWidth
-          disabled={!selectedType || !selectedStatus || isSubmitting || isLoading}
+          disabled={!selectedType || !selectedStatus || !equipmentName.trim() || isSubmitting || isLoading}
           startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
         >
           {isSubmitting ? 'Adding Equipment...' : 'Add Equipment'}

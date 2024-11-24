@@ -14,6 +14,10 @@ interface PropertyLayerProps {
   onPropertyClick?: (property: MapProperty) => void;
 }
 
+interface Location {
+  coordinates: [number, number];
+}
+
 /**
  * PropertyLayer handles rendering and interaction of property markers on the map.
  * Features:
@@ -30,7 +34,8 @@ export function PropertyLayer({
   const { 
     properties,
     selectedProperty,
-    flyToProperty
+    setSelectedProperty,
+    mapRef
   } = useFieldMap();
 
   // Debug property updates
@@ -57,36 +62,70 @@ export function PropertyLayer({
       }
     };
 
-    // Fly to property location
-    flyToProperty(propertyData);
+    // Update selected property
+    setSelectedProperty(propertyData);
+
+    // Fly to property location using mapRef
+    if (mapRef.current) {
+      mapRef.current.easeTo({
+        center: [propertyData.location.longitude, propertyData.location.latitude],
+        zoom: 18,
+        duration: 1500
+      });
+    }
     
     // Notify parent component
     onPropertyClick?.(property);
-  }, [flyToProperty, onPropertyClick]);
+  }, [setSelectedProperty, mapRef, onPropertyClick]);
 
   // Function to parse WKT string to coordinates
-  const parseWKT = (wkt: string) => {
+  const parseWKT = (wkt: string): Location | null => {
     const match = wkt.match(/POINT\s*\(\s*([\d.]+)\s+([\d.]+)\s*\)/);
     if (!match) {
       throw new Error(`Invalid WKT format: ${wkt}`);
     }
     const longitude = parseFloat(match[1]);
     const latitude = parseFloat(match[2]);
-    return { latitude, longitude };
+    return { coordinates: [longitude, latitude] };
+  };
+
+  // Function to get location coordinates regardless of format
+  const getLocationCoordinates = (location: any): Location | null => {
+    if (!location) return null;
+
+    // If location is already in the correct format
+    if (location.coordinates) {
+      return location as Location;
+    }
+
+    // If location is a WKT string
+    if (typeof location === 'string') {
+      try {
+        return parseWKT(location);
+      } catch (error) {
+        console.error('Error parsing WKT:', error);
+        return null;
+      }
+    }
+
+    // If location is in a different format, return null
+    console.error('Unsupported location format:', location);
+    return null;
   };
 
   return (
     <>
       {/* Regular property markers */}
-      {properties.map((property) => {
+      {properties.map((property: any) => {
         if (!property.location) return null;
 
-        // Convert property to MapProperty if needed
+        const locationData = getLocationCoordinates(property.location);
+        if (!locationData) return null;
+
+        // Convert property to MapProperty
         const mapProperty: MapProperty = {
           ...property,
-          location: typeof property.location === 'string'
-            ? parseWKT(property.location)
-            : property.location
+          location: locationData
         };
 
         return (

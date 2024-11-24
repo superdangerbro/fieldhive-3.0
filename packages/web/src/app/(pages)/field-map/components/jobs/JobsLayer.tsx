@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Layer, Source } from 'react-map-gl';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Layer, Source, useMap } from 'react-map-gl';
 import { useQuery } from '@tanstack/react-query';
 import { ENV_CONFIG } from '../../../../../app/config/environment';
 
@@ -13,15 +13,19 @@ interface JobFilters {
 interface JobsLayerProps {
   bounds: [number, number, number, number];
   filters: JobFilters;
+  selectedJobId?: string;
+  onJobSelect?: (jobId: string) => void;
 }
 
 interface PropertyWithJob {
   property_id: string;
+  job_id: string;
   boundary: {
     type: 'Feature';
     geometry: GeoJSON.Geometry;
     properties: {
       property_id: string;
+      job_id: string;
     };
   } | null;
   location: {
@@ -30,7 +34,8 @@ interface PropertyWithJob {
   } | null;
 }
 
-export function JobsLayer({ bounds, filters }: JobsLayerProps) {
+export function JobsLayer({ bounds, filters, selectedJobId, onJobSelect }: JobsLayerProps) {
+  const { current: map } = useMap();
   const [polygonGeojson, setPolygonGeojson] = useState<GeoJSON.FeatureCollection>({
     type: 'FeatureCollection',
     features: []
@@ -66,6 +71,30 @@ export function JobsLayer({ bounds, filters }: JobsLayerProps) {
     enabled: (filters.statuses.length > 0 || filters.types.length > 0) && bounds.length === 4
   });
 
+  // Handle click events
+  useEffect(() => {
+    if (!map || !onJobSelect) return;
+
+    const handleClick = (e: any) => {
+      const features = map.queryRenderedFeatures(e.point, {
+        layers: ['jobs-fill', 'jobs-marker']
+      });
+
+      if (features.length > 0) {
+        const jobId = features[0].properties?.job_id;
+        if (jobId) {
+          onJobSelect(jobId);
+        }
+      }
+    };
+
+    map.on('click', handleClick);
+
+    return () => {
+      map.off('click', handleClick);
+    };
+  }, [map, onJobSelect]);
+
   // Update GeoJSON when properties data changes
   useEffect(() => {
     if (!propertiesWithJobs) return;
@@ -73,7 +102,14 @@ export function JobsLayer({ bounds, filters }: JobsLayerProps) {
     // Create polygon features
     const polygonFeatures = propertiesWithJobs
       .filter(property => property.boundary)
-      .map(property => property.boundary!);
+      .map(property => ({
+        ...property.boundary!,
+        properties: {
+          ...property.boundary!.properties,
+          job_id: property.job_id,
+          isSelected: property.job_id === selectedJobId
+        }
+      }));
 
     // Create point features
     const pointFeatures: GeoJSON.Feature[] = propertiesWithJobs
@@ -82,7 +118,9 @@ export function JobsLayer({ bounds, filters }: JobsLayerProps) {
         type: 'Feature',
         geometry: property.location!,
         properties: {
-          property_id: property.property_id
+          property_id: property.property_id,
+          job_id: property.job_id,
+          isSelected: property.job_id === selectedJobId
         }
       }));
 
@@ -95,7 +133,32 @@ export function JobsLayer({ bounds, filters }: JobsLayerProps) {
       type: 'FeatureCollection',
       features: pointFeatures
     });
-  }, [propertiesWithJobs]);
+  }, [propertiesWithJobs, selectedJobId]);
+
+  // Set cursor style on hover
+  useEffect(() => {
+    if (!map) return;
+
+    const handleMouseEnter = () => {
+      map.getCanvas().style.cursor = 'pointer';
+    };
+
+    const handleMouseLeave = () => {
+      map.getCanvas().style.cursor = '';
+    };
+
+    map.on('mouseenter', 'jobs-fill', handleMouseEnter);
+    map.on('mouseenter', 'jobs-marker', handleMouseEnter);
+    map.on('mouseleave', 'jobs-fill', handleMouseLeave);
+    map.on('mouseleave', 'jobs-marker', handleMouseLeave);
+
+    return () => {
+      map.off('mouseenter', 'jobs-fill', handleMouseEnter);
+      map.off('mouseenter', 'jobs-marker', handleMouseEnter);
+      map.off('mouseleave', 'jobs-fill', handleMouseLeave);
+      map.off('mouseleave', 'jobs-marker', handleMouseLeave);
+    };
+  }, [map]);
 
   if (!propertiesWithJobs?.length) return null;
 
@@ -108,8 +171,18 @@ export function JobsLayer({ bounds, filters }: JobsLayerProps) {
           id="jobs-fill"
           type="fill"
           paint={{
-            'fill-color': '#ff9800',
-            'fill-opacity': 0.2
+            'fill-color': [
+              'case',
+              ['get', 'isSelected'],
+              '#f59e0b', // Selected color
+              '#ff9800'  // Default color
+            ],
+            'fill-opacity': [
+              'case',
+              ['get', 'isSelected'],
+              0.3,  // Selected opacity
+              0.2   // Default opacity
+            ]
           }}
         />
         {/* Polygon outline layer */}
@@ -117,8 +190,18 @@ export function JobsLayer({ bounds, filters }: JobsLayerProps) {
           id="jobs-outline"
           type="line"
           paint={{
-            'line-color': '#ff9800',
-            'line-width': 2
+            'line-color': [
+              'case',
+              ['get', 'isSelected'],
+              '#f59e0b', // Selected color
+              '#ff9800'  // Default color
+            ],
+            'line-width': [
+              'case',
+              ['get', 'isSelected'],
+              3,    // Selected width
+              2     // Default width
+            ]
           }}
         />
       </Source>
@@ -130,8 +213,18 @@ export function JobsLayer({ bounds, filters }: JobsLayerProps) {
           id="jobs-marker"
           type="circle"
           paint={{
-            'circle-radius': 6,
-            'circle-color': '#ff9800',
+            'circle-radius': [
+              'case',
+              ['get', 'isSelected'],
+              8,    // Selected radius
+              6     // Default radius
+            ],
+            'circle-color': [
+              'case',
+              ['get', 'isSelected'],
+              '#f59e0b', // Selected color
+              '#ff9800'  // Default color
+            ],
             'circle-stroke-width': 2,
             'circle-stroke-color': '#fff'
           }}

@@ -22,6 +22,8 @@ interface BaseMapProps {
   onTrackingStart?: () => void;
   /** Callback fired when geolocation tracking ends */
   onTrackingEnd?: () => void;
+  /** Callback fired when user location is updated */
+  onLocationUpdate?: (coords: [number, number]) => void;
   /** Child components to render within the map */
   children?: React.ReactNode;
 }
@@ -39,6 +41,7 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
   onMoveEnd,
   onTrackingStart,
   onTrackingEnd,
+  onLocationUpdate,
   children
 }, ref) => {
   const theme = useTheme();
@@ -66,11 +69,13 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
     }
   }, [ref, onMoveEnd]);
 
-  // Store map instance in ref
+  // Synchronize refs
   useEffect(() => {
-    const map = (ref as React.RefObject<MapRef>)?.current?.getMap();
-    if (map) {
-      mapRef.current = map;
+    if (ref) {
+      const mapInstance = (ref as React.RefObject<MapRef>)?.current?.getMap();
+      if (mapInstance) {
+        mapRef.current = mapInstance;
+      }
     }
   }, [ref, mapRef]);
 
@@ -113,9 +118,12 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
   }, [setViewState]);
 
   useEffect(() => {
-    const onGeolocate = () => {
+    const onGeolocate = (e: { coords: { longitude: number; latitude: number } }) => {
       setIsTracking(true);
       onTrackingStart?.();
+      if (onLocationUpdate) {
+        onLocationUpdate([e.coords.longitude, e.coords.latitude]);
+      }
     };
 
     const onGeolocateEnd = () => {
@@ -134,7 +142,7 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
         geolocateControlRef.current.off('trackuserlocationend', onGeolocateEnd);
       }
     };
-  }, [onTrackingStart, onTrackingEnd]);
+  }, [onTrackingStart, onTrackingEnd, onLocationUpdate]);
 
   return (
     <Box 
@@ -206,6 +214,11 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
           showUserHeading
           showAccuracyCircle={false}
           positionOptions={{ enableHighAccuracy: true }}
+          fitBoundsOptions={{
+            maxZoom: 12, // Limit initial zoom level
+            linear: true, // Use linear easing for smoother animation
+            duration: 1000 // 1 second animation
+          }}
           onTrackUserLocationStart={() => {
             console.log('Location tracking started');
             setIsTracking(true);
@@ -215,6 +228,12 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
             console.log('Location tracking ended');
             setIsTracking(false);
             onTrackingEnd?.();
+          }}
+          onGeolocate={(e: { coords: { longitude: number; latitude: number } }) => {
+            console.log('Location updated:', e.coords);
+            if (onLocationUpdate) {
+              onLocationUpdate([e.coords.longitude, e.coords.latitude]);
+            }
           }}
         />
         {children}

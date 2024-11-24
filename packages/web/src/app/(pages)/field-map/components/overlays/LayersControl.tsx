@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   Box, 
   Paper,
@@ -85,7 +85,7 @@ export function LayersControl({
     }
   });
 
-  const handleJobStatusToggle = (status: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleJobStatusToggle = useCallback((status: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
     const newStatuses = event.target.checked
       ? [...jobFilters.statuses, status]
       : jobFilters.statuses.filter(s => s !== status);
@@ -94,9 +94,9 @@ export function LayersControl({
       ...jobFilters,
       statuses: newStatuses
     });
-  };
+  }, [jobFilters, onJobFiltersChange]);
 
-  const handleJobTypeToggle = (typeId: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleJobTypeToggle = useCallback((typeId: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
     const newTypes = event.target.checked
       ? [...jobFilters.types, typeId]
       : jobFilters.types.filter(t => t !== typeId);
@@ -105,9 +105,9 @@ export function LayersControl({
       ...jobFilters,
       types: newTypes
     });
-  };
+  }, [jobFilters, onJobFiltersChange]);
 
-  const handlePropertyStatusToggle = (status: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePropertyStatusToggle = useCallback((status: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
     const newStatuses = event.target.checked
       ? [...propertyFilters.statuses, status]
       : propertyFilters.statuses.filter(s => s !== status);
@@ -116,9 +116,9 @@ export function LayersControl({
       ...propertyFilters,
       statuses: newStatuses
     });
-  };
+  }, [propertyFilters, onPropertyFiltersChange]);
 
-  const handlePropertyTypeToggle = (typeId: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePropertyTypeToggle = useCallback((typeId: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
     const newTypes = event.target.checked
       ? [...propertyFilters.types, typeId]
       : propertyFilters.types.filter(t => t !== typeId);
@@ -127,10 +127,21 @@ export function LayersControl({
       ...propertyFilters,
       types: newTypes
     });
-  };
+  }, [propertyFilters, onPropertyFiltersChange]);
+
+  const handleFloorPlanVisibilityToggle = useCallback((planId: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    event.stopPropagation();
+    requestAnimationFrame(() => {
+      toggleFloorPlanVisibility(planId);
+    });
+  }, [toggleFloorPlanVisibility]);
+
+  const handleFloorPlanClick = useCallback((planId: string) => {
+    setActiveFloorPlan(planId);
+  }, [setActiveFloorPlan]);
 
   const renderFilterSection = (
-    title: string,
+    sectionType: 'jobs' | 'properties',
     options: typeof defaultOptions,
     filters: Filters,
     onStatusToggle: (status: string) => (event: React.ChangeEvent<HTMLInputElement>) => void,
@@ -152,9 +163,9 @@ export function LayersControl({
             Status
           </Typography>
           <FormGroup>
-            {options.statuses.map(status => (
+            {options.statuses.map((status, index) => (
               <Box
-                key={status}
+                key={`${sectionType}-status-${status}-${index}`}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -199,31 +210,33 @@ export function LayersControl({
             Type
           </Typography>
           <FormGroup>
-            {options.types.map(type => (
-              <Box
-                key={type.id}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  py: 0.5,
-                }}
-              >
-                <Typography
-                  variant="body2"
+            {options.types
+              .filter(type => type && type.id) // Filter out any invalid types
+              .map((type, index) => (
+                <Box
+                  key={`${sectionType}-type-${type.id}-${index}`}
                   sx={{
-                    color: theme.palette.text.secondary,
-                    fontSize: '0.8125rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    py: 0.5,
                   }}
                 >
-                  {type.name}
-                </Typography>
-                <Switch
-                  size="small"
-                  checked={filters.types.includes(type.id)}
-                  onChange={onTypeToggle(type.id)}
-                />
-              </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: theme.palette.text.secondary,
+                      fontSize: '0.8125rem',
+                    }}
+                  >
+                    {type.name}
+                  </Typography>
+                  <Switch
+                    size="small"
+                    checked={filters.types.includes(type.id)}
+                    onChange={onTypeToggle(type.id)}
+                  />
+                </Box>
             ))}
           </FormGroup>
         </>
@@ -238,7 +251,7 @@ export function LayersControl({
             py: 1,
           }}
         >
-          No {title.toLowerCase()} found
+          No {sectionType} found
         </Typography>
       )}
     </Box>
@@ -365,7 +378,7 @@ export function LayersControl({
 
             <Collapse in={isPropertiesExpanded}>
               {renderFilterSection(
-                'Properties',
+                'properties',
                 propertyOptions,
                 propertyFilters,
                 handlePropertyStatusToggle,
@@ -424,9 +437,9 @@ export function LayersControl({
               <Collapse in={isFloorPlansExpanded}>
                 <Box sx={{ pl: 2, pt: 1 }}>
                   <FormGroup>
-                    {floorPlans.map(plan => (
+                    {floorPlans.map((plan, index) => (
                       <Box
-                        key={plan.id}
+                        key={`floorplan-${plan.id}-${index}`}
                         sx={{
                           display: 'flex',
                           alignItems: 'center',
@@ -437,7 +450,7 @@ export function LayersControl({
                             backgroundColor: theme.palette.action.hover,
                           },
                         }}
-                        onClick={() => setActiveFloorPlan(plan.id)}
+                        onClick={() => handleFloorPlanClick(plan.id)}
                       >
                         <Typography
                           variant="body2"
@@ -452,10 +465,7 @@ export function LayersControl({
                         <Switch
                           size="small"
                           checked={plan.visible}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            toggleFloorPlanVisibility(plan.id);
-                          }}
+                          onChange={handleFloorPlanVisibilityToggle(plan.id)}
                         />
                       </Box>
                     ))}
@@ -516,7 +526,7 @@ export function LayersControl({
 
             <Collapse in={isJobsExpanded}>
               {renderFilterSection(
-                'Jobs',
+                'jobs',
                 jobOptions,
                 jobFilters,
                 handleJobStatusToggle,

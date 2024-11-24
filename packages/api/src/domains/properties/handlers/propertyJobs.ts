@@ -2,34 +2,60 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../../../config/database';
 import { logger } from '../../../utils/logger';
 
-interface PropertyResult {
+interface PropertyQueryResult {
     property_id: string;
-    boundary: {
-        type: string;
-        coordinates: number[][][];
-    } | null;
-    location: {
-        type: string;
-        coordinates: [number, number];
-    } | null;
+    property_name: string;
+    location: string;
 }
 
-interface JobResult {
+interface JobQueryResult {
+    job_id: string;
+    job_name: string;
     property_id: string;
+    property_name: string;
+    location: string;
 }
 
 export async function getPropertiesWithActiveJobs(req: Request, res: Response) {
     try {
         const boundsStr = req.query.bounds as string;
-        const statuses = (req.query.statuses as string || '').split(',').filter(Boolean);
-        const types = (req.query.types as string || '').split(',').filter(Boolean);
+        const propertyId = req.query.propertyId as string;
 
         logger.info('Request parameters:', {
             bounds: boundsStr,
-            statuses,
-            types
+            propertyId
         });
 
+        // If propertyId is provided, return jobs for that property
+        if (propertyId) {
+            const jobQuery = `
+                SELECT 
+                    j.job_id,
+                    j.name as job_name,
+                    p.property_id,
+                    p.name as property_name,
+                    ST_AsGeoJSON(p.location) as location
+                FROM jobs j
+                INNER JOIN properties p ON j.property_id = p.property_id
+                WHERE j.property_id = $1
+                AND j.status != 'Archived'
+                AND j.status != 'archived'
+            `;
+
+            logger.info('Executing job query:', { jobQuery, propertyId });
+            const jobResults = await AppDataSource.query(jobQuery, [propertyId]);
+            logger.info('Job query results:', { count: jobResults.length });
+
+            // Parse GeoJSON strings to objects
+            const formattedJobs = jobResults.map((job: JobQueryResult) => ({
+                ...job,
+                location: job.location ? JSON.parse(job.location) : null
+            }));
+
+            return res.json(formattedJobs);
+        }
+
+        // Otherwise, return nearby properties
         if (!boundsStr) {
             return res.status(400).json({
                 error: 'Validation failed',
@@ -47,103 +73,32 @@ export async function getPropertiesWithActiveJobs(req: Request, res: Response) {
         }
 
         try {
-            // Step 1: Get property IDs with active jobs
-            let jobQuery = `
-                SELECT DISTINCT j.property_id
-                FROM jobs j
-                WHERE FALSE
-            `;
-            const jobParams: any[] = [];
-
-            // Build OR conditions for filters
-            const conditions = [];
-            
-            if (statuses.length > 0) {
-                jobParams.push(statuses);
-                conditions.push(`j.status = ANY($${jobParams.length})`);
-            }
-            if (types.length > 0) {
-                jobParams.push(types);
-                conditions.push(`j.job_type_id = ANY($${jobParams.length})`);
-            }
-
-            // Add OR conditions if any exist
-            if (conditions.length > 0) {
-                jobQuery = jobQuery.replace('WHERE FALSE', `WHERE ${conditions.join(' OR ')}`);
-            }
-
-            logger.info('Executing job query:', { jobQuery, jobParams });
-            const jobResults = await AppDataSource.query(jobQuery, jobParams);
-            logger.info('Job query results:', { count: jobResults.length });
-
-            if (jobResults.length === 0) {
-                return res.json([]);
-            }
-
-            // Step 2: Get property boundaries and locations
-            const propertyIds = jobResults.map((r: JobResult) => r.property_id);
+            // Get nearby properties regardless of jobs
             const propertyQuery = `
-                SELECT 
+                SELECT DISTINCT
                     p.property_id,
-                    CASE 
-                        WHEN ST_IsValid(p.boundary) THEN ST_AsGeoJSON(p.boundary)::json
-                        ELSE NULL
-                    END as boundary,
-                    CASE 
-                        WHEN ST_IsValid(p.location) THEN ST_AsGeoJSON(p.location)::json
-                        ELSE NULL
-                    END as location
+                    p.name as property_name,
+                    ST_AsGeoJSON(p.location) as location
                 FROM properties p
-                WHERE p.property_id = ANY($1)
-                AND (
-                    (p.boundary IS NOT NULL AND ST_IsValid(p.boundary) AND 
-                     ST_Intersects(p.boundary, ST_MakeEnvelope($2, $3, $4, $5, 4326)))
-                    OR
-                    (p.location IS NOT NULL AND ST_IsValid(p.location) AND 
-                     ST_Intersects(p.location, ST_MakeEnvelope($2, $3, $4, $5, 4326)))
+                WHERE p.location IS NOT NULL 
+                AND ST_Intersects(
+                    p.location, 
+                    ST_MakeEnvelope($1, $2, $3, $4, 4326)
                 )
             `;
-            const propertyParams = [propertyIds, minLng, minLat, maxLng, maxLat];
 
-            logger.info('Executing property query:', { 
-                propertyQuery, 
-                paramCount: propertyParams.length,
-                propertyCount: propertyIds.length
-            });
+            logger.info('Executing property query:', { propertyQuery });
+            const result = await AppDataSource.query(propertyQuery, [minLng, minLat, maxLng, maxLat]);
+            logger.info('Property query results:', { count: result.length });
 
-            const result = await AppDataSource.query(propertyQuery, propertyParams);
-            logger.info('Property query results:', { 
-                count: result.length,
-                sample: result[0]
-            });
+            // Format results and parse GeoJSON strings to objects
+            const formattedProperties = result.map((property: PropertyQueryResult) => ({
+                property_id: property.property_id,
+                name: property.property_name,
+                location: property.location ? JSON.parse(property.location) : null
+            }));
 
-            // Format results as GeoJSON Features
-            const formattedResult = result
-                .filter((property: PropertyResult) => 
-                    property && 
-                    (property.boundary || property.location)
-                )
-                .map((property: PropertyResult) => ({
-                    property_id: property.property_id,
-                    boundary: property.boundary ? {
-                        type: 'Feature',
-                        geometry: property.boundary,
-                        properties: {
-                            property_id: property.property_id
-                        }
-                    } : null,
-                    location: property.location ? {
-                        type: 'Point',
-                        coordinates: property.location.coordinates
-                    } : null
-                }));
-
-            logger.info('Formatted results:', { 
-                count: formattedResult.length,
-                sample: formattedResult[0]
-            });
-
-            res.json(formattedResult);
+            res.json(formattedProperties);
         } catch (queryError) {
             logger.error('Database query error:', {
                 error: queryError,
@@ -161,7 +116,7 @@ export async function getPropertiesWithActiveJobs(req: Request, res: Response) {
 
         res.status(500).json({
             error: 'Internal server error',
-            message: 'Failed to fetch properties with jobs',
+            message: 'Failed to fetch properties',
             details: error instanceof Error ? error.message : String(error)
         });
     }

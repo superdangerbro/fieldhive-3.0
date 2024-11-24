@@ -9,6 +9,8 @@ export type Mode = 'edit' | 'service' | null;
 
 interface ModeSelectorProps {
   onModeChange?: (mode: Mode) => void;
+  onAddEquipment?: () => void;
+  onAddFloorplan?: () => void;
 }
 
 function FloatingButton({ 
@@ -17,6 +19,7 @@ function FloatingButton({
   className, 
   sx, 
   color = '#3b82f6',
+  onClick,
   ...props 
 }: any) {
   return (
@@ -33,6 +36,7 @@ function FloatingButton({
       }}
     >
       <IconButton
+        onClick={onClick}
         sx={{
           width: { xs: 40, sm: 48 },
           height: { xs: 40, sm: 48 },
@@ -70,7 +74,7 @@ function FloatingButton({
   );
 }
 
-export function ModeSelector({ onModeChange }: ModeSelectorProps) {
+export function ModeSelector({ onModeChange, onAddEquipment, onAddFloorplan }: ModeSelectorProps) {
   const [activeMode, setActiveMode] = useState<Mode>(null);
   const theme = useTheme();
 
@@ -119,6 +123,7 @@ export function ModeSelector({ onModeChange }: ModeSelectorProps) {
           label="Add Equipment"
           color="#16a34a"
           title="Add Equipment"
+          onClick={onAddEquipment}
         />
 
         {/* Add Floorplan button */}
@@ -128,6 +133,7 @@ export function ModeSelector({ onModeChange }: ModeSelectorProps) {
           label="Add Floorplan"
           color="#ea580c"
           title="Add Floorplan"
+          onClick={onAddFloorplan}
           sx={{
             transitionDelay: '50ms',
           }}

@@ -9,6 +9,7 @@ import { BaseMap, MapControls } from '.';
 import { PropertyLayer, PropertyBoundaryLayer } from '../properties';
 import { PropertyDetailsDialog } from '../properties/PropertyDetailsDialog';
 import { EquipmentLayer } from '../equipment';
+import { SelectJobDialog } from '../equipment/SelectJobDialog';
 import { FloorPlanLayer, ModeSelector, LayersControl } from '../overlays';
 import { JobsLayer } from '../jobs/JobsLayer';
 import { ENV_CONFIG } from '../../../../../app/config/environment';
@@ -20,11 +21,26 @@ interface Filters {
   types: string[];
 }
 
+interface JobWithLocation {
+  job_id: string;
+  name: string;
+  property: {
+    property_id: string;
+    name: string;
+    location: {
+      coordinates: [number, number];
+    };
+  };
+}
+
 export function FieldMap() {
   const theme = useTheme();
   const mapRef = useRef<MapRef>(null);
   const [isTracking, setIsTracking] = useState(false);
+  const [userLocation, setUserLocation] = useState<[number, number] | undefined>();
   const [showFieldEquipment, setShowFieldEquipment] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | undefined>(undefined);
+  const [showSelectJobDialog, setShowSelectJobDialog] = useState(false);
   const [jobFilters, setJobFilters] = useState<Filters>({
     statuses: [],
     types: []
@@ -35,6 +51,7 @@ export function FieldMap() {
   });
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [currentMode, setCurrentMode] = useState<Mode>(null);
+  const equipmentLayerRef = useRef<any>(null);
 
   const { 
     selectedProperty,
@@ -154,7 +171,65 @@ export function FieldMap() {
   const handleModeChange = useCallback((mode: Mode) => {
     console.log('Mode changed:', mode);
     setCurrentMode(mode);
+    // Reset job selection when exiting edit mode
+    if (mode !== 'edit') {
+      setSelectedJobId(undefined);
+    }
   }, []);
+
+  const handleJobSelect = useCallback((jobOrId: JobWithLocation | string) => {
+    // If we received a job ID (from JobsLayer), fetch the job details
+    if (typeof jobOrId === 'string') {
+      setSelectedJobId(jobOrId);
+      return;
+    }
+
+    // If we received a full job object (from SelectJobDialog)
+    const job = jobOrId;
+    console.log('Job selected:', job);
+    setSelectedJobId(job.job_id);
+    setSelectedProperty({
+      id: job.property.property_id,
+      name: job.property.name,
+      location: {
+        latitude: job.property.location.coordinates[1],
+        longitude: job.property.location.coordinates[0]
+      }
+    });
+
+    // Zoom to property
+    const map = mapRef.current?.getMap();
+    if (map) {
+      map.easeTo({
+        center: [
+          job.property.location.coordinates[0],
+          job.property.location.coordinates[1]
+        ],
+        zoom: 18,
+        duration: 1500
+      });
+    }
+  }, [setSelectedProperty]);
+
+  const handleAddEquipment = useCallback(() => {
+    console.log('Add equipment clicked');
+    if (!selectedProperty || !selectedJobId) {
+      setShowSelectJobDialog(true);
+      return;
+    }
+    if (equipmentLayerRef.current?.handleStartPlacement) {
+      equipmentLayerRef.current.handleStartPlacement();
+    }
+  }, [selectedProperty, selectedJobId]);
+
+  const handleLocationUpdate = useCallback((coords: [number, number]) => {
+    console.log('Location update received in FieldMap:', coords);
+    setUserLocation(coords);
+  }, []);
+
+  useEffect(() => {
+    console.log('Current user location:', userLocation);
+  }, [userLocation]);
 
   const handleStyleChange = useCallback(() => {
     const map = mapRef.current?.getMap();
@@ -204,6 +279,7 @@ export function FieldMap() {
           console.log('Location tracking ended');
           setIsTracking(false);
         }}
+        onLocationUpdate={handleLocationUpdate}
       >
         <LayersControl
           showFieldEquipment={showFieldEquipment}
@@ -221,7 +297,10 @@ export function FieldMap() {
           onZoomOut={handleZoomOut}
         />
 
-        <ModeSelector onModeChange={handleModeChange} />
+        <ModeSelector 
+          onModeChange={handleModeChange}
+          onAddEquipment={handleAddEquipment}
+        />
 
         {/* Regular property markers */}
         <PropertyLayer
@@ -238,9 +317,12 @@ export function FieldMap() {
         )}
 
         <EquipmentLayer
+          ref={equipmentLayerRef}
           visible={showFieldEquipment}
           selectedPropertyId={selectedProperty?.id}
+          selectedJobId={selectedJobId}
           bounds={currentBounds || undefined}
+          isAddMode={currentMode === 'edit'}
         />
 
         {/* Filtered jobs */}
@@ -248,6 +330,8 @@ export function FieldMap() {
           <JobsLayer 
             bounds={currentBounds}
             filters={jobFilters}
+            selectedJobId={selectedJobId}
+            onJobSelect={handleJobSelect}
           />
         )}
 
@@ -261,6 +345,23 @@ export function FieldMap() {
       <PropertyDetailsDialog
         propertyId={selectedProperty?.id || null}
         onClose={handleClosePropertyDetails}
+      />
+
+      {/* Select Job Dialog */}
+      <SelectJobDialog
+        open={showSelectJobDialog}
+        onClose={() => setShowSelectJobDialog(false)}
+        onJobSelect={(job) => {
+          console.log('Job selected in dialog:', job);
+          handleJobSelect(job);
+          setShowSelectJobDialog(false);
+          if (equipmentLayerRef.current?.handleStartPlacement) {
+            setTimeout(() => {
+              equipmentLayerRef.current.handleStartPlacement();
+            }, 1500); // Wait for zoom animation
+          }
+        }}
+        userLocation={userLocation}
       />
     </Box>
   );
