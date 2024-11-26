@@ -18,11 +18,8 @@ interface PropertyBoundaryLayerProps {
 
 interface PropertyWithBoundary {
   property_id: string;
-  boundary: GeoJSON.Feature;
-  location: {
-    type: 'Point';
-    coordinates: [number, number];
-  } | null;
+  boundary: GeoJSON.Feature | null;
+  location: GeoJSON.Feature | null;
 }
 
 const LAYER_IDS = {
@@ -75,29 +72,15 @@ export function PropertyBoundaryLayer({ bounds, filters, onPropertyClick }: Prop
   useEffect(() => {
     if (!propertiesWithBoundaries) return;
 
-    // Create polygon features
+    // Create polygon features from boundaries
     const polygonFeatures = propertiesWithBoundaries
       .filter(property => property.boundary)
-      .map(property => ({
-        ...property.boundary,
-        properties: {
-          ...property.boundary.properties,
-          property_id: property.property_id,
-          location: property.location?.coordinates || null
-        }
-      }));
+      .map(property => property.boundary!);
 
-    // Create point features
-    const pointFeatures: GeoJSON.Feature[] = propertiesWithBoundaries
-      .filter(property => property.location !== null)
-      .map(property => ({
-        type: 'Feature',
-        geometry: property.location!,
-        properties: {
-          property_id: property.property_id,
-          location: property.location!.coordinates
-        }
-      }));
+    // Create point features from locations
+    const pointFeatures = propertiesWithBoundaries
+      .filter(property => property.location)
+      .map(property => property.location!);
 
     setPolygonGeojson({
       type: 'FeatureCollection',
@@ -146,12 +129,19 @@ export function PropertyBoundaryLayer({ bounds, filters, onPropertyClick }: Prop
       if (features.length > 0) {
         const feature = features[0];
         const propertyId = feature.properties?.property_id;
-        const location = feature.properties?.location;
+        const geometry = feature.geometry;
 
-        if (propertyId && location) {
-          console.log('Property boundary clicked:', propertyId, 'with location:', location);
-          // Parse location if it's a string (GeoJSON properties are serialized)
-          const coordinates = Array.isArray(location) ? location : JSON.parse(location);
+        if (propertyId && geometry) {
+          console.log('Property boundary clicked:', propertyId, 'with geometry:', geometry);
+          // For points, use the point coordinates
+          // For polygons, use the centroid or first coordinate
+          let coordinates: [number, number];
+          if (geometry.type === 'Point') {
+            coordinates = (geometry as GeoJSON.Point).coordinates as [number, number];
+          } else {
+            // For polygons, use the first coordinate of the first ring
+            coordinates = ((geometry as GeoJSON.Polygon).coordinates[0][0]) as [number, number];
+          }
           onPropertyClick(propertyId, coordinates);
         }
       }

@@ -56,7 +56,7 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
                         ELSE NULL
                     END as location
                 FROM properties p
-                WHERE FALSE
+                WHERE TRUE
             `;
             const queryParams: any[] = [];
             const conditions = [];
@@ -70,12 +70,12 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
             // Add type filter
             if (types.length > 0) {
                 queryParams.push(types);
-                conditions.push(`p.property_type_id = ANY($${queryParams.length})`);
+                conditions.push(`p.property_type = ANY($${queryParams.length})`);
             }
 
-            // Add OR conditions if any exist
+            // Add AND conditions if any exist
             if (conditions.length > 0) {
-                query = query.replace('WHERE FALSE', `WHERE (${conditions.join(' OR ')})`);
+                query += ` AND (${conditions.join(' OR ')})`;
             }
 
             // Add bounds condition
@@ -118,8 +118,11 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
                         }
                     } : null,
                     location: property.location ? {
-                        type: 'Point',
-                        coordinates: property.location.coordinates
+                        type: 'Feature',
+                        geometry: property.location,
+                        properties: {
+                            property_id: property.property_id
+                        }
                     } : null
                 }));
 

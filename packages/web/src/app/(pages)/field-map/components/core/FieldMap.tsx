@@ -11,7 +11,6 @@ import { PropertyDetailsDialog } from '../properties/PropertyDetailsDialog';
 import { EquipmentLayer } from '../equipment';
 import { SelectJobDialog } from '../equipment/SelectJobDialog';
 import { FloorPlanLayer, ModeSelector, LayersControl } from '../overlays';
-import { JobsLayer } from '../jobs/JobsLayer';
 import { ENV_CONFIG } from '../../../../../app/config/environment';
 import type { MapProperty } from '../../types';
 import type { Mode } from '../overlays/ModeSelector';
@@ -21,15 +20,16 @@ interface Filters {
   types: string[];
 }
 
-interface JobWithLocation {
+interface Job {
   job_id: string;
   name: string;
   property: {
     property_id: string;
     name: string;
     location: {
+      type: string;
       coordinates: [number, number];
-    };
+    } | null;
   };
 }
 
@@ -41,12 +41,8 @@ export function FieldMap() {
   const [showFieldEquipment, setShowFieldEquipment] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | undefined>(undefined);
   const [showSelectJobDialog, setShowSelectJobDialog] = useState(false);
-  const [jobFilters, setJobFilters] = useState<Filters>({
-    statuses: [],
-    types: []
-  });
   const [propertyFilters, setPropertyFilters] = useState<Filters>({
-    statuses: [],
+    statuses: ['active'], // Set 'active' as default
     types: []
   });
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -158,11 +154,6 @@ export function FieldMap() {
     setShowFieldEquipment(event.target.checked);
   }, []);
 
-  const handleJobFiltersChange = useCallback((filters: Filters) => {
-    console.log('Job filters updated:', filters);
-    setJobFilters(filters);
-  }, []);
-
   const handlePropertyFiltersChange = useCallback((filters: Filters) => {
     console.log('Property filters updated:', filters);
     setPropertyFilters(filters);
@@ -177,29 +168,21 @@ export function FieldMap() {
     }
   }, []);
 
-  const handleJobSelect = useCallback((jobOrId: JobWithLocation | string) => {
-    // If we received a job ID (from JobsLayer), fetch the job details
-    if (typeof jobOrId === 'string') {
-      setSelectedJobId(jobOrId);
-      return;
-    }
-
-    // If we received a full job object (from SelectJobDialog)
-    const job = jobOrId;
+  const handleJobSelect = useCallback((job: Job) => {
     console.log('Job selected:', job);
     setSelectedJobId(job.job_id);
     setSelectedProperty({
       id: job.property.property_id,
       name: job.property.name,
       location: {
-        latitude: job.property.location.coordinates[1],
-        longitude: job.property.location.coordinates[0]
+        latitude: job.property.location?.coordinates[1] || 0,
+        longitude: job.property.location?.coordinates[0] || 0
       }
     });
 
     // Zoom to property
     const map = mapRef.current?.getMap();
-    if (map) {
+    if (map && job.property.location) {
       map.easeTo({
         center: [
           job.property.location.coordinates[0],
@@ -284,8 +267,6 @@ export function FieldMap() {
         <LayersControl
           showFieldEquipment={showFieldEquipment}
           onToggleFieldEquipment={handleToggleFieldEquipment}
-          jobFilters={jobFilters}
-          onJobFiltersChange={handleJobFiltersChange}
           propertyFilters={propertyFilters}
           onPropertyFiltersChange={handlePropertyFiltersChange}
         />
@@ -324,16 +305,6 @@ export function FieldMap() {
           bounds={currentBounds || undefined}
           isAddMode={currentMode === 'edit'}
         />
-
-        {/* Filtered jobs */}
-        {currentBounds && jobFilters.statuses.length > 0 && (
-          <JobsLayer 
-            bounds={currentBounds}
-            filters={jobFilters}
-            selectedJobId={selectedJobId}
-            onJobSelect={handleJobSelect}
-          />
-        )}
 
         <FloorPlanLayer
           mapRef={mapRef}

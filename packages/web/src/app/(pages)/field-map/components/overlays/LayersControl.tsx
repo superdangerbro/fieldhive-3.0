@@ -26,27 +26,22 @@ interface Filters {
 interface LayersControlProps {
   showFieldEquipment: boolean;
   onToggleFieldEquipment: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  jobFilters: Filters;
-  onJobFiltersChange: (filters: Filters) => void;
   propertyFilters: Filters;
   onPropertyFiltersChange: (filters: Filters) => void;
 }
 
-const defaultOptions: { statuses: string[]; types: { id: string; name: string; }[] } = {
-  statuses: [],
-  types: []
+const defaultOptions = {
+  statuses: [] as string[],
+  types: [] as string[]
 };
 
 export function LayersControl({ 
   showFieldEquipment, 
   onToggleFieldEquipment,
-  jobFilters,
-  onJobFiltersChange,
   propertyFilters,
   onPropertyFiltersChange
 }: LayersControlProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isJobsExpanded, setIsJobsExpanded] = useState(false);
   const [isPropertiesExpanded, setIsPropertiesExpanded] = useState(false);
   const [isFloorPlansExpanded, setIsFloorPlansExpanded] = useState(false);
   const theme = useTheme();
@@ -59,19 +54,6 @@ export function LayersControl({
     selectedProperty
   } = useFieldMap();
 
-  // Fetch available job options
-  const { data: jobOptions = defaultOptions } = useQuery({
-    queryKey: ['jobOptions'],
-    queryFn: async () => {
-      const response = await fetch(`${ENV_CONFIG.api.baseUrl}/jobs/options`);
-      if (!response.ok) throw new Error('Failed to fetch job options');
-      return response.json() as Promise<{
-        statuses: string[];
-        types: { id: string; name: string; }[];
-      }>;
-    }
-  });
-
   // Fetch available property options
   const { data: propertyOptions = defaultOptions } = useQuery({
     queryKey: ['propertyOptions'],
@@ -80,32 +62,10 @@ export function LayersControl({
       if (!response.ok) throw new Error('Failed to fetch property options');
       return response.json() as Promise<{
         statuses: string[];
-        types: { id: string; name: string; }[];
+        types: string[];
       }>;
     }
   });
-
-  const handleJobStatusToggle = useCallback((status: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newStatuses = event.target.checked
-      ? [...jobFilters.statuses, status]
-      : jobFilters.statuses.filter(s => s !== status);
-    
-    onJobFiltersChange({
-      ...jobFilters,
-      statuses: newStatuses
-    });
-  }, [jobFilters, onJobFiltersChange]);
-
-  const handleJobTypeToggle = useCallback((typeId: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newTypes = event.target.checked
-      ? [...jobFilters.types, typeId]
-      : jobFilters.types.filter(t => t !== typeId);
-    
-    onJobFiltersChange({
-      ...jobFilters,
-      types: newTypes
-    });
-  }, [jobFilters, onJobFiltersChange]);
 
   const handlePropertyStatusToggle = useCallback((status: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
     const newStatuses = event.target.checked
@@ -118,10 +78,10 @@ export function LayersControl({
     });
   }, [propertyFilters, onPropertyFiltersChange]);
 
-  const handlePropertyTypeToggle = useCallback((typeId: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePropertyTypeToggle = useCallback((type: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
     const newTypes = event.target.checked
-      ? [...propertyFilters.types, typeId]
-      : propertyFilters.types.filter(t => t !== typeId);
+      ? [...propertyFilters.types, type]
+      : propertyFilters.types.filter(t => t !== type);
     
     onPropertyFiltersChange({
       ...propertyFilters,
@@ -141,11 +101,10 @@ export function LayersControl({
   }, [setActiveFloorPlan]);
 
   const renderFilterSection = (
-    sectionType: 'jobs' | 'properties',
     options: typeof defaultOptions,
     filters: Filters,
     onStatusToggle: (status: string) => (event: React.ChangeEvent<HTMLInputElement>) => void,
-    onTypeToggle: (typeId: string) => (event: React.ChangeEvent<HTMLInputElement>) => void
+    onTypeToggle: (type: string) => (event: React.ChangeEvent<HTMLInputElement>) => void
   ) => (
     <Box sx={{ pl: 2, pt: 1 }}>
       {/* Status Filters */}
@@ -165,7 +124,7 @@ export function LayersControl({
           <FormGroup>
             {options.statuses.map((status, index) => (
               <Box
-                key={`${sectionType}-status-${status}-${index}`}
+                key={`property-status-${status}-${index}`}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -210,33 +169,32 @@ export function LayersControl({
             Type
           </Typography>
           <FormGroup>
-            {options.types
-              .filter(type => type && type.id) // Filter out any invalid types
-              .map((type, index) => (
-                <Box
-                  key={`${sectionType}-type-${type.id}-${index}`}
+            {options.types.map((type, index) => (
+              <Box
+                key={`property-type-${type}-${index}`}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  py: 0.5,
+                }}
+              >
+                <Typography
+                  variant="body2"
                   sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    py: 0.5,
+                    color: theme.palette.text.secondary,
+                    fontSize: '0.8125rem',
+                    textTransform: 'capitalize',
                   }}
                 >
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: theme.palette.text.secondary,
-                      fontSize: '0.8125rem',
-                    }}
-                  >
-                    {type.name}
-                  </Typography>
-                  <Switch
-                    size="small"
-                    checked={filters.types.includes(type.id)}
-                    onChange={onTypeToggle(type.id)}
-                  />
-                </Box>
+                  {type}
+                </Typography>
+                <Switch
+                  size="small"
+                  checked={filters.types.includes(type)}
+                  onChange={onTypeToggle(type)}
+                />
+              </Box>
             ))}
           </FormGroup>
         </>
@@ -251,7 +209,7 @@ export function LayersControl({
             py: 1,
           }}
         >
-          No {sectionType} found
+          No properties found
         </Typography>
       )}
     </Box>
@@ -378,7 +336,6 @@ export function LayersControl({
 
             <Collapse in={isPropertiesExpanded}>
               {renderFilterSection(
-                'properties',
                 propertyOptions,
                 propertyFilters,
                 handlePropertyStatusToggle,
@@ -486,54 +443,6 @@ export function LayersControl({
               </Collapse>
             </Box>
           )}
-
-          {/* Jobs Section */}
-          <Box sx={{ mt: 1 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                cursor: 'pointer',
-                '&:hover': {
-                  backgroundColor: theme.palette.action.hover,
-                },
-                borderRadius: 1,
-                px: 1,
-                py: 0.5,
-              }}
-              onClick={() => setIsJobsExpanded(!isJobsExpanded)}
-            >
-              <Typography
-                variant="body2"
-                sx={{
-                  flex: 1,
-                  color: theme.palette.text.secondary,
-                  fontSize: '0.8125rem',
-                  fontWeight: 500,
-                }}
-              >
-                Jobs
-              </Typography>
-              <SvgIcon
-                component={isJobsExpanded ? ChevronUpIcon : ChevronDownIcon}
-                sx={{
-                  fontSize: '12px',
-                  color: theme.palette.text.secondary,
-                }}
-              />
-            </Box>
-
-            <Collapse in={isJobsExpanded}>
-              {renderFilterSection(
-                'jobs',
-                jobOptions,
-                jobFilters,
-                handleJobStatusToggle,
-                handleJobTypeToggle
-              )}
-            </Collapse>
-          </Box>
         </Box>
       </Collapse>
     </Paper>

@@ -3,7 +3,7 @@
 import React from 'react';
 import { Box, Skeleton } from '@mui/material';
 import Map, { Marker, Source, Layer } from 'react-map-gl';
-import type { LocationData } from '../types/location';
+import type { LocationData, GeoJSONPoint, GeoJSONPolygon } from '../types/location';
 import { validateGeoJsonCoordinates } from '../types/location';
 
 interface PropertyLocationMapProps {
@@ -13,6 +13,12 @@ interface PropertyLocationMapProps {
     cssLoaded: boolean;
     defaultZoom: number;
     themeColor: string;
+}
+
+interface GeoJSONFeature<G> {
+    type: 'Feature';
+    geometry: G;
+    properties: Record<string, any>;
 }
 
 export default function PropertyLocationMap({
@@ -32,14 +38,16 @@ export default function PropertyLocationMap({
     }
 
     // Get marker coordinates and validate them
-    const markerCoordinates = locationData?.location?.coordinates;
+    const location = locationData?.location;
+    const markerCoordinates = location?.coordinates;
     const hasMarker = markerCoordinates && 
                      Array.isArray(markerCoordinates) && 
                      markerCoordinates.length === 2 &&
                      validateGeoJsonCoordinates(markerCoordinates[0], markerCoordinates[1]);
 
     // Get boundary data and validate all coordinates
-    const boundaryCoordinates = locationData?.boundary?.coordinates?.[0];
+    const boundary = locationData?.boundary;
+    const boundaryCoordinates = boundary?.coordinates?.[0];
     const hasBoundary = boundaryCoordinates && 
                        Array.isArray(boundaryCoordinates) && 
                        boundaryCoordinates.length >= 3 &&
@@ -74,12 +82,12 @@ export default function PropertyLocationMap({
                 )}
 
                 {/* Only show boundary if all coordinates are valid */}
-                {hasBoundary && locationData?.boundary && boundaryCoordinates && (
+                {hasBoundary && boundary && (
                     <Source
                         type="geojson"
                         data={{
                             type: 'Feature',
-                            geometry: locationData.boundary,
+                            geometry: boundary,
                             properties: {}
                         }}
                     >
