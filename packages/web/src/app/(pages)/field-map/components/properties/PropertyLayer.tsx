@@ -80,13 +80,38 @@ export function PropertyLayer({
 
   // Function to parse WKT string to coordinates
   const parseWKT = (wkt: string): Location | null => {
-    const match = wkt.match(/POINT\s*\(\s*([\d.]+)\s+([\d.]+)\s*\)/);
-    if (!match) {
-      throw new Error(`Invalid WKT format: ${wkt}`);
+    try {
+      // Remove any whitespace and convert to uppercase for consistent parsing
+      const normalizedWkt = wkt.replace(/\s+/g, ' ').trim().toUpperCase();
+      
+      // Extract coordinates using a more flexible regex pattern
+      const coordsMatch = normalizedWkt.match(/POINT\s*\(([^)]+)\)/);
+      if (!coordsMatch) {
+        console.warn('WKT string does not contain POINT data:', wkt);
+        return null;
+      }
+
+      // Split coordinates and convert to numbers
+      const coords = coordsMatch[1].trim().split(/\s+/);
+      if (coords.length !== 2) {
+        console.warn('Invalid number of coordinates in WKT string:', wkt);
+        return null;
+      }
+
+      const longitude = parseFloat(coords[0]);
+      const latitude = parseFloat(coords[1]);
+
+      // Validate coordinates
+      if (isNaN(longitude) || isNaN(latitude)) {
+        console.warn('Invalid coordinate values in WKT string:', wkt);
+        return null;
+      }
+
+      return { coordinates: [longitude, latitude] };
+    } catch (error) {
+      console.warn('Error parsing WKT string:', wkt, error);
+      return null;
     }
-    const longitude = parseFloat(match[1]);
-    const latitude = parseFloat(match[2]);
-    return { coordinates: [longitude, latitude] };
   };
 
   // Function to get location coordinates regardless of format
@@ -100,16 +125,16 @@ export function PropertyLayer({
 
     // If location is a WKT string
     if (typeof location === 'string') {
-      try {
-        return parseWKT(location);
-      } catch (error) {
-        console.error('Error parsing WKT:', error);
+      const parsedLocation = parseWKT(location);
+      if (!parsedLocation) {
+        console.warn('Failed to parse location WKT:', location);
         return null;
       }
+      return parsedLocation;
     }
 
-    // If location is in a different format, return null
-    console.error('Unsupported location format:', location);
+    // If location is in a different format, log and return null
+    console.warn('Unsupported location format:', location);
     return null;
   };
 

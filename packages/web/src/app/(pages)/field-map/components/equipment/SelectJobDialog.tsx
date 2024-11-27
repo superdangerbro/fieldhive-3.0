@@ -28,7 +28,9 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchIcon from '@mui/icons-material/Search';
 import { useQuery } from '@tanstack/react-query';
+import { useJobs } from '../../../jobs/hooks/useJobs';
 import { ENV_CONFIG } from '../../../../../app/config/environment';
+import type { Job } from '../../../../../app/globalTypes/job';
 
 interface Property {
   property_id: string;
@@ -37,19 +39,6 @@ interface Property {
     type: string;
     coordinates: [number, number];
   } | null;
-}
-
-interface Job {
-  job_id: string;
-  name: string;
-  property: {
-    property_id: string;
-    name: string;
-    location: {
-      type: string;
-      coordinates: [number, number];
-    } | null;
-  };
 }
 
 interface SelectJobDialogProps {
@@ -142,28 +131,15 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
     enabled: searchTerm.length >= 3 && activeTab === 'search'
   });
 
-  // Query for property jobs
+  // Query for property jobs using the updated useJobs hook
   const {
-    data: propertyJobs = [],
+    data: jobsData,
     isLoading: isLoadingJobs
-  } = useQuery({
-    queryKey: ['property-jobs', selectedProperty?.property_id],
-    queryFn: async () => {
-      if (!selectedProperty) return [];
-      
-      const url = `${ENV_CONFIG.api.baseUrl}/properties/with-active-jobs?propertyId=${selectedProperty.property_id}`;
-      console.log('Fetching jobs for property:', url);
+  } = useJobs(
+    selectedProperty ? { property_id: selectedProperty.property_id } : undefined
+  );
 
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error('Failed to fetch property jobs');
-      }
-      const data = await response.json();
-      console.log('Received property jobs:', data);
-      return data;
-    },
-    enabled: !!selectedProperty
-  });
+  const propertyJobs = jobsData?.jobs || [];
 
   const handleSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
@@ -236,7 +212,7 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
             <ListItemText
               primary={
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="subtitle1">{job.name}</Typography>
+                  <Typography variant="subtitle1">{job.title}</Typography>
                 </Box>
               }
             />

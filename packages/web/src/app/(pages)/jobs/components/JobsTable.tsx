@@ -23,20 +23,13 @@ import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import type { Job, JobStatus } from '../../../globalTypes/job';
 import { useJobs } from '../hooks/useJobs';
+import { useSetting } from '../hooks/useSettings';
 
 interface JobsTableProps {
     onJobSelect: (job: Job | null) => void;
     selectedJob: Job | null;
     onJobsLoad?: (jobs: Job[]) => void;
 }
-
-// Status mapping for display
-const STATUS_DISPLAY: Record<string, { name: string; color: string }> = {
-    pending: { name: 'Pending', color: '#FFA726' },  // Orange
-    in_progress: { name: 'In Progress', color: '#42A5F5' },  // Blue
-    completed: { name: 'Completed', color: '#66BB6A' },  // Green
-    cancelled: { name: 'Cancelled', color: '#EF5350' },  // Red
-};
 
 // Helper function to convert snake_case to Title Case
 const toTitleCase = (str: string | null | undefined): string => {
@@ -105,18 +98,18 @@ const defaultColumns: GridColDef<Job>[] = [
         headerName: 'Status',
         width: 150,
         renderCell: (params) => {
-            const status = params.row.status;
-            const displayStatus = STATUS_DISPLAY[status] || { 
-                name: toTitleCase(status),
-                color: '#757575' // Default gray for unknown status
-            };
-
+            const currentStatus = params.row.status;
+            const { data: statusSettings } = useSetting<{ statuses: JobStatus[] }>('job_statuses');
+            
+            // Find matching status from settings
+            const statusConfig = statusSettings?.statuses?.find(s => s.value === currentStatus);
+            
             return (
                 <Chip
-                    label={displayStatus.name}
+                    label={statusConfig?.label || toTitleCase(currentStatus)}
                     size="small"
                     sx={{ 
-                        bgcolor: displayStatus.color,
+                        bgcolor: statusConfig?.color || '#757575', // Default gray if no color found
                         color: 'white'
                     }}
                 />
@@ -147,6 +140,9 @@ export function JobsTable({ onJobSelect, selectedJob, onJobsLoad }: JobsTablePro
         error,
         refetch
     } = useJobs();
+
+    // Fetch job statuses for filtering
+    const { data: statusSettings } = useSetting<{ statuses: JobStatus[] }>('job_statuses');
 
     const handleColumnMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
         setColumnMenuAnchor(event.currentTarget);
@@ -179,7 +175,9 @@ export function JobsTable({ onJobSelect, selectedJob, onJobsLoad }: JobsTablePro
         
         const searchText = filterText.toLowerCase();
         return data.jobs.filter((job: Job) => {
-            const status = STATUS_DISPLAY[job.status]?.name || toTitleCase(job.status);
+            const statusConfig = statusSettings?.statuses?.find(s => s.value === job.status);
+            const statusLabel = statusConfig?.label || toTitleCase(job.status);
+            
             return (
                 job.title?.toLowerCase().includes(searchText) ||
                 job.property?.name?.toLowerCase().includes(searchText) ||
@@ -187,10 +185,10 @@ export function JobsTable({ onJobSelect, selectedJob, onJobsLoad }: JobsTablePro
                     account.name.toLowerCase().includes(searchText)
                 ) ||
                 job.job_type_id?.toLowerCase().includes(searchText) ||
-                status.toLowerCase().includes(searchText)
+                statusLabel.toLowerCase().includes(searchText)
             );
         });
-    }, [data.jobs, filterText]);
+    }, [data.jobs, filterText, statusSettings]);
 
     // Call onJobsLoad when jobs are loaded
     React.useEffect(() => {

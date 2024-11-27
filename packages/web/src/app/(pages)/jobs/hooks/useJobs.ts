@@ -10,8 +10,18 @@ const ENDPOINTS = {
     bulkDelete: '/jobs/bulk-delete'
 } as const;
 
-// Helper function to build full API URL
-const buildUrl = (endpoint: string) => `${ENV_CONFIG.api.baseUrl}${endpoint}`;
+// Helper function to build full API URL with query params
+const buildUrl = (endpoint: string, params?: Record<string, string | undefined>) => {
+    const url = `${ENV_CONFIG.api.baseUrl}${endpoint}`;
+    if (!params) return url;
+    
+    const queryString = Object.entries(params)
+        .filter(([_, value]) => value !== undefined)
+        .map(([key, value]) => `${key}=${encodeURIComponent(value as string)}`)
+        .join('&');
+    
+    return queryString ? `${url}?${queryString}` : url;
+};
 
 // Helper function to handle API errors consistently
 const handleApiError = async (response: Response) => {
@@ -23,6 +33,9 @@ interface JobsResponse {
     jobs: Job[];
     total: number;
 }
+
+// Define JobsQueryParams as a Record type to match buildUrl parameter type
+type JobsQueryParams = Partial<Record<'property_id' | 'type' | 'status' | 'title', string>>;
 
 // Helper function to transform API response to match our TypeScript interfaces
 const transformJob = (job: any): Job => {
@@ -63,11 +76,11 @@ const transformJob = (job: any): Job => {
 };
 
 // Jobs List Hook
-export const useJobs = () => {
+export const useJobs = (params?: JobsQueryParams) => {
     return useQuery<JobsResponse>({
-        queryKey: ['jobs'],
+        queryKey: ['jobs', params],
         queryFn: async () => {
-            const response = await fetch(buildUrl(ENDPOINTS.jobs), {
+            const response = await fetch(buildUrl(ENDPOINTS.jobs, params), {
                 headers: { 'Content-Type': 'application/json' },
                 signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
             });
