@@ -29,17 +29,10 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchIcon from '@mui/icons-material/Search';
 import { useQuery } from '@tanstack/react-query';
 import { useJobs } from '../../../jobs/hooks/useJobs';
+import { useActiveJobContext } from '../../../../../app/globalHooks/useActiveJobContext';
 import { ENV_CONFIG } from '../../../../../app/config/environment';
 import type { Job } from '../../../../../app/globalTypes/job';
-
-interface Property {
-  property_id: string;
-  name: string;
-  location: {
-    type: string;
-    coordinates: [number, number];
-  } | null;
-}
+import type { Property } from '../../../../../app/globalTypes/property';
 
 interface SelectJobDialogProps {
   open: boolean;
@@ -54,6 +47,7 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [activeTab, setActiveTab] = useState<TabValue>('nearby');
   const [searchTerm, setSearchTerm] = useState('');
+  const { setActiveJob, setActiveProperty } = useActiveJobContext();
 
   // Query for nearby properties
   const {
@@ -150,9 +144,14 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
   }, []);
 
   const handleJobClick = useCallback((job: Job) => {
+    // Set the active job context
+    setActiveJob(job);
+    setActiveProperty(selectedProperty);
+    
+    // Call the original handlers
     onJobSelect(job);
     onClose();
-  }, [onJobSelect, onClose]);
+  }, [onJobSelect, onClose, setActiveJob, setActiveProperty, selectedProperty]);
 
   const handleBack = useCallback(() => {
     setSelectedProperty(null);

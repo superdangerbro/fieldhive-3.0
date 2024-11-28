@@ -30,6 +30,11 @@ interface PlacementState {
   propertyId: string | null;
 }
 
+interface Filters {
+  statuses: string[];
+  types: string[];
+}
+
 const INITIAL_VIEW_STATE: ViewState = {
   longitude: -123.1207,
   latitude: 49.2827,
@@ -47,6 +52,7 @@ export function useFieldMap() {
   const [floorPlans, setFloorPlans] = useState<FloorPlan[]>([]);
   const [activeFloorPlan, setActiveFloorPlan] = useState<string | null>(null);
   const [placementState, setPlacementState] = useState<PlacementState | null>(null);
+  const [filters, setFilters] = useState<Filters>({ statuses: ['active'], types: [] });
   const mapRef = useRef<mapboxgl.Map | null>(null);
 
   // Fetch properties within bounds
@@ -55,18 +61,37 @@ export function useFieldMap() {
     isLoading,
     error
   } = useQuery({
-    queryKey: ['properties', currentBounds],
+    queryKey: ['properties', currentBounds, filters],
     queryFn: async () => {
       if (!currentBounds) return [];
       
-      const url = new URL(`${ENV_CONFIG.api.baseUrl}/properties`);
+      const url = new URL(`${ENV_CONFIG.api.baseUrl}/properties/boundaries`);
+      
+      // Add bounds
       url.searchParams.set('bounds', currentBounds.join(','));
+      
+      // Add filters
+      if (filters.statuses.length > 0) {
+        url.searchParams.append('statuses', filters.statuses.join(','));
+      }
+      if (filters.types.length > 0) {
+        url.searchParams.append('types', filters.types.join(','));
+      }
+
+      console.log('Fetching properties with URL:', url.toString());
+      console.log('Current filters:', filters);
       
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error('Failed to fetch properties');
       }
-      return response.json();
+      const data = await response.json();
+      console.log('API Response:', {
+        totalProperties: data.length,
+        propertiesWithLocation: data.filter((p: any) => p.location).length,
+        firstProperty: data[0]
+      });
+      return data;
     },
     enabled: !!currentBounds
   });
@@ -124,6 +149,10 @@ export function useFieldMap() {
     // Bounds state
     currentBounds,
     setCurrentBounds,
+
+    // Filter state
+    filters,
+    setFilters,
 
     // Floor plan state
     floorPlans,

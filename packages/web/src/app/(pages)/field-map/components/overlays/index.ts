@@ -1,9 +1,4 @@
-export * from './FinePlacement';
-export * from './FloorControls';
-export * from './FloorPlanDialog';
-export * from './FloorPlanLayer';
-export * from './FloorPlanPlacement';
-export * from './ImageOverlay';
-export * from './RoughPlacement';
-export * from './ModeSelector';
-export * from './LayersControl';
+export { FloorPlanLayer } from './FloorPlanLayer';
+export { ModeSelector } from './ModeSelector';
+export { LayersControl } from './LayersControl';
+export { ActiveJobIndicator } from './ActiveJobIndicator';

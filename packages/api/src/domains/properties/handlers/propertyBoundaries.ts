@@ -4,6 +4,13 @@ import { logger } from '../../../utils/logger';
 
 interface PropertyResult {
     property_id: string;
+    name: string;
+    property_type: string;
+    status: string;
+    service_address_id: string;
+    billing_address_id: string;
+    created_at: Date;
+    updated_at: Date;
     boundary: {
         type: string;
         coordinates: number[][][];
@@ -43,10 +50,17 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
         }
 
         try {
-            // Build the query with OR conditions for filters
+            // Build the query with AND conditions for filters
             let query = `
                 SELECT 
                     p.property_id,
+                    p.name,
+                    p.property_type,
+                    p.status,
+                    p.service_address_id,
+                    p.billing_address_id,
+                    p.created_at,
+                    p.updated_at,
                     CASE 
                         WHEN ST_IsValid(p.boundary) THEN ST_AsGeoJSON(p.boundary)::json
                         ELSE NULL
@@ -59,23 +73,17 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
                 WHERE TRUE
             `;
             const queryParams: any[] = [];
-            const conditions = [];
 
             // Add status filter
             if (statuses.length > 0) {
                 queryParams.push(statuses);
-                conditions.push(`p.status = ANY($${queryParams.length})`);
+                query += ` AND p.status = ANY($${queryParams.length})`;
             }
 
-            // Add type filter
+            // Add type filter (using 'property_type' column)
             if (types.length > 0) {
                 queryParams.push(types);
-                conditions.push(`p.property_type = ANY($${queryParams.length})`);
-            }
-
-            // Add AND conditions if any exist
-            if (conditions.length > 0) {
-                query += ` AND (${conditions.join(' OR ')})`;
+                query += ` AND p.property_type = ANY($${queryParams.length})`;
             }
 
             // Add bounds condition
@@ -93,7 +101,8 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
 
             logger.info('Executing property query:', { 
                 query, 
-                paramCount: queryParams.length
+                paramCount: queryParams.length,
+                params: queryParams
             });
 
             const result = await AppDataSource.query(query, queryParams);
@@ -110,6 +119,13 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
                 )
                 .map((property: PropertyResult) => ({
                     property_id: property.property_id,
+                    name: property.name,
+                    type: property.property_type,
+                    status: property.status,
+                    service_address_id: property.service_address_id,
+                    billing_address_id: property.billing_address_id,
+                    created_at: property.created_at,
+                    updated_at: property.updated_at,
                     boundary: property.boundary ? {
                         type: 'Feature',
                         geometry: property.boundary,

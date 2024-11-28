@@ -1,225 +1,257 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Layer, Source, useMap } from 'react-map-gl';
+import React, { useCallback, useEffect } from 'react';
+import { Source, Layer, useMap } from 'react-map-gl';
+import type { FillLayer, LineLayer } from 'react-map-gl';
 import { useQuery } from '@tanstack/react-query';
 import { ENV_CONFIG } from '../../../../../app/config/environment';
 
-interface PropertyFilters {
-  statuses: string[];
-  types: string[];
-}
-
 interface PropertyBoundaryLayerProps {
   bounds: [number, number, number, number];
-  filters: PropertyFilters;
-  onPropertyClick?: (propertyId: string, location: [number, number]) => void;
+  filters: {
+    statuses: string[];
+    types: string[];
+  };
+  onPropertyClick: (propertyId: string, coordinates: [number, number]) => void;
+  activePropertyId?: string;
+  highlightColor?: string;
 }
 
-interface PropertyWithBoundary {
+interface PropertyResponse {
   property_id: string;
-  boundary: GeoJSON.Feature | null;
-  location: GeoJSON.Feature | null;
+  boundary: {
+    type: 'Feature';
+    geometry: any;
+    properties: {
+      property_id: string;
+    };
+  } | null;
+  location: {
+    type: 'Feature';
+    geometry: any;
+    properties: {
+      property_id: string;
+    };
+  } | null;
 }
 
-const LAYER_IDS = {
-  fill: 'property-boundary-fill',
-  outline: 'property-boundary-outline',
-  marker: 'property-boundary-marker'
-};
+const defaultColor = '#4CAF50'; // Green color for properties
+const defaultOpacity = 0.2;
+const activeOpacity = 0.4;
 
-export function PropertyBoundaryLayer({ bounds, filters, onPropertyClick }: PropertyBoundaryLayerProps) {
-  const { current: map } = useMap();
-  const [layersLoaded, setLayersLoaded] = useState(false);
-  const [polygonGeojson, setPolygonGeojson] = useState<GeoJSON.FeatureCollection>({
-    type: 'FeatureCollection',
-    features: []
-  });
+export function PropertyBoundaryLayer({
+  bounds,
+  filters,
+  onPropertyClick,
+  activePropertyId,
+  highlightColor = '#4CAF50'
+}: PropertyBoundaryLayerProps) {
+  const { current: mapRef } = useMap();
 
-  const [pointGeojson, setPointGeojson] = useState<GeoJSON.FeatureCollection>({
-    type: 'FeatureCollection',
-    features: []
-  });
-
-  // Query properties with filters within bounds
-  const { data: propertiesWithBoundaries } = useQuery({
-    queryKey: ['propertiesWithBoundaries', bounds, filters],
+  // Query property boundaries within the current map bounds
+  const { data: properties } = useQuery({
+    queryKey: ['property-boundaries', bounds, filters],
     queryFn: async () => {
-      const [minLng, minLat, maxLng, maxLat] = bounds;
-      const params = new URLSearchParams({
-        bounds: `${minLng},${minLat},${maxLng},${maxLat}`
-      });
+      try {
+        const [minLng, minLat, maxLng, maxLat] = bounds;
+        const params = new URLSearchParams();
+        
+        // Add bounds
+        params.append('bounds', `${minLng},${minLat},${maxLng},${maxLat}`);
+        
+        // Add filters
+        if (filters.statuses.length > 0) {
+          params.append('statuses', filters.statuses.join(','));
+        }
+        if (filters.types.length > 0) {
+          params.append('types', filters.types.join(','));
+        }
 
-      // Add filters if they exist
-      if (filters.statuses.length > 0) {
-        params.append('statuses', filters.statuses.join(','));
-      }
-      if (filters.types.length > 0) {
-        params.append('types', filters.types.join(','));
-      }
+        console.log('Fetching boundaries with params:', params.toString());
 
-      const response = await fetch(`${ENV_CONFIG.api.baseUrl}/properties/boundaries?${params}`);
-      if (!response.ok) {
-        console.error('Failed to fetch property boundaries:', response.statusText);
-        throw new Error('Failed to fetch property boundaries');
+        const response = await fetch(
+          `${ENV_CONFIG.api.baseUrl}/properties/boundaries?${params}`
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch property boundaries');
+        }
+
+        const data: PropertyResponse[] = await response.json();
+        console.log('Received properties:', data);
+
+        // Convert to GeoJSON FeatureCollection
+        const features = data
+          .filter(property => property.boundary)
+          .map(property => property.boundary);
+
+        return {
+          type: 'FeatureCollection',
+          features: features
+        };
+      } catch (error) {
+        console.error('Error fetching boundaries:', error);
+        return {
+          type: 'FeatureCollection',
+          features: []
+        };
       }
-      return response.json() as Promise<PropertyWithBoundary[]>;
     },
-    enabled: bounds.length === 4
+    // Ensure we have valid bounds before fetching
+    enabled: bounds.every(coord => typeof coord === 'number' && !isNaN(coord))
   });
 
-  // Update GeoJSON when properties data changes
-  useEffect(() => {
-    if (!propertiesWithBoundaries) return;
+  const handleClick = useCallback((event: mapboxgl.MapMouseEvent) => {
+    if (!mapRef) return;
 
-    // Create polygon features from boundaries
-    const polygonFeatures = propertiesWithBoundaries
-      .filter(property => property.boundary)
-      .map(property => property.boundary!);
-
-    // Create point features from locations
-    const pointFeatures = propertiesWithBoundaries
-      .filter(property => property.location)
-      .map(property => property.location!);
-
-    setPolygonGeojson({
-      type: 'FeatureCollection',
-      features: polygonFeatures
+    const features = mapRef.queryRenderedFeatures(event.point, {
+      layers: ['property-boundaries-interaction']
     });
 
-    setPointGeojson({
-      type: 'FeatureCollection',
-      features: pointFeatures
-    });
-  }, [propertiesWithBoundaries]);
+    const feature = features[0];
+    if (!feature) return;
 
-  // Monitor layer loading
+    const propertyId = feature.properties?.property_id;
+    const [lng, lat] = (feature.properties?.centroid as string).split(',').map(Number);
+    
+    onPropertyClick(propertyId, [lng, lat]);
+  }, [mapRef, onPropertyClick]);
+
   useEffect(() => {
-    if (!map) return;
+    if (!mapRef) return;
 
-    const checkLayers = () => {
-      const hasLayers = [LAYER_IDS.fill, LAYER_IDS.marker].every(id => {
-        try {
-          return map.getLayer(id);
-        } catch {
-          return false;
-        }
-      });
-      console.log('Checking layers:', hasLayers);
-      setLayersLoaded(hasLayers);
-    };
-
-    map.on('styledata', checkLayers);
-    checkLayers();
+    mapRef.on('click', handleClick);
 
     return () => {
-      map.off('styledata', checkLayers);
+      mapRef.off('click', handleClick);
     };
-  }, [map]);
+  }, [mapRef, handleClick]);
 
-  // Set up click handler
+  // Basic styles for all properties
+  const layerStyle: FillLayer = {
+    id: 'property-boundaries-fill',
+    type: 'fill',
+    source: 'property-boundaries',
+    paint: {
+      'fill-color': [
+        'case',
+        ['==', ['get', 'property_id'], activePropertyId || ''],
+        highlightColor,
+        defaultColor
+      ],
+      'fill-opacity': [
+        'case',
+        ['==', ['get', 'property_id'], activePropertyId || ''],
+        activeOpacity,
+        defaultOpacity
+      ]
+    }
+  };
+
+  const outlineStyle: LineLayer = {
+    id: 'property-boundaries-outline',
+    type: 'line',
+    source: 'property-boundaries',
+    paint: {
+      'line-color': [
+        'case',
+        ['==', ['get', 'property_id'], activePropertyId || ''],
+        highlightColor,
+        defaultColor
+      ],
+      'line-width': [
+        'case',
+        ['==', ['get', 'property_id'], activePropertyId || ''],
+        3,
+        1
+      ]
+    }
+  };
+
+  const interactionStyle: FillLayer = {
+    id: 'property-boundaries-interaction',
+    type: 'fill',
+    source: 'property-boundaries',
+    paint: {
+      'fill-opacity': 0
+    }
+  };
+
+  // Add pulsing animation only for active property
   useEffect(() => {
-    if (!map || !onPropertyClick || !layersLoaded) return;
+    if (!mapRef || !activePropertyId) return;
 
-    const handleClick = (e: mapboxgl.MapMouseEvent) => {
-      const features = map.queryRenderedFeatures(e.point, {
-        layers: [LAYER_IDS.fill, LAYER_IDS.marker]
-      });
+    const map = mapRef.getMap();
+    const startTime = performance.now();
+    let animationFrameId: number;
 
-      if (features.length > 0) {
-        const feature = features[0];
-        const propertyId = feature.properties?.property_id;
-        const geometry = feature.geometry;
+    const animate = () => {
+      const currentTime = performance.now();
+      const elapsed = (currentTime - startTime) / 1000;
+      const pulse = (Math.sin(elapsed * 2) + 1) / 2; // Faster pulse
 
-        if (propertyId && geometry) {
-          console.log('Property boundary clicked:', propertyId, 'with geometry:', geometry);
-          // For points, use the point coordinates
-          // For polygons, use the centroid or first coordinate
-          let coordinates: [number, number];
-          if (geometry.type === 'Point') {
-            coordinates = (geometry as GeoJSON.Point).coordinates as [number, number];
-          } else {
-            // For polygons, use the first coordinate of the first ring
-            coordinates = ((geometry as GeoJSON.Polygon).coordinates[0][0]) as [number, number];
-          }
-          onPropertyClick(propertyId, coordinates);
-        }
+      try {
+        // Update opacity for active property
+        map.setPaintProperty(
+          'property-boundaries-fill',
+          'fill-opacity',
+          [
+            'case',
+            ['==', ['get', 'property_id'], activePropertyId],
+            defaultOpacity + (pulse * 0.3), // Pulse between default and higher opacity
+            defaultOpacity // Default opacity for other properties
+          ]
+        );
+
+        // Update line width for active property
+        map.setPaintProperty(
+          'property-boundaries-outline',
+          'line-width',
+          [
+            'case',
+            ['==', ['get', 'property_id'], activePropertyId],
+            2 + (pulse * 2), // Pulse between 2 and 4
+            1
+          ]
+        );
+
+        animationFrameId = requestAnimationFrame(animate);
+      } catch (error) {
+        console.error('Error updating property styles:', error);
       }
     };
 
-    // Add cursor style changes
-    const handleMouseEnter = () => {
-      map.getCanvas().style.cursor = 'pointer';
-    };
-
-    const handleMouseLeave = () => {
-      map.getCanvas().style.cursor = '';
-    };
-
-    // Add event listeners
-    map.on('click', LAYER_IDS.fill, handleClick);
-    map.on('click', LAYER_IDS.marker, handleClick);
-    map.on('mouseenter', LAYER_IDS.fill, handleMouseEnter);
-    map.on('mouseleave', LAYER_IDS.fill, handleMouseLeave);
-    map.on('mouseenter', LAYER_IDS.marker, handleMouseEnter);
-    map.on('mouseleave', LAYER_IDS.marker, handleMouseLeave);
+    animate();
 
     return () => {
-      map.off('click', LAYER_IDS.fill, handleClick);
-      map.off('click', LAYER_IDS.marker, handleClick);
-      map.off('mouseenter', LAYER_IDS.fill, handleMouseEnter);
-      map.off('mouseleave', LAYER_IDS.fill, handleMouseLeave);
-      map.off('mouseenter', LAYER_IDS.marker, handleMouseEnter);
-      map.off('mouseleave', LAYER_IDS.marker, handleMouseLeave);
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      try {
+        // Reset to default styles
+        map.setPaintProperty('property-boundaries-fill', 'fill-opacity', defaultOpacity);
+        map.setPaintProperty('property-boundaries-outline', 'line-width', 1);
+      } catch (error) {
+        console.error('Error resetting property styles:', error);
+      }
     };
-  }, [map, onPropertyClick, layersLoaded]);
+  }, [mapRef, activePropertyId]);
+
+  if (!properties) {
+    console.warn('No property data available');
+    return null;
+  }
 
   return (
-    <>
-      {/* Polygon Source */}
-      <Source 
-        id="property-boundary-source" 
-        type="geojson" 
-        data={polygonGeojson}
-      >
-        {/* Polygon fill layer */}
-        <Layer
-          id={LAYER_IDS.fill}
-          type="fill"
-          paint={{
-            'fill-color': '#4caf50',
-            'fill-opacity': 0.2
-          }}
-        />
-        {/* Polygon outline layer */}
-        <Layer
-          id={LAYER_IDS.outline}
-          type="line"
-          paint={{
-            'line-color': '#4caf50',
-            'line-width': 2
-          }}
-        />
-      </Source>
-
-      {/* Point Source */}
-      <Source 
-        id="property-boundary-point-source" 
-        type="geojson" 
-        data={pointGeojson}
-      >
-        {/* Marker layer */}
-        <Layer
-          id={LAYER_IDS.marker}
-          type="circle"
-          paint={{
-            'circle-radius': 6,
-            'circle-color': '#4caf50',
-            'circle-stroke-width': 2,
-            'circle-stroke-color': '#fff'
-          }}
-        />
-      </Source>
-    </>
+    <Source
+      id="property-boundaries"
+      type="geojson"
+      data={properties}
+      generateId={true}
+    >
+      <Layer {...layerStyle} />
+      <Layer {...outlineStyle} />
+      <Layer {...interactionStyle} />
+    </Source>
   );
 }
