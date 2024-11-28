@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ViewState } from 'react-map-gl';
 import { ENV_CONFIG } from '../config/environment';
 import type { Property } from '../globalTypes/property';
 import mapboxgl from 'mapbox-gl';
+import debounce from 'lodash/debounce';
 
 interface SelectedProperty {
   id: string;
@@ -35,10 +36,10 @@ interface Filters {
   types: string[];
 }
 
-const INITIAL_VIEW_STATE: ViewState = {
-  longitude: -123.1207,
+const DEFAULT_VIEW_STATE: ViewState = {
+  longitude: -123.1207, // Vancouver
   latitude: 49.2827,
-  zoom: 11,
+  zoom: 10,
   pitch: 0,
   bearing: 0,
   padding: { top: 0, bottom: 0, left: 0, right: 0 }
@@ -46,7 +47,7 @@ const INITIAL_VIEW_STATE: ViewState = {
 
 export function useFieldMap() {
   const queryClient = useQueryClient();
-  const [viewState, setViewState] = useState<ViewState>(INITIAL_VIEW_STATE);
+  const [viewState, setViewState] = useState<ViewState>(DEFAULT_VIEW_STATE);
   const [selectedProperty, setSelectedProperty] = useState<SelectedProperty | null>(null);
   const [currentBounds, setCurrentBounds] = useState<[number, number, number, number] | null>(null);
   const [floorPlans, setFloorPlans] = useState<FloorPlan[]>([]);
@@ -54,6 +55,101 @@ export function useFieldMap() {
   const [placementState, setPlacementState] = useState<PlacementState | null>(null);
   const [filters, setFilters] = useState<Filters>({ statuses: ['active'], types: [] });
   const mapRef = useRef<mapboxgl.Map | null>(null);
+  const locationInitializedRef = useRef(false);
+
+  // Initialize location on mount
+  useEffect(() => {
+    if (locationInitializedRef.current) return;
+    locationInitializedRef.current = true;
+
+    const initializeLocation = async () => {
+      try {
+        const permission = await navigator.permissions.query({ name: 'geolocation' });
+        
+        if (permission.state === 'granted') {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              setViewState(prev => ({
+                ...prev,
+                longitude: position.coords.longitude,
+                latitude: position.coords.latitude,
+                zoom: 14
+              }));
+            },
+            () => {
+              // On error, keep default view state
+              console.warn('Failed to get location, using default view');
+            },
+            { 
+              enableHighAccuracy: true,
+              timeout: 5000
+            }
+          );
+        } else if (permission.state === 'prompt') {
+          // Wait for user to respond to permission prompt
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              setViewState(prev => ({
+                ...prev,
+                longitude: position.coords.longitude,
+                latitude: position.coords.latitude,
+                zoom: 14
+              }));
+            },
+            () => {
+              // User denied or error occurred, keep default view state
+              console.warn('Location permission denied, using default view');
+            },
+            { 
+              enableHighAccuracy: true,
+              timeout: 5000
+            }
+          );
+        }
+        // If denied, keep default view state
+      } catch (error) {
+        console.warn('Error checking location permission:', error);
+      }
+    };
+
+    initializeLocation();
+  }, []);
+
+  // Padded bounds for smoother loading
+  const paddedBounds = useMemo(() => {
+    if (!currentBounds) return null;
+    const padding = 0.005; // ~500m at equator
+    const [west, south, east, north] = currentBounds;
+    return [
+      Number((west - padding).toFixed(6)),
+      Number((south - padding).toFixed(6)),
+      Number((east + padding).toFixed(6)),
+      Number((north + padding).toFixed(6))
+    ];
+  }, [currentBounds]);
+
+  // Debounced bounds setter with proper memoization
+  const debouncedSetBounds = useCallback(
+    debounce((bounds: [number, number, number, number]) => {
+      if (!bounds || bounds.some(isNaN)) {
+        console.warn('Invalid bounds detected:', bounds);
+        return;
+      }
+      setCurrentBounds(bounds.map(coord => Number(Number(coord).toFixed(6))) as [number, number, number, number]);
+    }, 500),
+    []
+  );
+
+  // Query key factory for better cache management
+  const queryKey = useMemo(() => {
+    if (!paddedBounds) return ['properties', null];
+    return [
+      'properties',
+      paddedBounds.join(','),
+      filters.statuses.join(','),
+      filters.types.join(',')
+    ];
+  }, [paddedBounds, filters]);
 
   // Fetch properties within bounds
   const {
@@ -61,39 +157,59 @@ export function useFieldMap() {
     isLoading,
     error
   } = useQuery({
-    queryKey: ['properties', currentBounds, filters],
+    queryKey,
     queryFn: async () => {
-      if (!currentBounds) return [];
+      if (!paddedBounds || paddedBounds.some(isNaN)) return [];
       
-      const url = new URL(`${ENV_CONFIG.api.baseUrl}/properties/boundaries`);
-      
-      // Add bounds
-      url.searchParams.set('bounds', currentBounds.join(','));
-      
-      // Add filters
-      if (filters.statuses.length > 0) {
-        url.searchParams.append('statuses', filters.statuses.join(','));
-      }
-      if (filters.types.length > 0) {
-        url.searchParams.append('types', filters.types.join(','));
+      // If no filters are active, return empty array
+      if (filters.statuses.length === 0 && filters.types.length === 0) {
+        return [];
       }
 
-      console.log('Fetching properties with URL:', url.toString());
-      console.log('Current filters:', filters);
+      const params = new URLSearchParams();
+      params.append('bounds', paddedBounds.join(','));
       
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error('Failed to fetch properties');
+      if (filters.statuses.length > 0) {
+        params.append('statuses', filters.statuses.join(','));
       }
-      const data = await response.json();
-      console.log('API Response:', {
-        totalProperties: data.length,
-        propertiesWithLocation: data.filter((p: any) => p.location).length,
-        firstProperty: data[0]
-      });
-      return data;
+      if (filters.types.length > 0) {
+        params.append('types', filters.types.join(','));
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+      try {
+        const response = await fetch(
+          `${ENV_CONFIG.api.baseUrl}/properties?${params.toString()}`,
+          { signal: controller.signal }
+        );
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch properties');
+        }
+
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          console.warn('Property fetch aborted');
+          return [];
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeoutId);
+      }
     },
-    enabled: !!currentBounds
+    staleTime: 30000,
+    cacheTime: 5 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    gcTime: 1000 // Cleanup queries quickly after unmount
   });
 
   // Floor plan mutations
@@ -148,7 +264,7 @@ export function useFieldMap() {
 
     // Bounds state
     currentBounds,
-    setCurrentBounds,
+    setCurrentBounds: debouncedSetBounds,
 
     // Filter state
     filters,

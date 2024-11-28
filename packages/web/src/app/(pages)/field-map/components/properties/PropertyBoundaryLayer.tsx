@@ -49,46 +49,65 @@ export function PropertyBoundaryLayer({
   const { current: mapRef } = useMap();
 
   // Query property boundaries within the current map bounds
-  const { data: properties } = useQuery({
+  const { data: properties, isLoading } = useQuery({
     queryKey: ['property-boundaries', bounds, filters],
     queryFn: async () => {
       try {
-        const [minLng, minLat, maxLng, maxLat] = bounds;
-        const params = new URLSearchParams();
-        
-        // Add bounds
-        params.append('bounds', `${minLng},${minLat},${maxLng},${maxLat}`);
-        
-        // Add filters
-        if (filters.statuses.length > 0) {
-          params.append('statuses', filters.statuses.join(','));
-        }
-        if (filters.types.length > 0) {
-          params.append('types', filters.types.join(','));
+        // If no filters are active, return empty collection
+        if (filters.statuses.length === 0 && filters.types.length === 0) {
+          return {
+            type: 'FeatureCollection',
+            features: []
+          };
         }
 
-        console.log('Fetching boundaries with params:', params.toString());
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-        const response = await fetch(
-          `${ENV_CONFIG.api.baseUrl}/properties/boundaries?${params}`
-        );
+        try {
+          const params = new URLSearchParams();
+          params.append('bounds', bounds.map(coord => Number(coord.toFixed(6))).join(','));
+          
+          if (filters.statuses.length > 0) {
+            params.append('statuses', filters.statuses.join(','));
+          }
+          if (filters.types.length > 0) {
+            params.append('types', filters.types.join(','));
+          }
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch property boundaries');
+          const response = await fetch(
+            `${ENV_CONFIG.api.baseUrl}/properties/boundaries?${params}`,
+            { signal: controller.signal }
+          );
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            throw new Error('Failed to fetch property boundaries');
+          }
+
+          const data: PropertyResponse[] = await response.json();
+          
+          const features = data
+            .filter(property => property.boundary)
+            .map(property => property.boundary);
+
+          return {
+            type: 'FeatureCollection',
+            features: features
+          };
+        } catch (error) {
+          if (error.name === 'AbortError') {
+            console.warn('Boundary fetch aborted');
+            return {
+              type: 'FeatureCollection',
+              features: []
+            };
+          }
+          throw error;
+        } finally {
+          clearTimeout(timeoutId);
         }
-
-        const data: PropertyResponse[] = await response.json();
-        console.log('Received properties:', data);
-
-        // Convert to GeoJSON FeatureCollection
-        const features = data
-          .filter(property => property.boundary)
-          .map(property => property.boundary);
-
-        return {
-          type: 'FeatureCollection',
-          features: features
-        };
       } catch (error) {
         console.error('Error fetching boundaries:', error);
         return {
@@ -97,35 +116,65 @@ export function PropertyBoundaryLayer({
         };
       }
     },
-    // Ensure we have valid bounds before fetching
-    enabled: bounds.every(coord => typeof coord === 'number' && !isNaN(coord))
+    staleTime: 30000,
+    cacheTime: 5 * 60 * 1000,
+    enabled: bounds.every(coord => typeof coord === 'number' && !isNaN(coord)),
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    gcTime: 1000
   });
 
-  const handleClick = useCallback((event: mapboxgl.MapMouseEvent) => {
-    if (!mapRef) return;
-
-    const features = mapRef.queryRenderedFeatures(event.point, {
-      layers: ['property-boundaries-interaction']
-    });
-
-    const feature = features[0];
-    if (!feature) return;
-
-    const propertyId = feature.properties?.property_id;
-    const [lng, lat] = (feature.properties?.centroid as string).split(',').map(Number);
-    
-    onPropertyClick(propertyId, [lng, lat]);
-  }, [mapRef, onPropertyClick]);
-
+  // Wait for layer to be loaded before adding click handler
   useEffect(() => {
     if (!mapRef) return;
+    
+    const map = mapRef.getMap();
+    let isLayerLoaded = false;
 
-    mapRef.on('click', handleClick);
+    const handleClick = (event: mapboxgl.MapMouseEvent) => {
+      try {
+        const features = map.queryRenderedFeatures(event.point, {
+          layers: ['property-boundaries-fill']
+        });
+
+        const feature = features[0];
+        if (!feature) return;
+
+        const propertyId = feature.properties?.property_id;
+        if (!propertyId) return;
+
+        // Get the centroid from the feature's geometry
+        const coordinates = feature.geometry.type === 'Point' 
+          ? feature.geometry.coordinates
+          : map.project(event.lngLat);
+
+        onPropertyClick(propertyId, coordinates);
+      } catch (error) {
+        console.error('Error handling property click:', error);
+      }
+    };
+
+    const setupClickHandler = () => {
+      if (isLayerLoaded) return;
+      
+      if (map.getLayer('property-boundaries-fill')) {
+        isLayerLoaded = true;
+        map.on('click', handleClick);
+      }
+    };
+
+    // Check if layer exists immediately
+    setupClickHandler();
+
+    // Also listen for layer addition
+    map.on('sourcedata', setupClickHandler);
 
     return () => {
-      mapRef.off('click', handleClick);
+      map.off('click', handleClick);
+      map.off('sourcedata', setupClickHandler);
     };
-  }, [mapRef, handleClick]);
+  }, [mapRef, onPropertyClick]);
 
   // Basic styles for all properties
   const layerStyle: FillLayer = {
@@ -237,8 +286,8 @@ export function PropertyBoundaryLayer({
     };
   }, [mapRef, activePropertyId]);
 
-  if (!properties) {
-    console.warn('No property data available');
+  // Don't render anything if no filters are active
+  if (!properties || (filters.statuses.length === 0 && filters.types.length === 0)) {
     return null;
   }
 

@@ -37,7 +37,7 @@ export function FieldMap() {
     selectedProperty,
     setSelectedProperty,
     currentBounds,
-    setCurrentBounds,
+    setCurrentBounds: debouncedSetBounds,
     properties,
     isLoading,
     filters,
@@ -47,9 +47,10 @@ export function FieldMap() {
   const { activeJob, activeProperty } = useActiveJobContext();
 
   const handleMoveEnd = useCallback(async (bounds: [number, number, number, number]) => {
+    if (bounds.some(isNaN)) return;
     console.log('Map bounds updated:', bounds);
-    setCurrentBounds(bounds);
-  }, [setCurrentBounds]);
+    debouncedSetBounds(bounds);
+  }, [debouncedSetBounds]);
 
   const handleLocationUpdate = useCallback((coords: [number, number]) => {
     console.log('Location update received in FieldMap:', coords);
@@ -62,8 +63,13 @@ export function FieldMap() {
   }, []);
 
   const handlePropertyFiltersChange = useCallback((newFilters: typeof filters) => {
-    console.log('Property filters updated:', newFilters);
-    setFilters(newFilters);
+    // Ensure we always have arrays, even if empty
+    const sanitizedFilters = {
+      statuses: newFilters.statuses || [],
+      types: newFilters.types || []
+    };
+    console.log('Property filters updated:', sanitizedFilters);
+    setFilters(sanitizedFilters);
   }, [setFilters]);
 
   const handleModeChange = useCallback((mode: Mode) => {

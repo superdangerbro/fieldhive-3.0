@@ -48,26 +48,7 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
   const { viewState, setViewState, mapRef } = useFieldMap();
   const geolocateControlRef = useRef<mapboxgl.GeolocateControl>(null);
   const [isTracking, setIsTracking] = useState(false);
-  const mapInitializedRef = useRef(false);
-
-  // Set initial bounds when map loads
-  useEffect(() => {
-    const map = (ref as React.RefObject<MapRef>)?.current;
-    if (map && !mapInitializedRef.current && onMoveEnd) {
-      mapInitializedRef.current = true;
-      const bounds = map.getBounds();
-      if (bounds) {
-        const boundsArray: [number, number, number, number] = [
-          bounds.getWest(),
-          bounds.getSouth(),
-          bounds.getEast(),
-          bounds.getNorth()
-        ];
-        console.log('Setting initial bounds:', boundsArray);
-        onMoveEnd(boundsArray);
-      }
-    }
-  }, [ref, onMoveEnd]);
+  const lastBoundsRef = useRef('');
 
   // Synchronize refs
   useEffect(() => {
@@ -83,7 +64,6 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
   useEffect(() => {
     const timer = setTimeout(() => {
       if (geolocateControlRef.current) {
-        console.log('Automatically triggering location tracking');
         geolocateControlRef.current.trigger();
       }
     }, 1000);
@@ -107,10 +87,14 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
       bounds.getEast(),
       bounds.getNorth()
     ];
-    
-    console.log('Map moved, new bounds:', boundsArray);
-    onMoveEnd(boundsArray);
-  }, [onMoveEnd, ref]);
+
+    // Only trigger if bounds have actually changed
+    const boundsString = boundsArray.map(n => Number(n).toFixed(6)).join(',');
+    if (boundsString !== lastBoundsRef.current) {
+      lastBoundsRef.current = boundsString;
+      onMoveEnd(boundsArray);
+    }
+  }, [ref, onMoveEnd]);
 
   const handleMove = useCallback((evt: { viewState: typeof viewState }) => {
     console.log('View state updated:', evt.viewState);
@@ -200,7 +184,6 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
         mapStyle="mapbox://styles/mapbox/dark-v10"
         onMove={handleMove}
         onMoveEnd={handleMoveEnd}
-        onLoad={handleMoveEnd}
         attributionControl={false}
         style={{
           width: '100%',
@@ -213,24 +196,32 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
           trackUserLocation
           showUserHeading
           showAccuracyCircle={false}
-          positionOptions={{ enableHighAccuracy: true }}
+          positionOptions={{ enableHighAccuracy: true, timeout: 5000 }}
           fitBoundsOptions={{
-            maxZoom: 12, // Limit initial zoom level
-            linear: true, // Use linear easing for smoother animation
-            duration: 1000 // 1 second animation
+            zoom: 14,
+            maxZoom: 14,
+            minZoom: 14,
+            linear: true,
+            duration: 1000,
+            padding: 50
           }}
           onTrackUserLocationStart={() => {
-            console.log('Location tracking started');
             setIsTracking(true);
             onTrackingStart?.();
           }}
           onTrackUserLocationEnd={() => {
-            console.log('Location tracking ended');
             setIsTracking(false);
             onTrackingEnd?.();
           }}
           onGeolocate={(e: { coords: { longitude: number; latitude: number } }) => {
-            console.log('Location updated:', e.coords);
+            setViewState(prev => ({
+              ...prev,
+              longitude: e.coords.longitude,
+              latitude: e.coords.latitude,
+              zoom: 14,
+              bearing: 0,
+              pitch: 0
+            }));
             if (onLocationUpdate) {
               onLocationUpdate([e.coords.longitude, e.coords.latitude]);
             }

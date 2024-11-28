@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import type { MapRef } from 'react-map-gl';
 import type { BoundsArray } from '../types';
 
@@ -53,11 +53,28 @@ export function useMapBounds(
   const updateBounds = useCallback(() => {
     const bounds = calculateBounds();
     if (bounds) {
-      console.log('Updating bounds:', bounds);
-      setCurrentBounds(bounds);
+      console.log('Calculating new bounds:', bounds);
       onBoundsChange?.(bounds);
     }
   }, [calculateBounds, onBoundsChange]);
+
+  // Set up map event listeners
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+
+    // Update bounds on relevant map events
+    map.on('moveend', updateBounds);
+    map.on('zoomend', updateBounds);
+
+    // Initial bounds calculation
+    updateBounds();
+
+    return () => {
+      map.off('moveend', updateBounds);
+      map.off('zoomend', updateBounds);
+    };
+  }, [mapRef, updateBounds]);
 
   /**
    * Check if a point is within current bounds
