@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { Source, Layer, useMap } from 'react-map-gl';
 import type { FillLayer, LineLayer } from 'react-map-gl';
 import { useQuery } from '@tanstack/react-query';
@@ -49,9 +49,9 @@ export function PropertyBoundaryLayer({
   const { current: mapRef } = useMap();
 
   // Query property boundaries within the current map bounds
-  const { data: properties, isLoading } = useQuery({
+  const { data: boundaries, isLoading, isPending } = useQuery({
     queryKey: ['property-boundaries', bounds, filters],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       try {
         // If no filters are active, return empty collection
         if (filters.statuses.length === 0 && filters.types.length === 0) {
@@ -60,9 +60,6 @@ export function PropertyBoundaryLayer({
             features: []
           };
         }
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         try {
           const params = new URLSearchParams();
@@ -77,10 +74,8 @@ export function PropertyBoundaryLayer({
 
           const response = await fetch(
             `${ENV_CONFIG.api.baseUrl}/properties/boundaries?${params}`,
-            { signal: controller.signal }
+            { signal }
           );
-
-          clearTimeout(timeoutId);
 
           if (!response.ok) {
             throw new Error('Failed to fetch property boundaries');
@@ -99,14 +94,9 @@ export function PropertyBoundaryLayer({
         } catch (error) {
           if (error.name === 'AbortError') {
             console.warn('Boundary fetch aborted');
-            return {
-              type: 'FeatureCollection',
-              features: []
-            };
+            return null; // Return null to keep previous data
           }
           throw error;
-        } finally {
-          clearTimeout(timeoutId);
         }
       } catch (error) {
         console.error('Error fetching boundaries:', error);
@@ -122,8 +112,21 @@ export function PropertyBoundaryLayer({
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
-    gcTime: 1000
+    gcTime: 1000,
+    placeholderData: keepPreviousData => keepPreviousData,
+    retryDelay: 1000
   });
+
+  // Only update source data when we have new boundaries and they're not loading
+  const sourceData = useMemo(() => {
+    if (!boundaries || (filters.statuses.length === 0 && filters.types.length === 0)) {
+      return {
+        type: 'FeatureCollection',
+        features: []
+      };
+    }
+    return boundaries;
+  }, [boundaries, filters]);
 
   // Wait for layer to be loaded before adding click handler
   useEffect(() => {
@@ -287,7 +290,7 @@ export function PropertyBoundaryLayer({
   }, [mapRef, activePropertyId]);
 
   // Don't render anything if no filters are active
-  if (!properties || (filters.statuses.length === 0 && filters.types.length === 0)) {
+  if (!boundaries || (filters.statuses.length === 0 && filters.types.length === 0)) {
     return null;
   }
 
@@ -295,7 +298,7 @@ export function PropertyBoundaryLayer({
     <Source
       id="property-boundaries"
       type="geojson"
-      data={properties}
+      data={sourceData}
       generateId={true}
     >
       <Layer {...layerStyle} />

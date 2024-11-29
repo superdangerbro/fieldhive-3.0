@@ -70,6 +70,7 @@ export function useFieldMap() {
           navigator.geolocation.getCurrentPosition(
             (position) => {
               setViewState(prev => ({
+
                 ...prev,
                 longitude: position.coords.longitude,
                 latitude: position.coords.latitude,
@@ -90,6 +91,7 @@ export function useFieldMap() {
           navigator.geolocation.getCurrentPosition(
             (position) => {
               setViewState(prev => ({
+
                 ...prev,
                 longitude: position.coords.longitude,
                 latitude: position.coords.latitude,
@@ -155,10 +157,11 @@ export function useFieldMap() {
   const {
     data: properties = [],
     isLoading,
-    error
+    error,
+    isPending
   } = useQuery({
     queryKey,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!paddedBounds || paddedBounds.some(isNaN)) return [];
       
       // If no filters are active, return empty array
@@ -167,7 +170,7 @@ export function useFieldMap() {
       }
 
       const params = new URLSearchParams();
-      params.append('bounds', paddedBounds.join(','));
+      params.append('bounds', paddedBounds.map(coord => Number(coord.toFixed(6))).join(','));
       
       if (filters.statuses.length > 0) {
         params.append('statuses', filters.statuses.join(','));
@@ -176,16 +179,11 @@ export function useFieldMap() {
         params.append('types', filters.types.join(','));
       }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
       try {
         const response = await fetch(
           `${ENV_CONFIG.api.baseUrl}/properties?${params.toString()}`,
-          { signal: controller.signal }
+          { signal }
         );
-
-        clearTimeout(timeoutId);
 
         if (!response.ok) {
           throw new Error('Failed to fetch properties');
@@ -196,11 +194,9 @@ export function useFieldMap() {
       } catch (error) {
         if (error.name === 'AbortError') {
           console.warn('Property fetch aborted');
-          return [];
+          return null; // Return null to keep previous data
         }
         throw error;
-      } finally {
-        clearTimeout(timeoutId);
       }
     },
     staleTime: 30000,
@@ -209,7 +205,9 @@ export function useFieldMap() {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
-    gcTime: 1000 // Cleanup queries quickly after unmount
+    gcTime: 1000,
+    placeholderData: keepPreviousData => keepPreviousData,
+    retryDelay: 1000
   });
 
   // Floor plan mutations

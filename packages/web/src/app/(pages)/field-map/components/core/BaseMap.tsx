@@ -196,13 +196,17 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
           trackUserLocation
           showUserHeading
           showAccuracyCircle={false}
-          positionOptions={{ enableHighAccuracy: true, timeout: 5000 }}
+          positionOptions={{
+            enableHighAccuracy: true,
+            timeout: 2000,
+            maximumAge: 0
+          }}
           fitBoundsOptions={{
             zoom: 14,
             maxZoom: 14,
             minZoom: 14,
             linear: true,
-            duration: 1000,
+            duration: 500,
             padding: 50
           }}
           onTrackUserLocationStart={() => {
