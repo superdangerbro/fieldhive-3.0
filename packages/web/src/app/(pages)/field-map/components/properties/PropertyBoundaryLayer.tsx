@@ -53,7 +53,14 @@ export function PropertyBoundaryLayer({
     queryKey: ['property-boundaries', bounds, filters],
     queryFn: async ({ signal }) => {
       try {
-        // If no filters are active, return empty collection
+        // If no filters are active or bounds are invalid, return empty collection
+        if (!bounds || !Array.isArray(bounds) || bounds.length !== 4 || bounds.some(coord => typeof coord !== 'number' || isNaN(coord))) {
+          return {
+            type: 'FeatureCollection',
+            features: []
+          };
+        }
+
         if (filters.statuses.length === 0 && filters.types.length === 0) {
           return {
             type: 'FeatureCollection',
@@ -92,7 +99,7 @@ export function PropertyBoundaryLayer({
             features: features
           };
         } catch (error) {
-          if (error.name === 'AbortError') {
+          if (error instanceof Error && error.name === 'AbortError') {
             console.warn('Boundary fetch aborted');
             return null; // Return null to keep previous data
           }
@@ -108,7 +115,7 @@ export function PropertyBoundaryLayer({
     },
     staleTime: 30000,
     cacheTime: 5 * 60 * 1000,
-    enabled: bounds.every(coord => typeof coord === 'number' && !isNaN(coord)),
+    enabled: bounds && Array.isArray(bounds) && bounds.length === 4 && bounds.every(coord => typeof coord === 'number' && !isNaN(coord)),
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
@@ -147,11 +154,8 @@ export function PropertyBoundaryLayer({
         const propertyId = feature.properties?.property_id;
         if (!propertyId) return;
 
-        // Get the centroid from the feature's geometry
-        const coordinates = feature.geometry.type === 'Point' 
-          ? feature.geometry.coordinates
-          : map.project(event.lngLat);
-
+        // Use the click coordinates instead of trying to get centroid
+        const coordinates: [number, number] = [event.lngLat.lng, event.lngLat.lat];
         onPropertyClick(propertyId, coordinates);
       } catch (error) {
         console.error('Error handling property click:', error);
@@ -163,7 +167,7 @@ export function PropertyBoundaryLayer({
       
       if (map.getLayer('property-boundaries-fill')) {
         isLayerLoaded = true;
-        map.on('click', handleClick);
+        map.on('click', 'property-boundaries-fill', handleClick);
       }
     };
 
@@ -174,7 +178,7 @@ export function PropertyBoundaryLayer({
     map.on('sourcedata', setupClickHandler);
 
     return () => {
-      map.off('click', handleClick);
+      map.off('click', 'property-boundaries-fill', handleClick);
       map.off('sourcedata', setupClickHandler);
     };
   }, [mapRef, onPropertyClick]);

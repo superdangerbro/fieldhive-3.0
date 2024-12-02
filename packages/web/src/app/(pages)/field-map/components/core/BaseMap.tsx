@@ -64,7 +64,11 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
   useEffect(() => {
     const timer = setTimeout(() => {
       if (geolocateControlRef.current) {
-        geolocateControlRef.current.trigger();
+        try {
+          geolocateControlRef.current.trigger();
+        } catch (error) {
+          console.error('Failed to trigger geolocation:', error);
+        }
       }
     }, 1000);
 
@@ -75,58 +79,84 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
     const map = (ref as React.RefObject<MapRef>)?.current;
     if (!map || !onMoveEnd) return;
     
-    const bounds = map.getBounds();
-    if (!bounds) {
-      console.warn('Could not get map bounds');
-      return;
-    }
+    try {
+      const bounds = map.getBounds();
+      if (!bounds) {
+        console.warn('Could not get map bounds');
+        return;
+      }
 
-    const boundsArray: [number, number, number, number] = [
-      bounds.getWest(),
-      bounds.getSouth(),
-      bounds.getEast(),
-      bounds.getNorth()
-    ];
+      const boundsArray: [number, number, number, number] = [
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth()
+      ];
 
-    // Only trigger if bounds have actually changed
-    const boundsString = boundsArray.map(n => Number(n).toFixed(6)).join(',');
-    if (boundsString !== lastBoundsRef.current) {
-      lastBoundsRef.current = boundsString;
-      onMoveEnd(boundsArray);
+      // Only trigger if bounds have actually changed
+      const boundsString = boundsArray.map(n => Number(n).toFixed(6)).join(',');
+      if (boundsString !== lastBoundsRef.current) {
+        lastBoundsRef.current = boundsString;
+        onMoveEnd(boundsArray);
+      }
+    } catch (error) {
+      console.error('Error handling map move:', error);
     }
   }, [ref, onMoveEnd]);
 
   const handleMove = useCallback((evt: { viewState: typeof viewState }) => {
-    console.log('View state updated:', evt.viewState);
-    setViewState(evt.viewState);
+    try {
+      console.log('View state updated:', evt.viewState);
+      setViewState(evt.viewState);
+    } catch (error) {
+      console.error('Error updating view state:', error);
+    }
   }, [setViewState]);
 
   useEffect(() => {
     const onGeolocate = (e: { coords: { longitude: number; latitude: number } }) => {
+      console.log('Geolocate event:', e);
       setIsTracking(true);
       onTrackingStart?.();
+      setViewState(prev => ({
+        ...prev,
+        longitude: e.coords.longitude,
+        latitude: e.coords.latitude,
+        zoom: 14,
+        bearing: 0,
+        pitch: 0
+      }));
       if (onLocationUpdate) {
         onLocationUpdate([e.coords.longitude, e.coords.latitude]);
       }
     };
 
+    const onGeolocateError = (error: GeolocationPositionError) => {
+      console.warn('Geolocate error:', error);
+      setIsTracking(false);
+      onTrackingEnd?.();
+    };
+
     const onGeolocateEnd = () => {
+      console.log('Geolocate tracking ended');
       setIsTracking(false);
       onTrackingEnd?.();
     };
 
     if (geolocateControlRef.current) {
       geolocateControlRef.current.on('geolocate', onGeolocate);
+      geolocateControlRef.current.on('error', onGeolocateError);
       geolocateControlRef.current.on('trackuserlocationend', onGeolocateEnd);
     }
 
     return () => {
       if (geolocateControlRef.current) {
         geolocateControlRef.current.off('geolocate', onGeolocate);
+        geolocateControlRef.current.off('error', onGeolocateError);
         geolocateControlRef.current.off('trackuserlocationend', onGeolocateEnd);
       }
     };
-  }, [onTrackingStart, onTrackingEnd, onLocationUpdate]);
+  }, [onTrackingStart, onTrackingEnd, onLocationUpdate, setViewState]);
 
   return (
     <Box 
@@ -198,37 +228,14 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
           showAccuracyCircle={false}
           positionOptions={{
             enableHighAccuracy: true,
-            timeout: 2000,
+            timeout: 6000,
             maximumAge: 0
           }}
           fitBoundsOptions={{
-            zoom: 14,
             maxZoom: 14,
-            minZoom: 14,
             linear: true,
             duration: 500,
             padding: 50
-          }}
-          onTrackUserLocationStart={() => {
-            setIsTracking(true);
-            onTrackingStart?.();
-          }}
-          onTrackUserLocationEnd={() => {
-            setIsTracking(false);
-            onTrackingEnd?.();
-          }}
-          onGeolocate={(e: { coords: { longitude: number; latitude: number } }) => {
-            setViewState(prev => ({
-              ...prev,
-              longitude: e.coords.longitude,
-              latitude: e.coords.latitude,
-              zoom: 14,
-              bearing: 0,
-              pitch: 0
-            }));
-            if (onLocationUpdate) {
-              onLocationUpdate([e.coords.longitude, e.coords.latitude]);
-            }
           }}
         />
         {children}

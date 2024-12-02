@@ -142,73 +142,50 @@ export function useFieldMap() {
     []
   );
 
-  // Query key factory for better cache management
-  const queryKey = useMemo(() => {
-    if (!paddedBounds) return ['properties', null];
-    return [
-      'properties',
-      paddedBounds.join(','),
-      filters.statuses.join(','),
-      filters.types.join(',')
-    ];
-  }, [paddedBounds, filters]);
-
-  // Fetch properties within bounds
-  const {
-    data: properties = [],
-    isLoading,
-    error,
-    isPending
-  } = useQuery({
-    queryKey,
-    queryFn: async ({ signal }) => {
-      if (!paddedBounds || paddedBounds.some(isNaN)) return [];
-      
-      // If no filters are active, return empty array
-      if (filters.statuses.length === 0 && filters.types.length === 0) {
-        return [];
-      }
-
-      const params = new URLSearchParams();
-      params.append('bounds', paddedBounds.map(coord => Number(coord.toFixed(6))).join(','));
-      
-      if (filters.statuses.length > 0) {
-        params.append('statuses', filters.statuses.join(','));
-      }
-      if (filters.types.length > 0) {
-        params.append('types', filters.types.join(','));
+  // Query for properties within the current bounds
+  const { data: propertiesData, isLoading, error } = useQuery({
+    queryKey: ['properties', currentBounds, filters],
+    queryFn: async () => {
+      if (!currentBounds) {
+        return { properties: [] };
       }
 
       try {
-        const response = await fetch(
-          `${ENV_CONFIG.api.baseUrl}/properties?${params.toString()}`,
-          { signal }
-        );
+        const params = new URLSearchParams({
+          bounds: currentBounds.join(','),
+          ...(filters.statuses.length ? { statuses: filters.statuses.join(',') } : {}),
+          ...(filters.types.length ? { types: filters.types.join(',') } : {})
+        });
 
+        console.log('Fetching properties with params:', params.toString());
+        const response = await fetch(`${ENV_CONFIG.api.baseUrl}/properties?${params}`);
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch properties');
+          const errorText = await response.text();
+          throw new Error(`Failed to fetch properties: ${response.status} ${response.statusText}\n${errorText}`);
         }
 
         const data = await response.json();
+        console.log('Received properties:', data);
         return data;
-      } catch (error) {
-        if (error.name === 'AbortError') {
-          console.warn('Property fetch aborted');
-          return null; // Return null to keep previous data
-        }
-        throw error;
+      } catch (err) {
+        console.error('Error fetching properties:', err);
+        throw err instanceof Error ? err : new Error('Failed to fetch properties');
       }
     },
-    staleTime: 30000,
-    cacheTime: 5 * 60 * 1000,
-    retry: 1,
+    enabled: !!currentBounds,
+    staleTime: 30000, // Cache for 30 seconds
     refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    refetchOnMount: false,
-    gcTime: 1000,
-    placeholderData: keepPreviousData => keepPreviousData,
-    retryDelay: 1000
+    retry: (failureCount, error) => {
+      // Only retry network errors, not API errors
+      if (error instanceof Error && error.message.includes('Failed to fetch properties:')) {
+        return false;
+      }
+      return failureCount < 3;
+    }
   });
+
+  const properties = propertiesData?.properties || [];
 
   // Floor plan mutations
   const toggleFloorPlanVisibility = useCallback((id: string) => {
@@ -247,7 +224,6 @@ export function useFieldMap() {
     // Properties data
     properties,
     isLoading,
-    error,
 
     // View state
     viewState,

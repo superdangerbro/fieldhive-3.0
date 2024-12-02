@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -37,7 +37,7 @@ import type { Property } from '../../../../../app/globalTypes/property';
 interface SelectJobDialogProps {
   open: boolean;
   onClose: () => void;
-  onJobSelect: (job: Job) => void;
+  onJobSelect?: (job: Job) => void;
   userLocation?: [number, number];
 }
 
@@ -47,7 +47,23 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [activeTab, setActiveTab] = useState<TabValue>('nearby');
   const [searchTerm, setSearchTerm] = useState('');
-  const { setActiveJob, setActiveProperty } = useActiveJobContext();
+  const { setActiveJob, setActiveProperty, activeProperty } = useActiveJobContext();
+
+  // If we already have an activeProperty from the map, use it immediately
+  useEffect(() => {
+    if (open && activeProperty && !selectedProperty) {
+      setSelectedProperty(activeProperty);
+    }
+  }, [open, activeProperty, selectedProperty]);
+
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setSearchTerm('');
+      setActiveTab('nearby');
+      // Don't reset selectedProperty here as it should persist
+    }
+  }, [open]);
 
   // Query for nearby properties
   const {
@@ -57,37 +73,20 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
   } = useQuery({
     queryKey: ['nearby-properties', userLocation],
     queryFn: async () => {
-      console.log('Fetching nearby properties with location:', userLocation);
-      if (!userLocation) {
-        console.warn('No user location available');
-        return [];
-      }
-      
       // Create a bounding box around the user's location (2km radius ≈ 0.02 degrees)
       const radius = 0.02;
+      const [longitude, latitude] = userLocation || [0, 0];
       const params = new URLSearchParams({
-        bounds: `${userLocation[0] - radius},${userLocation[1] - radius},${userLocation[0] + radius},${userLocation[1] + radius}`
+        bounds: `${longitude - radius},${latitude - radius},${longitude + radius},${latitude + radius}`
       });
 
-      const url = `${ENV_CONFIG.api.baseUrl}/properties/with-active-jobs?${params}`;
-      console.log('Fetching from URL:', url);
-
-      try {
-        const response = await fetch(url);
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Failed to fetch nearby properties:', errorText);
-          throw new Error(`Failed to fetch nearby properties: ${errorText}`);
-        }
-        const data = await response.json();
-        console.log('Received nearby properties:', data);
-        return data;
-      } catch (error) {
-        console.error('Error fetching nearby properties:', error);
-        throw error;
-      }
+      const url = `${ENV_CONFIG.api.baseUrl}/properties?${params}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      return data.properties || [];
     },
-    enabled: !!userLocation && open && activeTab === 'nearby'
+    enabled: open && activeTab === 'nearby',
+    staleTime: 30000
   });
 
   // Query for searched properties
@@ -141,53 +140,61 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
 
   const handlePropertyClick = useCallback((property: Property) => {
     setSelectedProperty(property);
-  }, []);
+    setActiveProperty(property);
+  }, [setActiveProperty]);
 
-  const handleJobClick = useCallback((job: Job) => {
-    // Set the active job context
+  const handleJobSelect = useCallback((job: Job) => {
     setActiveJob(job);
-    setActiveProperty(selectedProperty);
-    
-    // Call the original handlers
-    onJobSelect(job);
+    if (onJobSelect) {
+      onJobSelect(job);
+    }
     onClose();
-  }, [onJobSelect, onClose, setActiveJob, setActiveProperty, selectedProperty]);
+  }, [setActiveJob, onJobSelect, onClose]);
 
   const handleBack = useCallback(() => {
     setSelectedProperty(null);
   }, []);
 
-  const renderPropertyList = (properties: Property[]) => (
-    <List sx={{ mt: 2 }}>
-      {properties.map((property) => (
-        <ListItem 
-          key={property.property_id}
-          disablePadding
-          sx={{ mb: 1 }}
-        >
-          <ListItemButton
-            onClick={() => handlePropertyClick(property)}
-            sx={{
-              border: 1,
-              borderColor: 'divider',
-              borderRadius: 1,
-              '&:hover': {
-                backgroundColor: 'action.hover'
-              }
-            }}
-          >
-            <ListItemText
-              primary={
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="subtitle1">{property.name}</Typography>
-                </Box>
-              }
-            />
-          </ListItemButton>
-        </ListItem>
-      ))}
-    </List>
-  );
+  const renderNearbyContent = () => {
+    if (isLoadingNearby) {
+      return (
+        <Box display="flex" justifyContent="center" p={2}>
+          <CircularProgress />
+        </Box>
+      );
+    }
+
+    if (nearbyError) {
+      return (
+        <Alert severity="error" sx={{ m: 2 }}>
+          Error loading properties
+        </Alert>
+      );
+    }
+
+    if (!nearbyProperties?.length) {
+      return (
+        <Box p={2}>
+          <Typography>No properties found within 2km</Typography>
+        </Box>
+      );
+    }
+
+    return (
+      <List>
+        {nearbyProperties.map((property) => (
+          <ListItem key={property.property_id} disablePadding>
+            <ListItemButton onClick={() => handlePropertyClick(property)}>
+              <ListItemText 
+                primary={property.name || 'Unnamed Property'}
+                secondary={property.address}
+              />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+    );
+  };
 
   const renderJobList = (jobs: Job[]) => (
     <List sx={{ mt: 2 }}>
@@ -198,7 +205,7 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
           sx={{ mb: 1 }}
         >
           <ListItemButton
-            onClick={() => handleJobClick(job)}
+            onClick={() => handleJobSelect(job)}
             sx={{
               border: 1,
               borderColor: 'divider',
@@ -265,6 +272,7 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
         <Box sx={{ mt: 2 }}>
           {!selectedProperty && (
             <>
+
               <Tabs
                 value={activeTab}
                 onChange={(_, newValue) => setActiveTab(newValue)}
@@ -291,35 +299,12 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
               </Tabs>
 
               {activeTab === 'nearby' && (
-                <>
-                  {!userLocation && (
-                    <Alert severity="warning" sx={{ mb: 2 }}>
-                      Waiting for location... Please ensure location services are enabled.
-                    </Alert>
-                  )}
-
-                  {nearbyError && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                      {nearbyError instanceof Error ? nearbyError.message : 'Failed to fetch nearby properties'}
-                    </Alert>
-                  )}
-
-                  {isLoadingNearby ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-                      <CircularProgress />
-                    </Box>
-                  ) : nearbyProperties.length > 0 ? (
-                    renderPropertyList(nearbyProperties)
-                  ) : (
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
-                      No properties found within 2km
-                    </Typography>
-                  )}
-                </>
+                renderNearbyContent()
               )}
 
               {activeTab === 'search' && (
                 <>
+
                   <TextField
                     fullWidth
                     placeholder="Search properties..."
@@ -353,26 +338,42 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
 
                   {searchTerm.length >= 3 && (
                     <>
+
                       {isLoadingSearch ? (
                         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
                           <CircularProgress />
                         </Box>
                       ) : searchedProperties.length > 0 ? (
-                        renderPropertyList(searchedProperties)
+                        <List>
+                          {searchedProperties.map((property) => (
+                            <ListItem key={property.property_id} disablePadding>
+                              <ListItemButton onClick={() => handlePropertyClick(property)}>
+                                <ListItemText 
+                                  primary={property.name || 'Unnamed Property'}
+                                  secondary={property.address}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          ))}
+                        </List>
                       ) : (
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
                           No properties found matching your search
                         </Typography>
                       )}
                     </>
+
                   )}
                 </>
+
               )}
             </>
+
           )}
 
           {selectedProperty && (
             <>
+
               {isLoadingJobs ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
                   <CircularProgress />
@@ -385,6 +386,7 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
                 </Typography>
               )}
             </>
+
           )}
         </Box>
       </DialogContent>

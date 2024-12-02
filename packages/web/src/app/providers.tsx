@@ -1,30 +1,26 @@
 'use client';
 
+import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ThemeProvider } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { SnackbarProvider } from 'notistack';
-import { theme } from '../theme';
 import { QueryErrorBoundary } from './globalComponents/QueryErrorBoundary';
-import { ENV_CONFIG } from '../config/environment';
+import { theme } from '../theme';
+import { ENV_CONFIG } from './config/environment';
 
+// Create a client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: true,
-      refetchOnMount: true,
-      refetchOnReconnect: true,
-      retry: ENV_CONFIG.queryClient.maxRetries,
       staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
       gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
-      throwOnError: true,
-    },
-    mutations: {
       retry: ENV_CONFIG.queryClient.maxRetries,
-    },
-  },
+      refetchOnWindowFocus: false
+    }
+  }
 });
 
 export function Providers({ children }: { children: React.ReactNode }) {
