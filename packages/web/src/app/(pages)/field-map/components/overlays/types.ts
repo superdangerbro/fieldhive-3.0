@@ -8,6 +8,7 @@ export interface LayersControlProps {
   onToggleFieldEquipment: (event: React.ChangeEvent<HTMLInputElement>) => void;
   propertyFilters: Filters;
   onPropertyFiltersChange: (filters: Filters) => void;
+  activePropertyId?: string;
 }
 
 export interface PropertyFiltersProps {

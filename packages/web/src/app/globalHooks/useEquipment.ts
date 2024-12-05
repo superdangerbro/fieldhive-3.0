@@ -36,9 +36,13 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
       if (!response.ok) {
         throw new Error('Failed to fetch equipment');
       }
-      return response.json();
+      const data = await response.json();
+      return data.equipment || []; // Ensure we return an array
     },
-    enabled: !!bounds
+    enabled: !!bounds,
+    initialData: [],
+    staleTime: 30000,
+    retry: 1
   });
 
   // Fetch equipment types

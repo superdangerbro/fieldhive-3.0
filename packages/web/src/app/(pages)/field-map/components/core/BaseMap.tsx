@@ -60,6 +60,17 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
     }
   }, [ref, mapRef]);
 
+  // Initialize map with default settings
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Set default settings
+    map.setMaxPitch(0); // Disable tilting
+    map.setMinZoom(3); // Set minimum zoom
+    map.setMaxZoom(20); // Set maximum zoom
+  }, [mapRef.current]);
+
   // Automatically start tracking on mount
   useEffect(() => {
     const timer = setTimeout(() => {

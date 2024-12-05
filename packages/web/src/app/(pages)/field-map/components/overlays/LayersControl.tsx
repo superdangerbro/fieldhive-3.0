@@ -3,15 +3,16 @@
 import React, { useState } from 'react';
 import { 
   Box, 
-  Paper,
-  Typography,
-  Switch,
+  Paper, 
+  Switch, 
+  Typography, 
   useTheme,
   SvgIcon,
   Collapse
 } from '@mui/material';
 import { Square3Stack3DIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { PropertyFilters } from './PropertyFilters';
+import { PropertyDetails } from './PropertyDetails';
 import { LayersControlProps, Filters } from './types';
 
 const defaultFilters: Filters = {
@@ -23,7 +24,8 @@ export function LayersControl({
   showFieldEquipment, 
   onToggleFieldEquipment,
   propertyFilters,
-  onPropertyFiltersChange
+  onPropertyFiltersChange,
+  activePropertyId
 }: LayersControlProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isPropertiesExpanded, setIsPropertiesExpanded] = useState(true);
@@ -72,7 +74,7 @@ export function LayersControl({
             fontSize: '0.875rem',
           }}
         >
-          Layers
+          {activePropertyId ? 'Property Details' : 'Layers'}
         </Typography>
         <SvgIcon
           component={isExpanded ? ChevronUpIcon : ChevronDownIcon}
@@ -84,41 +86,85 @@ export function LayersControl({
 
       {/* Content */}
       <Collapse in={isExpanded}>
-        <Box sx={{ px: 1.5, py: 1 }}>
-          {/* Field Equipment Toggle */}
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              py: 0.5,
-            }}
-          >
-            <Typography
-              variant="body2"
+        {activePropertyId ? (
+          <PropertyDetails propertyId={activePropertyId} />
+        ) : (
+          <Box sx={{ px: 1.5, py: 1 }}>
+            {/* Field Equipment Toggle */}
+            <Box
               sx={{
-                color: theme.palette.text.secondary,
-                fontSize: '0.8125rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                py: 0.5,
               }}
             >
-              Field Equipment
-            </Typography>
-            <Switch
-              size="small"
-              checked={showFieldEquipment}
-              onChange={onToggleFieldEquipment}
-              name="showFieldEquipment"
-            />
-          </Box>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: theme.palette.text.secondary,
+                  fontSize: '0.8125rem',
+                }}
+              >
+                Field Equipment
+              </Typography>
+              <Switch
+                size="small"
+                checked={showFieldEquipment}
+                onChange={onToggleFieldEquipment}
+                name="showFieldEquipment"
+              />
+            </Box>
 
-          {/* Properties Section */}
-          <PropertyFilters
-            isExpanded={isPropertiesExpanded}
-            onExpandToggle={() => setIsPropertiesExpanded(!isPropertiesExpanded)}
-            propertyFilters={propertyFilters}
-            onPropertyFiltersChange={onPropertyFiltersChange}
-          />
-        </Box>
+            {/* Properties Section */}
+            <Box sx={{ mt: 1 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  cursor: 'pointer',
+                  '&:hover': {
+                    backgroundColor: theme.palette.action.hover,
+                  },
+                  borderRadius: 1,
+                  px: 1,
+                  py: 0.5,
+                }}
+                onClick={() => setIsPropertiesExpanded(!isPropertiesExpanded)}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{
+                    flex: 1,
+                    color: theme.palette.text.secondary,
+                    fontSize: '0.8125rem',
+                  }}
+                >
+                  Properties
+                </Typography>
+                <SvgIcon
+                  component={isPropertiesExpanded ? ChevronUpIcon : ChevronDownIcon}
+                  sx={{
+                    fontSize: '12px',
+                    color: theme.palette.text.secondary,
+                  }}
+                />
+              </Box>
+
+              <Collapse in={isPropertiesExpanded}>
+                <Box sx={{ mt: 1 }}>
+                  <PropertyFilters
+                    filters={propertyFilters}
+                    onChange={onPropertyFiltersChange}
+                    isExpanded={isPropertiesExpanded}
+                    onExpandToggle={() => setIsPropertiesExpanded(!isPropertiesExpanded)}
+                  />
+                </Box>
+              </Collapse>
+            </Box>
+          </Box>
+        )}
       </Collapse>
     </Paper>
   );

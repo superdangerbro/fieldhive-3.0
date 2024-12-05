@@ -35,7 +35,7 @@ interface PropertyDetailsDialogProps {
 export function PropertyDetailsDialog({ propertyId, onClose, onWorkOnJob }: PropertyDetailsDialogProps) {
   const theme = useTheme();
   const { activeJob, setActiveJob, setActiveProperty } = useActiveJobContext();
-  const [showJobs, setShowJobs] = useState(false);
+  const [showJobs, setShowJobs] = useState(false); // Start with property details
 
   // Query for property details
   const { data: property, isLoading: isLoadingProperty } = useQuery({
@@ -55,20 +55,24 @@ export function PropertyDetailsDialog({ propertyId, onClose, onWorkOnJob }: Prop
     refetchOnWindowFocus: false
   });
 
-  // Query for jobs
+  // Query for jobs only when needed
   const { data: jobs = [], isLoading: isLoadingJobs } = useQuery({
     queryKey: ['property-jobs', propertyId],
     queryFn: async () => {
       if (!propertyId) return [];
-      const response = await fetch(`${ENV_CONFIG.api.baseUrl}/properties/${propertyId}/jobs`);
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to fetch property jobs');
+      try {
+        const response = await fetch(`${ENV_CONFIG.api.baseUrl}/properties/${propertyId}/jobs`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch property jobs');
+        }
+        const data = await response.json();
+        return data.jobs || [];
+      } catch (error) {
+        console.error('Error fetching jobs:', error);
+        return [];
       }
-      const data = await response.json();
-      return data.jobs || [];
     },
-    enabled: !!propertyId && showJobs,
+    enabled: !!propertyId && showJobs, // Only fetch when showing jobs
     staleTime: 30000,
     retry: 1,
     refetchOnWindowFocus: false
@@ -85,13 +89,22 @@ export function PropertyDetailsDialog({ propertyId, onClose, onWorkOnJob }: Prop
   }, [property, setActiveProperty, setActiveJob, onWorkOnJob, onClose]);
 
   const handleWorkClick = useCallback(() => {
-    setShowJobs(true);
+    setShowJobs(true); // Show jobs list when "Work on this property" is clicked
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setShowJobs(false); // Reset to property details view when closing
+    onClose();
+  }, [onClose]);
+
+  const handleBack = useCallback(() => {
+    setShowJobs(false); // Go back to property details
   }, []);
 
   // Reset show jobs when dialog closes
   useEffect(() => {
     if (!propertyId) {
-      setShowJobs(false);
+      setShowJobs(false); // Reset to property details view when dialog closes
     }
   }, [propertyId]);
 
@@ -102,7 +115,7 @@ export function PropertyDetailsDialog({ propertyId, onClose, onWorkOnJob }: Prop
   return (
     <Dialog 
       open={!!propertyId} 
-      onClose={onClose}
+      onClose={handleClose}
       maxWidth="sm"
       fullWidth
     >
@@ -110,11 +123,24 @@ export function PropertyDetailsDialog({ propertyId, onClose, onWorkOnJob }: Prop
         {isLoadingProperty ? (
           <Typography component="div" variant="h6">Loading...</Typography>
         ) : (
-          <Typography component="div" variant="h6">{property?.name || 'Property Details'}</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+            {showJobs && (
+              <IconButton
+                aria-label="back"
+                onClick={handleBack}
+                sx={{ mr: 1 }}
+              >
+                <CloseIcon />
+              </IconButton>
+            )}
+            <Typography component="div" variant="h6">
+              {showJobs ? 'Select a Job' : property?.name || 'Property Details'}
+            </Typography>
+          </Box>
         )}
         <IconButton
           aria-label="close"
-          onClick={onClose}
+          onClick={handleClose}
         >
           <CloseIcon />
         </IconButton>
@@ -209,7 +235,7 @@ export function PropertyDetailsDialog({ propertyId, onClose, onWorkOnJob }: Prop
       
       {showJobs && (
         <DialogActions sx={{ p: 2, justifyContent: 'flex-start' }}>
-          <Button onClick={() => setShowJobs(false)}>
+          <Button onClick={handleBack}>
             Back to Details
           </Button>
         </DialogActions>

@@ -43,7 +43,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
 }, ref) => {
   // Equipment data and state management
   const {
-    equipment,
+    equipment = [],  // Provide default empty array
     addEquipment,
     updateEquipment,
     deleteEquipment,
@@ -80,8 +80,8 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   return (
     <>
       {/* Equipment Markers */}
-      {equipment?.map((eq: Equipment) => {
-        if (!eq.location?.coordinates) return null;
+      {Array.isArray(equipment) && equipment.map((eq: Equipment) => {
+        if (!eq?.location?.coordinates) return null;
         const [longitude, latitude] = eq.location.coordinates;
 
         return (

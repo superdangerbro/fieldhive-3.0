@@ -79,16 +79,41 @@ export function PropertyBoundaryLayer({
             params.append('types', filters.types.join(','));
           }
 
-          const response = await fetch(
-            `${ENV_CONFIG.api.baseUrl}/properties/boundaries?${params}`,
-            { signal }
-          );
+          if (!ENV_CONFIG?.api?.baseUrl) {
+            console.error('API base URL is not configured:', ENV_CONFIG);
+            throw new Error('API base URL is not configured');
+          }
+
+          console.log('Fetching boundaries with filters:', {
+            statuses: filters.statuses,
+            types: filters.types,
+            params: params.toString()
+          });
+
+          const url = `${ENV_CONFIG.api.baseUrl}/properties/boundaries?${params}`;
+          console.log('Fetching boundaries from URL:', url);
+
+          const response = await fetch(url, { signal });
 
           if (!response.ok) {
-            throw new Error('Failed to fetch property boundaries');
+            const errorText = await response.text();
+            console.error('Failed to fetch property boundaries:', {
+              status: response.status,
+              statusText: response.statusText,
+              errorText,
+              url
+            });
+            throw new Error(`Failed to fetch property boundaries: ${errorText}`);
           }
 
           const data: PropertyResponse[] = await response.json();
+          console.log('Property boundaries response:', { 
+            dataLength: data?.length,
+            filters,
+            firstProperty: data[0],
+            params: params.toString(),
+            url
+          });
           
           const features = data
             .filter(property => property.boundary)
@@ -124,64 +149,41 @@ export function PropertyBoundaryLayer({
     retryDelay: 1000
   });
 
+  const filteredProperties = useMemo(() => {
+    if (!boundaries?.features) return [];
+
+    return boundaries.features.filter(feature => {
+      const properties = feature.properties;
+      if (!properties) return false;
+
+      // Status filter - convert both to lowercase for comparison
+      const propertyStatus = properties.status?.toLowerCase() || '';
+      const statusMatch = filters.statuses.length === 0 || 
+        filters.statuses.some(status => propertyStatus.includes(status.toLowerCase()));
+
+      // Type filter - convert both to lowercase for comparison
+      const propertyType = properties.property_type?.toLowerCase() || '';
+      const typeMatch = filters.types.length === 0 || 
+        filters.types.some(type => propertyType.includes(type.toLowerCase()));
+
+      // Use OR condition between status and type filters
+      return statusMatch || typeMatch;
+    });
+  }, [boundaries, filters]);
+
   // Only update source data when we have new boundaries and they're not loading
   const sourceData = useMemo(() => {
-    if (!boundaries || (filters.statuses.length === 0 && filters.types.length === 0)) {
+    if (!boundaries?.features) {
       return {
         type: 'FeatureCollection',
         features: []
       };
     }
-    return boundaries;
-  }, [boundaries, filters]);
-
-  // Wait for layer to be loaded before adding click handler
-  useEffect(() => {
-    if (!mapRef) return;
-    
-    const map = mapRef.getMap();
-    let isLayerLoaded = false;
-
-    const handleClick = (event: mapboxgl.MapMouseEvent) => {
-      try {
-        const features = map.queryRenderedFeatures(event.point, {
-          layers: ['property-boundaries-fill']
-        });
-
-        const feature = features[0];
-        if (!feature) return;
-
-        const propertyId = feature.properties?.property_id;
-        if (!propertyId) return;
-
-        // Use the click coordinates instead of trying to get centroid
-        const coordinates: [number, number] = [event.lngLat.lng, event.lngLat.lat];
-        onPropertyClick(propertyId, coordinates);
-      } catch (error) {
-        console.error('Error handling property click:', error);
-      }
+    return {
+      type: 'FeatureCollection',
+      features: filteredProperties
     };
-
-    const setupClickHandler = () => {
-      if (isLayerLoaded) return;
-      
-      if (map.getLayer('property-boundaries-fill')) {
-        isLayerLoaded = true;
-        map.on('click', 'property-boundaries-fill', handleClick);
-      }
-    };
-
-    // Check if layer exists immediately
-    setupClickHandler();
-
-    // Also listen for layer addition
-    map.on('sourcedata', setupClickHandler);
-
-    return () => {
-      map.off('click', 'property-boundaries-fill', handleClick);
-      map.off('sourcedata', setupClickHandler);
-    };
-  }, [mapRef, onPropertyClick]);
+  }, [boundaries, filteredProperties]);
 
   // Basic styles for all properties
   const layerStyle: FillLayer = {
@@ -230,8 +232,73 @@ export function PropertyBoundaryLayer({
     source: 'property-boundaries',
     paint: {
       'fill-opacity': 0
+    },
+    layout: {
+      visibility: 'visible'
     }
   };
+
+  // Wait for layer to be loaded before adding click handler
+  useEffect(() => {
+    if (!mapRef) return;
+    
+    const map = mapRef.getMap();
+    let isLayerLoaded = false;
+
+    const handleClick = (event: mapboxgl.MapMouseEvent) => {
+      try {
+        const features = map.queryRenderedFeatures(event.point, {
+          layers: ['property-boundaries-interaction']
+        });
+
+        const feature = features[0];
+        if (!feature) return;
+
+        const propertyId = feature.properties?.property_id;
+        if (!propertyId) return;
+
+        // Use the click coordinates instead of trying to get centroid
+        const coordinates: [number, number] = [event.lngLat.lng, event.lngLat.lat];
+        onPropertyClick(propertyId, coordinates);
+      } catch (error) {
+        console.error('Error handling property click:', error);
+      }
+    };
+
+    const setupClickHandler = () => {
+      if (isLayerLoaded) return;
+      
+      if (map.getLayer('property-boundaries-interaction')) {
+        isLayerLoaded = true;
+        map.on('click', 'property-boundaries-interaction', handleClick);
+        
+        // Change cursor on hover
+        map.on('mouseenter', 'property-boundaries-interaction', () => {
+          map.getCanvas().style.cursor = 'pointer';
+        });
+        map.on('mouseleave', 'property-boundaries-interaction', () => {
+          map.getCanvas().style.cursor = '';
+        });
+      }
+    };
+
+    // Check if layer exists immediately
+    setupClickHandler();
+
+    // Also listen for layer addition
+    map.on('sourcedata', setupClickHandler);
+
+    return () => {
+      map.off('click', 'property-boundaries-interaction', handleClick);
+      map.off('mouseenter', 'property-boundaries-interaction', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.off('mouseleave', 'property-boundaries-interaction', () => {
+        map.getCanvas().style.cursor = '';
+      });
+      map.off('sourcedata', setupClickHandler);
+    };
+  }, [mapRef, onPropertyClick]);
 
   // Add pulsing animation only for active property
   useEffect(() => {
@@ -294,7 +361,7 @@ export function PropertyBoundaryLayer({
   }, [mapRef, activePropertyId]);
 
   // Don't render anything if no filters are active
-  if (!boundaries || (filters.statuses.length === 0 && filters.types.length === 0)) {
+  if (!sourceData || (filters.statuses.length === 0 && filters.types.length === 0)) {
     return null;
   }
 

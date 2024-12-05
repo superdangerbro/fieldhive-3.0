@@ -53,6 +53,7 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
   useEffect(() => {
     if (open && activeProperty && !selectedProperty) {
       setSelectedProperty(activeProperty);
+      setActiveTab('search'); // Switch to search tab since we have a property
     }
   }, [open, activeProperty, selectedProperty]);
 
@@ -60,10 +61,10 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
   useEffect(() => {
     if (!open) {
       setSearchTerm('');
-      setActiveTab('nearby');
-      // Don't reset selectedProperty here as it should persist
+      setActiveTab(activeProperty ? 'search' : 'nearby'); // Default to search if we have an active property
+      setSelectedProperty(null);
     }
-  }, [open]);
+  }, [open, activeProperty]);
 
   // Query for nearby properties
   const {

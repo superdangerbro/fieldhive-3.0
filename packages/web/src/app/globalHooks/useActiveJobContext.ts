@@ -19,7 +19,11 @@ const loadPersistedState = () => {
   try {
     const savedState = localStorage.getItem('activeJobState');
     if (savedState) {
-      return JSON.parse(savedState);
+      const parsedState = JSON.parse(savedState);
+      // Only restore state if both job and property exist
+      if (parsedState.activeJob && parsedState.activeProperty) {
+        return parsedState;
+      }
     }
   } catch (error) {
     console.error('Error loading persisted state:', error);
@@ -32,14 +36,22 @@ export const useActiveJobContext = create<ActiveJobState>((set) => ({
   setActiveJob: (job) => set(
     (state) => {
       const newState = { ...state, activeJob: job };
-      localStorage.setItem('activeJobState', JSON.stringify(newState));
+      if (job) {
+        localStorage.setItem('activeJobState', JSON.stringify(newState));
+      } else {
+        localStorage.removeItem('activeJobState');
+      }
       return newState;
     }
   ),
   setActiveProperty: (property) => set(
     (state) => {
       const newState = { ...state, activeProperty: property };
-      localStorage.setItem('activeJobState', JSON.stringify(newState));
+      if (property) {
+        localStorage.setItem('activeJobState', JSON.stringify(newState));
+      } else {
+        localStorage.removeItem('activeJobState');
+      }
       return newState;
     }
   ),
