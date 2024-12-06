@@ -25,7 +25,7 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
     try {
         const boundsStr = req.query.bounds as string;
         const statuses = (req.query.statuses as string || '').split(',').filter(Boolean);
-        const types = (req.query.types as string || '').split(',').filter(Boolean);
+        const types = (req.query.types as string || '').split(',').filter(Boolean); // Changed from type to types
 
         logger.info('Request parameters:', {
             bounds: boundsStr,
@@ -50,7 +50,7 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
         }
 
         try {
-            // Build the query with AND conditions for filters
+            // Build the query with OR conditions for filters
             let query = `
                 SELECT 
                     p.property_id,
@@ -73,17 +73,23 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
                 WHERE TRUE
             `;
             const queryParams: any[] = [];
+            const filterConditions = [];
 
             // Add status filter
             if (statuses.length > 0) {
                 queryParams.push(statuses);
-                query += ` AND p.status = ANY($${queryParams.length})`;
+                filterConditions.push(`LOWER(p.status) = ANY(ARRAY(SELECT LOWER(unnest($${queryParams.length}::text[]))))`);
             }
 
-            // Add type filter (using 'property_type' column)
+            // Add type filter
             if (types.length > 0) {
                 queryParams.push(types);
-                query += ` AND p.property_type = ANY($${queryParams.length})`;
+                filterConditions.push(`LOWER(p.property_type) = ANY(ARRAY(SELECT LOWER(unnest($${queryParams.length}::text[]))))`);
+            }
+
+            // Combine filter conditions with OR if any exist
+            if (filterConditions.length > 0) {
+                query += ` AND (${filterConditions.join(' OR ')})`;
             }
 
             // Add bounds condition
@@ -102,7 +108,8 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
             logger.info('Executing property query:', { 
                 query, 
                 paramCount: queryParams.length,
-                params: queryParams
+                params: queryParams,
+                filterConditions
             });
 
             const result = await AppDataSource.query(query, queryParams);
@@ -130,14 +137,18 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
                         type: 'Feature',
                         geometry: property.boundary,
                         properties: {
-                            property_id: property.property_id
+                            property_id: property.property_id,
+                            property_type: property.property_type,
+                            status: property.status
                         }
                     } : null,
                     location: property.location ? {
                         type: 'Feature',
                         geometry: property.location,
                         properties: {
-                            property_id: property.property_id
+                            property_id: property.property_id,
+                            property_type: property.property_type,
+                            status: property.status
                         }
                     } : null
                 }));
