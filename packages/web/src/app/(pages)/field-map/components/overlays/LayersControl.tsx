@@ -36,13 +36,14 @@ export function LayersControl({
       elevation={2}
       sx={{
         position: 'absolute',
-        top: theme.spacing(3),
+        top: activePropertyId ? theme.spacing(9) : theme.spacing(3), // Adjusted to be below ActiveJobIndicator when property is selected
         left: theme.spacing(2),
         backgroundColor: theme.palette.background.paper,
         borderRadius: 1,
         overflow: 'hidden',
         zIndex: 1000,
         minWidth: 220,
+        transition: 'top 0.2s ease-in-out', // Smooth transition for top position change
       }}
     >
       {/* Header */}

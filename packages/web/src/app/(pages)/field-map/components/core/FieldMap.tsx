@@ -42,6 +42,7 @@ interface Filters {
 const ZOOM_LEVEL = 19;
 const ANIMATION_DURATION = 1500;
 const MAP_PITCH = 45;
+const isDev = process.env.NODE_ENV === 'development';
 
 export function FieldMap() {
   const theme = useTheme();
@@ -90,18 +91,16 @@ export function FieldMap() {
         }
         const data = await response.json();
         
-        // Ensure we have valid arrays
         const statuses = Array.isArray(data?.statuses) ? data.statuses : [];
         const types = Array.isArray(data?.types) ? data.types : [];
         
-        // Make sure 'active' is in the list and normalize all values
         const normalizedStatuses = Array.from(new Set([
           'active',
-          ...statuses.map(status => status?.toLowerCase() || '')
+          ...statuses.map((status: string) => status?.toLowerCase() || '')
         ])).filter(Boolean).sort();
         
         const normalizedTypes = Array.from(new Set(
-          types.map(type => type?.toLowerCase() || '')
+          types.map((type: string) => type?.toLowerCase() || '')
         )).filter(Boolean).sort();
 
         return {
@@ -113,17 +112,15 @@ export function FieldMap() {
         return { statuses: ['active'], types: [] };
       }
     },
-    staleTime: 300000 // Cache for 5 minutes
+    staleTime: 300000
   });
 
-  // Clear context on mount if no property is selected
   useEffect(() => {
     if (!selectedPropertyId) {
       clearContext();
     }
   }, [clearContext, selectedPropertyId]);
 
-  // Query for properties within bounds
   const { data: propertiesWithinBounds = [] } = useQuery<PropertyWithLocation[]>({
     queryKey: ['properties', mapBounds],
     queryFn: async () => {
@@ -147,7 +144,6 @@ export function FieldMap() {
     refetchOnWindowFocus: false
   });
 
-  // Utility functions first
   const focusOnLocation = useCallback((longitude: number, latitude: number) => {
     const map = mapRef.current?.getMap();
     if (!map) return;
@@ -167,17 +163,14 @@ export function FieldMap() {
   const handleMoveEnd = useCallback((bounds: [number, number, number, number]) => {
     setMapBounds(bounds);
     if (bounds.some(isNaN)) return;
-    console.log('Map bounds updated:', bounds);
     debouncedSetBounds(bounds);
   }, [debouncedSetBounds]);
 
   const handleLocationUpdate = useCallback((coords: [number, number]) => {
-    console.log('Location update received in FieldMap:', coords);
     setUserLocation(coords);
   }, []);
 
   const handleToggleFieldEquipment = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    console.log('Equipment visibility toggled:', event.target.checked);
     setShowFieldEquipment(event.target.checked);
   }, []);
 
@@ -189,9 +182,7 @@ export function FieldMap() {
     const map = mapRef.current?.getMap();
     if (!map) return;
 
-    const newMode = !isDarkMode;
-    console.log('Map style changing to:', newMode ? 'dark' : 'light');
-    
+    const newMode = !isDarkMode;    
     map.setStyle(`mapbox://styles/mapbox/${newMode ? 'dark' : 'light'}-v10`);
     setIsDarkMode(newMode);
   }, [isDarkMode]);
@@ -230,8 +221,6 @@ export function FieldMap() {
 
   const handlePropertyBoundaryClick = useCallback(async (propertyId: string, coordinates: [number, number]) => {
     if (!propertyId || !coordinates) return;
-    
-    console.log('Property boundary clicked:', propertyId, 'at coordinates:', coordinates);
 
     try {
       const response = await fetch(`${ENV_CONFIG.api.baseUrl}/properties/${propertyId}`);
@@ -244,39 +233,30 @@ export function FieldMap() {
         throw new Error('No property data received');
       }
 
-      // Set the property in the active job context
       setActiveProperty(propertyData);
-      
-      // Show the job selection dialog instead of property details
       setShowSelectJobDialog(true);
       
-      // Get the property boundary and fit the map to it
       const map = mapRef.current?.getMap();
       if (map && propertyData.boundary?.geometry?.coordinates?.[0]) {
         try {
-          // Calculate the bounds of the property boundary
           const bounds = new mapboxgl.LngLatBounds();
           const boundaryCoords = propertyData.boundary.geometry.coordinates[0];
           
-          // Extend bounds with each coordinate
           boundaryCoords.forEach((coord: [number, number]) => {
             if (Array.isArray(coord) && coord.length === 2) {
               bounds.extend(coord);
             }
           });
 
-          // Add some padding to the bounds
           const padding = { top: 50, bottom: 50, left: 50, right: 50 };
           
-          // Fit the map to the property bounds
           map.fitBounds(bounds, {
             padding,
             duration: ANIMATION_DURATION,
-            maxZoom: 19 // Prevent zooming in too far
+            maxZoom: 19
           });
         } catch (error) {
           console.error('Error fitting to bounds:', error);
-          // Fallback to simple centering if bounds calculation fails
           map.easeTo({
             center: coordinates,
             zoom: 17,
@@ -284,7 +264,6 @@ export function FieldMap() {
           });
         }
       } else {
-        // Fallback if no boundary data
         map?.easeTo({
           center: coordinates,
           zoom: 17,
@@ -296,33 +275,39 @@ export function FieldMap() {
     }
   }, [setActiveProperty]);
 
-  const handleJobSelect = useCallback((job: Job) => {
-    if (!job) return;
+  const handleJobSelect = useCallback((job: Job | null) => {
+    if (!job) {
+      if (isDev) console.warn('No job provided to handleJobSelect');
+      return;
+    }
     
-    console.log('Job selected:', job);
     setSelectedJobId(job.job_id);
     setShowSelectJobDialog(false);
     setShowFieldEquipment(true);
     
     try {
-      if (job.property) {
-        // Update the selected property
+      if (job.property && 
+          typeof job.property === 'object' && 
+          job.property.location?.coordinates && 
+          Array.isArray(job.property.location.coordinates) && 
+          job.property.location.coordinates.length === 2) {
+        
         setSelectedProperty({
           id: job.property.property_id,
           name: job.property.name || 'Unnamed Property',
-          location: job.property.location ? {
+          location: {
             latitude: job.property.location.coordinates[1],
             longitude: job.property.location.coordinates[0]
-          } : undefined
+          }
         });
 
-        // Only focus on location if we have coordinates
-        if (job.property.location?.coordinates) {
-          focusOnLocation(
-            job.property.location.coordinates[0],
-            job.property.location.coordinates[1]
-          );
-        }
+        focusOnLocation(
+          job.property.location.coordinates[0],
+          job.property.location.coordinates[1]
+        );
+      } else {
+        if (isDev) console.warn('Selected job has no valid location data');
+        setSelectedProperty(null);
       }
       
       setCurrentMode('edit');
@@ -330,12 +315,12 @@ export function FieldMap() {
       console.error('Error setting up job:', error);
       setSelectedJobId(undefined);
       setShowFieldEquipment(false);
+      setCurrentMode(null);
+      setSelectedProperty(null);
     }
   }, [setSelectedProperty, focusOnLocation, setCurrentMode]);
 
   const handleModeChange = useCallback((mode: Mode) => {
-    console.log('Mode changed:', mode);
-    
     if (mode === 'edit') {
       if (!activeJob) {
         setShowSelectJobDialog(true);
@@ -349,7 +334,6 @@ export function FieldMap() {
   }, [activeJob]);
 
   const handleAddEquipment = useCallback(() => {
-    console.log('Add equipment clicked');
     if (!activeJob) {
       setShowSelectJobDialog(true);
       return;
@@ -358,10 +342,6 @@ export function FieldMap() {
       equipmentLayerRef.current.handleStartPlacement();
     }
   }, [activeJob]);
-
-  useEffect(() => {
-    console.log('Current user location:', userLocation);
-  }, [userLocation]);
 
   return (
     <Box sx={{ height: '100%', width: '100%', position: 'relative' }}>
@@ -441,7 +421,6 @@ export function FieldMap() {
         />
       </BaseMap>
 
-      {/* Map Controls */}
       <LayersControl
         showFieldEquipment={showFieldEquipment}
         onToggleFieldEquipment={handleToggleFieldEquipment}
@@ -450,13 +429,11 @@ export function FieldMap() {
         activePropertyId={activeProperty?.property_id}
       />
 
-      {/* Mode Selector */}
       <ModeSelector
         onModeChange={handleModeChange}
         onAddEquipment={handleAddEquipment}
       />
 
-      {/* Map Controls */}
       <MapControls
         onStyleChange={handleStyleChange}
         onZoomIn={handleZoomIn}
@@ -480,7 +457,6 @@ export function FieldMap() {
         />
       )}
 
-      {/* Active Job Indicator */}
       <ActiveJobIndicator />
     </Box>
   );

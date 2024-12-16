@@ -113,11 +113,21 @@ export default function PropertyLocationMap({
                         <Layer
                             id="boundary-points"
                             type="circle"
+                            minzoom={0}
+                            maxzoom={24}
                             paint={{
-                                'circle-radius': 4,
+                                'circle-radius': [
+                                    'interpolate',
+                                    ['linear'],
+                                    ['zoom'],
+                                    10, 2,  // At zoom level 10 or less, radius is 2px
+                                    15, 4,  // At zoom level 15, radius is 4px
+                                    20, 6   // At zoom level 20 or more, radius is 6px
+                                ],
                                 'circle-color': themeColor,
                                 'circle-stroke-width': 1,
-                                'circle-stroke-color': '#fff'
+                                'circle-stroke-color': '#fff',
+                                'circle-stroke-opacity': 1
                             }}
                         />
                     </Source>

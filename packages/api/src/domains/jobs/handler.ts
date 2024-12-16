@@ -16,7 +16,10 @@ export async function getJobs(req: Request, res: Response) {
             .leftJoinAndSelect('property.serviceAddress', 'propertyServiceAddress')
             .leftJoinAndSelect('property.billingAddress', 'propertyBillingAddress')
             .leftJoinAndSelect('job.serviceAddress', 'jobServiceAddress')
-            .leftJoinAndSelect('job.billingAddress', 'jobBillingAddress');
+            .leftJoinAndSelect('job.billingAddress', 'jobBillingAddress')
+            // Explicitly select location and boundary fields
+            .addSelect('property.location')
+            .addSelect('property.boundary');
 
         if (type) {
             queryBuilder.andWhere('job.job_type_id = :type', { type });
@@ -67,7 +70,15 @@ export async function getJob(req: Request, res: Response) {
                 'property.billingAddress',
                 'serviceAddress',
                 'billingAddress'
-            ]
+            ],
+            select: {
+                property: {
+                    property_id: true,
+                    name: true,
+                    location: true,
+                    boundary: true
+                }
+            }
         });
 
         if (!job) {
@@ -95,6 +106,8 @@ export async function getJobAddresses(req: Request, res: Response) {
             .leftJoinAndSelect('job.billingAddress', 'jobBillingAddress')
             .leftJoinAndSelect('property.serviceAddress', 'propertyServiceAddress')
             .leftJoinAndSelect('property.billingAddress', 'propertyBillingAddress')
+            .addSelect('property.location')
+            .addSelect('property.boundary')
             .where('job.job_id = :jobId', { jobId: req.params.id })
             .getOne();
 
@@ -208,7 +221,15 @@ export async function createJob(req: Request, res: Response) {
                 'property.billingAddress',
                 'serviceAddress',
                 'billingAddress'
-            ]
+            ],
+            select: {
+                property: {
+                    property_id: true,
+                    name: true,
+                    location: true,
+                    boundary: true
+                }
+            }
         });
 
         if (!fullJob) {
@@ -259,7 +280,15 @@ export async function updateJob(req: Request, res: Response) {
                 'property.billingAddress',
                 'serviceAddress',
                 'billingAddress'
-            ]
+            ],
+            select: {
+                property: {
+                    property_id: true,
+                    name: true,
+                    location: true,
+                    boundary: true
+                }
+            }
         });
 
         if (!updatedJob) {
@@ -295,7 +324,15 @@ export async function archiveJob(req: Request, res: Response) {
                 'property.billingAddress',
                 'serviceAddress',
                 'billingAddress'
-            ]
+            ],
+            select: {
+                property: {
+                    property_id: true,
+                    name: true,
+                    location: true,
+                    boundary: true
+                }
+            }
         });
 
         if (!job) {
@@ -315,7 +352,15 @@ export async function archiveJob(req: Request, res: Response) {
                 'property.billingAddress',
                 'serviceAddress',
                 'billingAddress'
-            ]
+            ],
+            select: {
+                property: {
+                    property_id: true,
+                    name: true,
+                    location: true,
+                    boundary: true
+                }
+            }
         });
 
         if (!archivedJob) {

@@ -13,6 +13,8 @@ import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useQuery } from '@tanstack/react-query';
 import { ENV_CONFIG } from '../../../../../app/config/environment';
 
+const isDev = process.env.NODE_ENV === 'development';
+
 export interface PropertyFiltersProps {
   filters: {
     statuses: string[];
@@ -28,6 +30,11 @@ interface PropertyOptions {
   types: string[];
 }
 
+interface ApiResponse {
+  statuses?: string[];
+  types?: string[];
+}
+
 export function PropertyFilters({
   filters,
   onChange,
@@ -37,54 +44,38 @@ export function PropertyFilters({
   const theme = useTheme();
 
   // Fetch property options from the API
-  const { data: propertyOptions = { statuses: ['active'], types: [] }, isLoading } = useQuery<PropertyOptions>({
+  const { data: propertyOptions, isLoading } = useQuery<PropertyOptions>({
     queryKey: ['propertyOptions'],
-    queryFn: async () => {
+    queryFn: async (): Promise<PropertyOptions> => {
       try {
         if (!ENV_CONFIG?.api?.baseUrl) {
-          console.error('API base URL is not configured:', ENV_CONFIG);
+          console.error('API base URL is not configured');
           throw new Error('API base URL is not configured');
         }
 
         const url = `${ENV_CONFIG.api.baseUrl}/properties/options`;
-        console.log('Fetching property options from URL:', url);
-        
         const response = await fetch(url);
+        
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('Failed to fetch property options:', {
-            status: response.status,
-            statusText: response.statusText,
-            errorText,
-            url
-          });
           throw new Error(`Failed to fetch property options: ${errorText}`);
         }
-        const data = await response.json();
-        console.log('Raw API response:', data);
+        
+        const data: ApiResponse = await response.json();
         
         // Ensure we have valid arrays
         const statuses = Array.isArray(data?.statuses) ? data.statuses : [];
         const types = Array.isArray(data?.types) ? data.types : [];
         
-        console.log('Extracted arrays:', { statuses, types });
-        
         // Make sure 'active' is in the list and normalize all values
         const normalizedStatuses = Array.from(new Set([
           'active',
-          ...statuses.map(status => status?.toLowerCase() || '')
+          ...statuses.map((status: string) => status?.toLowerCase() || '')
         ])).filter(Boolean).sort();
         
         const normalizedTypes = Array.from(new Set(
-          types.map(type => type?.toLowerCase() || '')
+          types.map((type: string) => type?.toLowerCase() || '')
         )).filter(Boolean).sort();
-
-        console.log('Normalized values:', { 
-          normalizedStatuses, 
-          normalizedTypes,
-          hasTypes: normalizedTypes.length > 0,
-          typesExample: normalizedTypes[0]
-        });
 
         return {
           statuses: normalizedStatuses,
@@ -92,21 +83,13 @@ export function PropertyFilters({
         };
       } catch (error) {
         console.error('Failed to fetch property options:', error);
-        // Return default values instead of throwing
         return { statuses: ['active'], types: [] };
       }
-    }
+    },
+    initialData: { statuses: ['active'], types: [] }
   });
 
-  // Debug render
-  console.log('Render state:', { 
-    hasPropertyOptions: !!propertyOptions,
-    statusesLength: propertyOptions?.statuses?.length,
-    typesLength: propertyOptions?.types?.length,
-    types: propertyOptions?.types
-  });
-
-  // Return early with loading state or error state
+  // Return early with loading state
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
@@ -116,7 +99,7 @@ export function PropertyFilters({
   }
 
   // Only render if we have options
-  if (!propertyOptions?.statuses?.length && !propertyOptions?.types?.length) {
+  if (!propertyOptions.statuses.length && !propertyOptions.types.length) {
     return null;
   }
 
@@ -189,7 +172,7 @@ export function PropertyFilters({
       <Collapse in={isExpanded}>
         <Box sx={{ mt: 1, pl: 2 }}>
           {/* Status Filters */}
-          {propertyOptions?.statuses?.length > 0 && (
+          {propertyOptions.statuses.length > 0 && (
             <Box>
               <Typography
                 variant="body2"
@@ -203,7 +186,7 @@ export function PropertyFilters({
                 Status
               </Typography>
               <FormGroup>
-                {propertyOptions.statuses.map(status => (
+                {propertyOptions.statuses.map((status: string) => (
                   <Box
                     key={status}
                     sx={{
@@ -236,7 +219,7 @@ export function PropertyFilters({
           )}
 
           {/* Type Filters */}
-          {propertyOptions?.types?.length > 0 && (
+          {propertyOptions.types.length > 0 && (
             <Box sx={{ mt: 2 }}>
               <Typography
                 variant="body2"
@@ -250,37 +233,34 @@ export function PropertyFilters({
                 Type ({propertyOptions.types.length})
               </Typography>
               <FormGroup>
-                {propertyOptions.types.map(type => {
-                  console.log('Rendering type:', type, 'checked:', filters?.types?.includes(type));
-                  return (
-                    <Box
-                      key={type}
+                {propertyOptions.types.map((type: string) => (
+                  <Box
+                    key={type}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      py: 0.25,
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
                       sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        py: 0.25,
+                        color: theme.palette.text.secondary,
+                        fontSize: '0.8125rem',
+                        textTransform: 'capitalize',
                       }}
                     >
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          color: theme.palette.text.secondary,
-                          fontSize: '0.8125rem',
-                          textTransform: 'capitalize',
-                        }}
-                      >
-                        {type}
-                      </Typography>
-                      <Switch
-                        size="small"
-                        checked={filters?.types?.includes(type) || false}
-                        onChange={handleTypeToggle(type)}
-                        disabled={isLoading}
-                      />
-                    </Box>
-                  );
-                })}
+                      {type}
+                    </Typography>
+                    <Switch
+                      size="small"
+                      checked={filters?.types?.includes(type) || false}
+                      onChange={handleTypeToggle(type)}
+                      disabled={isLoading}
+                    />
+                  </Box>
+                ))}
               </FormGroup>
             </Box>
           )}

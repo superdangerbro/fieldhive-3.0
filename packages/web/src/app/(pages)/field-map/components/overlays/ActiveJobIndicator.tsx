@@ -15,10 +15,10 @@ export function ActiveJobIndicator() {
     <Box
       sx={{
         position: 'absolute',
-        top: 16,
+        top: 24,
         left: '50%',
         transform: 'translateX(-50%)',
-        zIndex: 1000,
+        zIndex: 1001, // Ensure it's above other overlays
         backgroundColor: 'background.paper',
         borderRadius: 2,
         boxShadow: 2,
@@ -26,6 +26,7 @@ export function ActiveJobIndicator() {
         display: 'flex',
         alignItems: 'center',
         gap: 1,
+        transition: 'top 0.2s ease-in-out', // Smooth transition
       }}
     >
       <WorkIcon color="primary" />

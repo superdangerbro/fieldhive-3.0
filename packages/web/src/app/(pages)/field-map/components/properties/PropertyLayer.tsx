@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { Marker } from 'react-map-gl';
 import { Box, Tooltip, useTheme } from '@mui/material';
 import { useFieldMap } from '../../../../../app/globalHooks/useFieldMap';
@@ -66,24 +66,12 @@ export function PropertyLayer({
 
   const { activeJob } = useActiveJobContext();
 
-  // Debug property updates
-  useEffect(() => {
-    console.log('Properties in PropertyLayer:', {
-      total: properties.length,
-      withLocation: properties.filter((p: PropertyResponse) => p.location?.geometry?.coordinates).length,
-      firstProperty: properties[0],
-      filters
-    });
-  }, [properties, filters]);
-
   /**
    * Handle property marker click
    * Updates selected property and triggers animation
    */
   const handlePropertyClick = useCallback((property: MapProperty) => {
     if (!property.location?.coordinates) return;
-
-    console.log('Property clicked:', property.property_id);
     
     const propertyData = {
       id: property.property_id,
@@ -114,10 +102,7 @@ export function PropertyLayer({
     <>
       {/* Regular property markers */}
       {properties.map((property: PropertyResponse) => {
-        if (!property.location?.geometry?.coordinates) {
-          console.log('Skipping property without location:', property.property_id);
-          return null;
-        }
+        if (!property.location?.geometry?.coordinates) return null;
 
         // Convert property to MapProperty format
         const mapProperty: MapProperty = {

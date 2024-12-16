@@ -113,8 +113,8 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
                     CASE 
                         WHEN p.boundary IS NOT NULL AND ST_IsValid(p.boundary) THEN
                             CASE 
-                                WHEN $5::integer < 12 THEN ST_AsGeoJSON(ST_SimplifyPreserveTopology(p.boundary, 0.01))::json
-                                WHEN $5::integer < 15 THEN ST_AsGeoJSON(ST_SimplifyPreserveTopology(p.boundary, 0.001))::json
+                                WHEN $5::integer < 12 THEN ST_AsGeoJSON(ST_SimplifyPreserveTopology(p.boundary, 0.0001))::json
+                                WHEN $5::integer < 15 THEN ST_AsGeoJSON(ST_SimplifyPreserveTopology(p.boundary, 0.00001))::json
                                 ELSE ST_AsGeoJSON(p.boundary)::json
                             END
                         ELSE NULL

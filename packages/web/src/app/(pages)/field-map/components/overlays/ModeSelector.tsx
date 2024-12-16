@@ -88,7 +88,7 @@ export function ModeSelector({ onModeChange, onAddEquipment, onAddFloorplan }: M
     <Box
       sx={{
         position: 'absolute',
-        bottom: { xs: theme.spacing(2), sm: theme.spacing(3) },
+        bottom: { xs: theme.spacing(10), sm: theme.spacing(12) }, // Increased bottom spacing
         left: { xs: theme.spacing(2), sm: theme.spacing(3) },
         display: 'flex',
         flexDirection: 'column',
@@ -106,12 +106,12 @@ export function ModeSelector({ onModeChange, onAddEquipment, onAddFloorplan }: M
             opacity: activeMode === 'edit' ? 1 : 0,
             pointerEvents: activeMode === 'edit' ? 'auto' : 'none',
           },
-          '& .button-1': {
-            top: activeMode === 'edit' ? '-90px' : '0px',
+          '& .button-1': { // Adjusted positioning for Add Equipment button
+            bottom: activeMode === 'edit' ? '90px' : '0px',
             left: activeMode === 'edit' ? '0px' : '0px',
           },
-          '& .button-2': {
-            top: activeMode === 'edit' ? '-45px' : '0px',
+          '& .button-2': { // Adjusted positioning for Add Floorplan button
+            bottom: activeMode === 'edit' ? '45px' : '0px',
             left: activeMode === 'edit' ? '70px' : '0px',
           }
         }}
@@ -144,7 +144,7 @@ export function ModeSelector({ onModeChange, onAddEquipment, onAddFloorplan }: M
           onClick={() => handleModeChange('edit')}
           sx={{
             position: 'absolute',
-            top: 0,
+            bottom: 0,
             left: 0,
             width: { xs: 48, sm: 56 },
             height: { xs: 48, sm: 56 },

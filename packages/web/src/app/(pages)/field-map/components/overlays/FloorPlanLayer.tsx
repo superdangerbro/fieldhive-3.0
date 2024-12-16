@@ -13,6 +13,8 @@ interface FloorPlanLayerProps {
   selectedPropertyId?: string;
 }
 
+const isDev = process.env.NODE_ENV === 'development';
+
 /**
  * FloorPlanLayer handles all floor plan related functionality
  * Features:
@@ -44,22 +46,12 @@ export function FloorPlanLayer({
   // Listen for add floor plan event from LayersControl
   useEffect(() => {
     const handleAddFloorPlan = () => {
-      console.log('Opening floor plan dialog from event');
       setShowFloorPlanDialog(true);
     };
 
     document.addEventListener('add-floor-plan', handleAddFloorPlan);
     return () => document.removeEventListener('add-floor-plan', handleAddFloorPlan);
   }, []);
-
-  // Debug floor plan state
-  React.useEffect(() => {
-    console.log('FloorPlan layer state:', {
-      showDialog: showFloorPlanDialog,
-      activeFloorPlan,
-      floorPlansCount: floorPlans.length
-    });
-  }, [showFloorPlanDialog, activeFloorPlan, floorPlans]);
 
   if (!selectedProperty) return null;
 
@@ -69,10 +61,7 @@ export function FloorPlanLayer({
       {showFloorPlanDialog && selectedPropertyId && (
         <FloorPlanDialog
           open={showFloorPlanDialog}
-          onClose={() => {
-            console.log('Closing floor plan dialog');
-            setShowFloorPlanDialog(false);
-          }}
+          onClose={() => setShowFloorPlanDialog(false)}
           propertyId={selectedPropertyId}
         />
       )}
