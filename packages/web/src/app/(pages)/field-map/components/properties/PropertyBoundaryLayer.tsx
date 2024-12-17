@@ -76,7 +76,7 @@ export function PropertyBoundaryLayer({
     return bounds.map(coord => Number(coord.toFixed(BOUNDS_PRECISION))) as [number, number, number, number];
   }, [bounds]);
 
-  // Format coordinates for API request
+  // Format coordinates for API request with proper separation
   const formatBounds = useCallback((bounds: [number, number, number, number]) => {
     return bounds
       .map(coord => coord.toFixed(BOUNDS_PRECISION))

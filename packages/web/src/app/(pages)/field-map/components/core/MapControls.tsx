@@ -1,10 +1,12 @@
 'use client';
 
 import React from 'react';
-import { Box, IconButton } from '@mui/material';
+import { Box, IconButton, Stack } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import MapIcon from '@mui/icons-material/Map';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 
 interface MapControlsProps {
   /** Handler for changing map style (light/dark) */
@@ -40,71 +42,51 @@ interface MapControlsProps {
 export function MapControls({
   onStyleChange,
   onZoomIn,
-  onZoomOut
+  onZoomOut,
+  isTracking
 }: MapControlsProps) {
   return (
-    <Box
-      sx={{
-        position: 'absolute',
-        top: 90,
-        right: 16,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 1,
-        zIndex: 1000,
-        '& .MuiIconButton-root': {
-          width: 40,
-          height: 40,
-          color: 'white',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-          transition: 'all 0.2s ease-in-out',
-          '&:hover': {
-            transform: 'scale(1.05)',
-          },
-        }
-      }}
-    >
-      {/* Style toggle button */}
-      <IconButton
-        onClick={onStyleChange}
+    <Box sx={{ position: 'absolute', top: 80, right: 16, zIndex: 1500 }}>
+      {/* Main controls */}
+      <Stack
+        direction="column"
+        spacing={1}
         sx={{
-          borderRadius: '50%',
-          bgcolor: '#0369a1', // Darker blue
-          '&:hover': {
-            bgcolor: '#075985',
-          },
+          backgroundColor: 'background.paper',
+          borderRadius: 1,
+          p: 0.5,
+          boxShadow: 2,
+          mb: isTracking ? 1 : 0
         }}
       >
-        <MapIcon />
-      </IconButton>
+        <IconButton onClick={onStyleChange} size="small">
+          <DarkModeIcon />
+        </IconButton>
+        <IconButton onClick={onZoomIn} size="small">
+          <AddIcon />
+        </IconButton>
+        <IconButton onClick={onZoomOut} size="small">
+          <RemoveIcon />
+        </IconButton>
+      </Stack>
 
-      {/* Zoom in button */}
-      <IconButton
-        onClick={onZoomIn}
-        sx={{
-          borderRadius: '50%',
-          bgcolor: '#0284c7', // Medium blue
-          '&:hover': {
-            bgcolor: '#0369a1',
-          },
-        }}
-      >
-        <AddIcon />
-      </IconButton>
-
-      {/* Zoom out button */}
-      <IconButton
-        onClick={onZoomOut}
-        sx={{
-          borderRadius: '50%',
-          bgcolor: '#0ea5e9', // Light blue
-          '&:hover': {
-            bgcolor: '#0284c7',
-          },
-        }}
-      >
-        <RemoveIcon />
-      </IconButton>
+      {/* Tracking control in separate container */}
+      {isTracking && (
+        <Box
+          sx={{
+            backgroundColor: 'background.paper',
+            borderRadius: 1,
+            p: 0.5,
+            boxShadow: 2,
+            display: 'flex',
+            justifyContent: 'center'
+          }}
+        >
+          <IconButton size="small" sx={{ color: 'primary.main' }}>
+            <LocationOnIcon />
+          </IconButton>
+        </Box>
+      )}
     </Box>
   );
 }

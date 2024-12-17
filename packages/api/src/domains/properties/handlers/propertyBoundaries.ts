@@ -96,7 +96,7 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
         }
 
         try {
-            // Build the query with OR conditions for filters and geometry simplification
+            // Build the query with OR logic between filters
             const query = `
                 WITH bounds AS (
                     SELECT ST_MakeEnvelope($1, $2, $3, $4, 4326) as geom
@@ -130,12 +130,14 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
                     (p.location IS NOT NULL AND ST_IsValid(p.location) AND ST_Intersects(p.location, b.geom))
                 )
                 AND (
-                    $6 = '{}'::text[] 
-                    OR LOWER(p.status) = ANY(SELECT LOWER(unnest($6::text[])))
-                )
-                AND (
-                    $7 = '{}'::text[] 
-                    OR LOWER(p.property_type) = ANY(SELECT LOWER(unnest($7::text[])))
+                    ($6 = '{}'::text[] AND $7 = '{}'::text[])
+                    OR
+                    ($6 = '{}'::text[] AND LOWER(p.property_type) = ANY(SELECT LOWER(unnest($7::text[]))))
+                    OR
+                    ($7 = '{}'::text[] AND LOWER(p.status) = ANY(SELECT LOWER(unnest($6::text[]))))
+                    OR
+                    (LOWER(p.status) = ANY(SELECT LOWER(unnest($6::text[])))
+                     OR LOWER(p.property_type) = ANY(SELECT LOWER(unnest($7::text[]))))
                 )
             `;
 

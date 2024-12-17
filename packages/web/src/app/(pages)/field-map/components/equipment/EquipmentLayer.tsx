@@ -7,19 +7,14 @@ import { Crosshairs } from './Crosshairs';
 import { AddEquipmentDialog } from './AddEquipmentDialog';
 import { EquipmentMarkerDialog } from './EquipmentMarkerDialog';
 import { useEquipment } from '../../../../../app/globalHooks/useEquipment';
+import { useMapContext } from '../../../../../app/globalHooks/useMapContext';
 import type { Equipment, CreateEquipmentDto } from '../../../../../app/globalTypes/equipment';
 
 interface EquipmentLayerProps {
   /** Whether equipment markers should be visible */
   visible?: boolean;
-  /** The currently selected property ID */
-  selectedPropertyId?: string;
-  /** The currently selected job ID */
-  selectedJobId?: string;
   /** Current map bounds */
   bounds?: [number, number, number, number];
-  /** Whether the map is in add/edit mode */
-  isAddMode?: boolean;
 }
 
 export interface EquipmentLayerHandle {
@@ -36,11 +31,17 @@ export interface EquipmentLayerHandle {
  */
 export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerProps>(({
   visible = false,
-  selectedPropertyId,
-  selectedJobId,
   bounds,
-  isAddMode = false
 }, ref) => {
+  // Get map context
+  const {
+    activeJob,
+    activeProperty,
+    activeMode,
+    isAddingEquipment,
+    setIsAddingEquipment
+  } = useMapContext();
+
   // Equipment data and state management
   const {
     equipment = [],  // Provide default empty array
@@ -62,7 +63,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   } = useEquipment({ bounds });
 
   // Validate requirements before allowing equipment placement
-  const canPlaceEquipment = selectedPropertyId && selectedJobId && isAddMode;
+  const canPlaceEquipment = activeProperty?.property_id && activeJob?.job_id && activeMode === 'edit';
 
   // Expose the start placement handler to parent components
   useImperativeHandle(ref, () => ({
@@ -71,6 +72,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
         console.warn('Cannot place equipment: Property and job must be selected');
         return;
       }
+      setIsAddingEquipment(true);
       startPlacingEquipment();
     }
   }));
@@ -121,21 +123,25 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
       )}
 
       {/* Add equipment dialog */}
-      {isAddEquipmentDialogOpen && placementLocation && canPlaceEquipment && selectedPropertyId && selectedJobId && (
+      {isAddEquipmentDialogOpen && placementLocation && canPlaceEquipment && activeProperty?.property_id && activeJob?.job_id && (
         <AddEquipmentDialog
           open={isAddEquipmentDialogOpen}
           location={placementLocation}
-          onClose={cancelPlacingEquipment}
+          onClose={() => {
+            cancelPlacingEquipment();
+            setIsAddingEquipment(false);
+          }}
           onSubmit={async (data) => {
             const equipmentData: CreateEquipmentDto = {
               ...data,
-              property_id: selectedPropertyId,
-              job_id: selectedJobId,
+              property_id: activeProperty.property_id,
+              job_id: activeJob.job_id,
               location: {
                 coordinates: placementLocation
               }
             };
-            return addEquipment.mutateAsync(equipmentData);
+            await addEquipment.mutateAsync(equipmentData);
+            setIsAddingEquipment(false);
           }}
         />
       )}

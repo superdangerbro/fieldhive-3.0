@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useCallback, useEffect, useRef, ChangeEvent } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useTheme, Box } from '@mui/material';
-import { MapRef, Marker, ViewState } from 'react-map-gl';
+import { MapRef, Marker } from 'react-map-gl';
 import mapboxgl from 'mapbox-gl';
-import { useQuery } from '@tanstack/react-query';
 import { useFieldMap } from '../../../../../app/globalHooks/useFieldMap';
-import { useActiveJobContext } from '../../../../../app/globalHooks/useActiveJobContext';
+import { useMapContext } from '../../../../../app/globalHooks/useMapContext';
+import { useMapMovement } from '../../../../../app/globalHooks/useMapMovement';
+import { usePropertyQueries } from '../../../../../app/globalHooks/usePropertyQueries';
 import { BaseMap, MapControls } from '.';
 import { PropertyLayer, PropertyBoundaryLayer } from '../properties';
 import { PropertyDetailsDialog } from '../properties/PropertyDetailsDialog';
@@ -15,29 +16,10 @@ import { SelectJobDialog } from '../equipment/SelectJobDialog';
 import { FloorPlanLayer, ModeSelector, LayersControl, ActiveJobIndicator } from '../overlays';
 import { ENV_CONFIG } from '../../../../../app/config/environment';
 import type { MapProperty } from '../../types';
-import type { Mode } from '../overlays/ModeSelector';
 import type { Job } from '../../../../../app/globalTypes/job';
-import type { Property } from '../../../../../app/globalTypes/property';
+import type { Filters } from '../overlays/types';
+import type { PropertyWithLocation } from '../../../../../app/globalTypes/property';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
-
-interface PropertyWithLocation {
-  property_id: string;
-  name: string;
-  type: string;
-  status: string;
-  service_address_id: string | null;
-  billing_address_id: string | null;
-  created_at: Date;
-  updated_at: Date;
-  location: {
-    coordinates: [number, number];
-  };
-}
-
-interface Filters {
-  statuses: string[];
-  types: string[];
-}
 
 const ZOOM_LEVEL = 19;
 const ANIMATION_DURATION = 1500;
@@ -46,103 +28,63 @@ const isDev = process.env.NODE_ENV === 'development';
 
 export function FieldMap() {
   const theme = useTheme();
-  const { activeJob, activeProperty, setActiveProperty, clearContext } = useActiveJobContext();
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
-  const [mapBounds, setMapBounds] = useState<[number, number, number, number] | null>(null);
-  const [viewState, setViewState] = useState<ViewState>({
-    longitude: -95,
-    latitude: 37,
-    zoom: 3.5,
-    bearing: 0,
-    pitch: 0,
-    padding: { top: 0, bottom: 0, left: 0, right: 0 }
+  const {
+    activeJob,
+    activeProperty,
+    activeMode,
+    showFieldEquipment,
+    setActiveJob,
+    setActiveProperty,
+    setShowFieldEquipment,
+    clearContext
+  } = useMapContext();
+
+  const [selectedPropertyId, setSelectedPropertyId] = React.useState<string | null>(null);
+  const [mapBounds, setMapBounds] = React.useState<[number, number, number, number] | null>(null);
+  const [showSelectJobDialog, setShowSelectJobDialog] = React.useState(false);
+  const [isDarkMode, setIsDarkMode] = React.useState(true);
+  const equipmentLayerRef = useRef<EquipmentLayerHandle>(null);
+  const [filters, setFilters] = React.useState<Filters>({
+    statuses: ['active'],
+    types: []
   });
 
   const { 
     selectedProperty,
     setSelectedProperty,
-    currentBounds,
     setCurrentBounds: debouncedSetBounds,
-    properties,
-    isLoading,
   } = useFieldMap();
 
-  const mapRef = useRef<MapRef>(null);
-  const [isTracking, setIsTracking] = useState(false);
-  const [userLocation, setUserLocation] = useState<[number, number] | undefined>();
-  const [showFieldEquipment, setShowFieldEquipment] = useState(true);
-  const [selectedJobId, setSelectedJobId] = useState<string | undefined>(undefined);
-  const [showSelectJobDialog, setShowSelectJobDialog] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const [currentMode, setCurrentMode] = useState<Mode>(null);
-  const equipmentLayerRef = useRef<EquipmentLayerHandle>(null);
-  const [filters, setFilters] = useState<Filters>({
-    statuses: ['active'],
-    types: []
-  });
-
-  const { data: propertyOptions } = useQuery({
-    queryKey: ['propertyOptions'],
-    queryFn: async () => {
-      try {
-        const response = await fetch(`${ENV_CONFIG.api.baseUrl}/api/properties/options`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch property options');
-        }
-        const data = await response.json();
-        
-        const statuses = Array.isArray(data?.statuses) ? data.statuses : [];
-        const types = Array.isArray(data?.types) ? data.types : [];
-        
-        const normalizedStatuses = Array.from(new Set([
-          'active',
-          ...statuses.map((status: string) => status?.toLowerCase() || '')
-        ])).filter(Boolean).sort();
-        
-        const normalizedTypes = Array.from(new Set(
-          types.map((type: string) => type?.toLowerCase() || '')
-        )).filter(Boolean).sort();
-
-        return {
-          statuses: normalizedStatuses,
-          types: normalizedTypes
-        };
-      } catch (error) {
-        console.error('Failed to fetch property options:', error);
-        return { statuses: ['active'], types: [] };
+  // Use optimized map movement hook
+  const { viewState, handleViewStateChange, handleMoveEnd } = useMapMovement({
+    onBoundsChange: (bounds) => {
+      setMapBounds(bounds);
+      if (!bounds.some(isNaN)) {
+        debouncedSetBounds(bounds);
       }
-    },
-    staleTime: 300000
+    }
   });
+
+  // Use optimized property queries
+  const {
+    propertiesWithinBounds,
+    propertyOptions,
+    isLoading: isLoadingProperties
+  } = usePropertyQueries({
+    bounds: mapBounds,
+    filters,
+    enabled: !!mapBounds
+  });
+
+  const mapRef = useRef<MapRef>(null);
+  const [isTracking, setIsTracking] = React.useState(false);
+  const [userLocation, setUserLocation] = React.useState<[number, number] | undefined>();
 
   useEffect(() => {
     if (!selectedPropertyId) {
       clearContext();
     }
   }, [clearContext, selectedPropertyId]);
-
-  const { data: propertiesWithinBounds = [] } = useQuery<PropertyWithLocation[]>({
-    queryKey: ['properties', mapBounds],
-    queryFn: async () => {
-      if (!mapBounds) return [];
-      try {
-        const response = await fetch(`${ENV_CONFIG.api.baseUrl}/properties?bounds=${mapBounds.join(',')}`);
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || 'Failed to fetch properties');
-        }
-        const data = await response.json();
-        return data.properties || [];
-      } catch (error) {
-        console.error('Error fetching properties:', error);
-        return [];
-      }
-    },
-    enabled: !!mapBounds,
-    staleTime: 30000,
-    retry: 1,
-    refetchOnWindowFocus: false
-  });
 
   const focusOnLocation = useCallback((longitude: number, latitude: number) => {
     const map = mapRef.current?.getMap();
@@ -160,18 +102,8 @@ export function FieldMap() {
     setSelectedProperty(null);
   }, [setSelectedProperty]);
 
-  const handleMoveEnd = useCallback((bounds: [number, number, number, number]) => {
-    setMapBounds(bounds);
-    if (bounds.some(isNaN)) return;
-    debouncedSetBounds(bounds);
-  }, [debouncedSetBounds]);
-
   const handleLocationUpdate = useCallback((coords: [number, number]) => {
     setUserLocation(coords);
-  }, []);
-
-  const handleToggleFieldEquipment = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    setShowFieldEquipment(event.target.checked);
   }, []);
 
   const handlePropertyFiltersChange = useCallback((newFilters: Filters) => {
@@ -217,7 +149,7 @@ export function FieldMap() {
     if (equipmentLayerRef.current?.handleStartPlacement) {
       equipmentLayerRef.current.handleStartPlacement();
     }
-  }, []);
+  }, [setShowFieldEquipment]);
 
   const handlePropertyBoundaryClick = useCallback(async (propertyId: string, coordinates: [number, number]) => {
     if (!propertyId || !coordinates) return;
@@ -281,7 +213,7 @@ export function FieldMap() {
       return;
     }
     
-    setSelectedJobId(job.job_id);
+    setActiveJob(job);
     setShowSelectJobDialog(false);
     setShowFieldEquipment(true);
     
@@ -309,29 +241,13 @@ export function FieldMap() {
         if (isDev) console.warn('Selected job has no valid location data');
         setSelectedProperty(null);
       }
-      
-      setCurrentMode('edit');
     } catch (error) {
       console.error('Error setting up job:', error);
-      setSelectedJobId(undefined);
+      setActiveJob(null);
       setShowFieldEquipment(false);
-      setCurrentMode(null);
       setSelectedProperty(null);
     }
-  }, [setSelectedProperty, focusOnLocation, setCurrentMode]);
-
-  const handleModeChange = useCallback((mode: Mode) => {
-    if (mode === 'edit') {
-      if (!activeJob) {
-        setShowSelectJobDialog(true);
-        return;
-      }
-    } else {
-      setSelectedJobId(undefined);
-    }
-    
-    setCurrentMode(mode);
-  }, [activeJob]);
+  }, [setActiveJob, setSelectedProperty, setShowFieldEquipment, focusOnLocation]);
 
   const handleAddEquipment = useCallback(() => {
     if (!activeJob) {
@@ -347,7 +263,8 @@ export function FieldMap() {
     <Box sx={{ height: '100%', width: '100%', position: 'relative' }}>
       <BaseMap
         ref={mapRef}
-        {...viewState}
+        viewState={viewState}
+        onMove={handleViewStateChange}
         onMoveEnd={handleMoveEnd}
         onTrackingStart={() => setIsTracking(true)}
         onTrackingEnd={() => setIsTracking(false)}
@@ -409,10 +326,7 @@ export function FieldMap() {
           <EquipmentLayer
             ref={equipmentLayerRef}
             visible={showFieldEquipment}
-            selectedJobId={selectedJobId}
-            selectedPropertyId={selectedProperty?.id}
             bounds={mapBounds || undefined}
-            isAddMode={currentMode === 'edit'}
           />
         )}
         <FloorPlanLayer
@@ -422,15 +336,11 @@ export function FieldMap() {
       </BaseMap>
 
       <LayersControl
-        showFieldEquipment={showFieldEquipment}
-        onToggleFieldEquipment={handleToggleFieldEquipment}
         propertyFilters={filters}
         onPropertyFiltersChange={handlePropertyFiltersChange}
-        activePropertyId={activeProperty?.property_id}
       />
 
       <ModeSelector
-        onModeChange={handleModeChange}
         onAddEquipment={handleAddEquipment}
       />
 

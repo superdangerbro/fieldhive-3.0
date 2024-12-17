@@ -5,6 +5,7 @@ import Map, { MapRef, GeolocateControl } from 'react-map-gl';
 import { Box, useTheme } from '@mui/material';
 import mapboxgl from 'mapbox-gl';
 import { useFieldMap } from '../../../../../app/globalHooks/useFieldMap';
+import type { ViewState } from 'react-map-gl';
 
 // Initialize Mapbox token
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -16,6 +17,10 @@ if (!MAPBOX_TOKEN) {
 }
 
 interface BaseMapProps {
+  /** Current view state */
+  viewState: ViewState;
+  /** Callback fired when view state changes */
+  onMove?: (evt: { viewState: ViewState }) => void;
   /** Callback fired when map stops moving, provides bounds array */
   onMoveEnd?: (bounds: [number, number, number, number]) => void;
   /** Callback fired when geolocation tracking starts */
@@ -38,6 +43,8 @@ interface BaseMapProps {
  * - Child component rendering (markers, overlays, etc.)
  */
 export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
+  viewState,
+  onMove,
   onMoveEnd,
   onTrackingStart,
   onTrackingEnd,
@@ -45,7 +52,7 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
   children
 }, ref) => {
   const theme = useTheme();
-  const { viewState, setViewState, mapRef } = useFieldMap();
+  const { mapRef } = useFieldMap();
   const geolocateControlRef = useRef<mapboxgl.GeolocateControl>(null);
   const [isTracking, setIsTracking] = useState(false);
   const lastBoundsRef = useRef('');
@@ -115,28 +122,11 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
     }
   }, [ref, onMoveEnd]);
 
-  const handleMove = useCallback((evt: { viewState: typeof viewState }) => {
-    try {
-      console.log('View state updated:', evt.viewState);
-      setViewState(evt.viewState);
-    } catch (error) {
-      console.error('Error updating view state:', error);
-    }
-  }, [setViewState]);
-
   useEffect(() => {
     const onGeolocate = (e: { coords: { longitude: number; latitude: number } }) => {
       console.log('Geolocate event:', e);
       setIsTracking(true);
       onTrackingStart?.();
-      setViewState(prev => ({
-        ...prev,
-        longitude: e.coords.longitude,
-        latitude: e.coords.latitude,
-        zoom: 14,
-        bearing: 0,
-        pitch: 0
-      }));
       if (onLocationUpdate) {
         onLocationUpdate([e.coords.longitude, e.coords.latitude]);
       }
@@ -167,7 +157,7 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
         geolocateControlRef.current.off('trackuserlocationend', onGeolocateEnd);
       }
     };
-  }, [onTrackingStart, onTrackingEnd, onLocationUpdate, setViewState]);
+  }, [onTrackingStart, onTrackingEnd, onLocationUpdate]);
 
   return (
     <Box 
@@ -223,7 +213,7 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
         {...viewState}
         reuseMaps
         mapStyle="mapbox://styles/mapbox/dark-v10"
-        onMove={handleMove}
+        onMove={onMove}
         onMoveEnd={handleMoveEnd}
         attributionControl={false}
         style={{

@@ -13,37 +13,46 @@ import {
 import { Square3Stack3DIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { PropertyFilters } from './PropertyFilters';
 import { PropertyDetails } from './PropertyDetails';
-import { LayersControlProps, Filters } from './types';
+import { useMapContext } from '../../../../../app/globalHooks/useMapContext';
+import type { Filters } from './types';
 
-const defaultFilters: Filters = {
-  statuses: ['active'],
-  types: []
-};
+interface LayersControlProps {
+  propertyFilters: Filters;
+  onPropertyFiltersChange: (filters: Filters) => void;
+}
 
 export function LayersControl({ 
-  showFieldEquipment, 
-  onToggleFieldEquipment,
   propertyFilters,
   onPropertyFiltersChange,
-  activePropertyId
 }: LayersControlProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isPropertiesExpanded, setIsPropertiesExpanded] = useState(true);
   const theme = useTheme();
+
+  const {
+    activeProperty,
+    showFieldEquipment,
+    setShowFieldEquipment,
+    activeJob
+  } = useMapContext();
+
+  const handleToggleFieldEquipment = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setShowFieldEquipment(event.target.checked);
+  };
 
   return (
     <Paper
       elevation={2}
       sx={{
         position: 'absolute',
-        top: activePropertyId ? theme.spacing(9) : theme.spacing(3), // Adjusted to be below ActiveJobIndicator when property is selected
+        top: activeJob ? '72px' : '24px', // Increased spacing when job is active
         left: theme.spacing(2),
         backgroundColor: theme.palette.background.paper,
         borderRadius: 1,
         overflow: 'hidden',
-        zIndex: 1000,
+        zIndex: 1100, // Below ActiveJobIndicator but above map
         minWidth: 220,
-        transition: 'top 0.2s ease-in-out', // Smooth transition for top position change
+        transition: 'top 0.2s ease-in-out',
       }}
     >
       {/* Header */}
@@ -75,7 +84,7 @@ export function LayersControl({
             fontSize: '0.875rem',
           }}
         >
-          {activePropertyId ? 'Property Details' : 'Layers'}
+          {activeProperty ? 'Property Details' : 'Layers'}
         </Typography>
         <SvgIcon
           component={isExpanded ? ChevronUpIcon : ChevronDownIcon}
@@ -87,8 +96,8 @@ export function LayersControl({
 
       {/* Content */}
       <Collapse in={isExpanded}>
-        {activePropertyId ? (
-          <PropertyDetails propertyId={activePropertyId} />
+        {activeProperty ? (
+          <PropertyDetails propertyId={activeProperty.property_id} />
         ) : (
           <Box sx={{ px: 1.5, py: 1 }}>
             {/* Field Equipment Toggle */}
@@ -112,7 +121,7 @@ export function LayersControl({
               <Switch
                 size="small"
                 checked={showFieldEquipment}
-                onChange={onToggleFieldEquipment}
+                onChange={handleToggleFieldEquipment}
                 name="showFieldEquipment"
               />
             </Box>

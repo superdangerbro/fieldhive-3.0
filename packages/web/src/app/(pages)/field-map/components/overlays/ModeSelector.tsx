@@ -2,13 +2,12 @@
 
 import { WrenchIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import { MapPinIcon, DocumentPlusIcon } from '@heroicons/react/24/outline';
-import { useState } from 'react';
 import { Box, IconButton, Typography, useTheme } from '@mui/material';
+import { useMapContext } from '../../../../../app/globalHooks/useMapContext';
 
 export type Mode = 'edit' | 'service' | null;
 
 interface ModeSelectorProps {
-  onModeChange?: (mode: Mode) => void;
   onAddEquipment?: () => void;
   onAddFloorplan?: () => void;
 }
@@ -74,21 +73,47 @@ function FloatingButton({
   );
 }
 
-export function ModeSelector({ onModeChange, onAddEquipment, onAddFloorplan }: ModeSelectorProps) {
-  const [activeMode, setActiveMode] = useState<Mode>(null);
+export function ModeSelector({ onAddEquipment, onAddFloorplan }: ModeSelectorProps) {
   const theme = useTheme();
+  const {
+    activeMode,
+    activeJob,
+    setActiveMode,
+    setIsAddingEquipment,
+    setIsAddingFloorplan
+  } = useMapContext();
 
   const handleModeChange = (mode: Mode) => {
-    console.log('Mode changing to:', mode);
-    setActiveMode(activeMode === mode ? null : mode);
-    onModeChange?.(mode);
+    if (mode === 'edit' && !activeJob) {
+      // If trying to enter edit mode without an active job,
+      // let the parent component handle showing the job selection dialog
+      onAddEquipment?.();
+      return;
+    }
+    setActiveMode(mode);
+  };
+
+  const handleAddEquipment = () => {
+    if (!activeJob) {
+      onAddEquipment?.();
+      return;
+    }
+    setIsAddingEquipment(true);
+  };
+
+  const handleAddFloorplan = () => {
+    if (!activeJob) {
+      onAddEquipment?.();
+      return;
+    }
+    setIsAddingFloorplan(true);
   };
 
   return (
     <Box
       sx={{
         position: 'absolute',
-        bottom: { xs: theme.spacing(10), sm: theme.spacing(12) }, // Increased bottom spacing
+        bottom: { xs: theme.spacing(10), sm: theme.spacing(12) },
         left: { xs: theme.spacing(2), sm: theme.spacing(3) },
         display: 'flex',
         flexDirection: 'column',
@@ -106,11 +131,11 @@ export function ModeSelector({ onModeChange, onAddEquipment, onAddFloorplan }: M
             opacity: activeMode === 'edit' ? 1 : 0,
             pointerEvents: activeMode === 'edit' ? 'auto' : 'none',
           },
-          '& .button-1': { // Adjusted positioning for Add Equipment button
+          '& .button-1': {
             bottom: activeMode === 'edit' ? '90px' : '0px',
             left: activeMode === 'edit' ? '0px' : '0px',
           },
-          '& .button-2': { // Adjusted positioning for Add Floorplan button
+          '& .button-2': {
             bottom: activeMode === 'edit' ? '45px' : '0px',
             left: activeMode === 'edit' ? '70px' : '0px',
           }
@@ -123,7 +148,7 @@ export function ModeSelector({ onModeChange, onAddEquipment, onAddFloorplan }: M
           label="Add Equipment"
           color="#16a34a"
           title="Add Equipment"
-          onClick={onAddEquipment}
+          onClick={handleAddEquipment}
         />
 
         {/* Add Floorplan button */}
@@ -133,7 +158,7 @@ export function ModeSelector({ onModeChange, onAddEquipment, onAddFloorplan }: M
           label="Add Floorplan"
           color="#ea580c"
           title="Add Floorplan"
-          onClick={onAddFloorplan}
+          onClick={handleAddFloorplan}
           sx={{
             transitionDelay: '50ms',
           }}
