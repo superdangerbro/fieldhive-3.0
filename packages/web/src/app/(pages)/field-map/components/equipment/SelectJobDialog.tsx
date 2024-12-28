@@ -29,10 +29,18 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchIcon from '@mui/icons-material/Search';
 import { useQuery } from '@tanstack/react-query';
 import { useJobs } from '../../../jobs/hooks/useJobs';
-import { useActiveJobContext } from '../../../../../app/globalHooks/useActiveJobContext';
+import { useMapContext } from '../../../../../app/globalHooks/useMapContext';
 import { ENV_CONFIG } from '../../../../../app/config/environment';
 import type { Job } from '../../../../../app/globalTypes/job';
-import type { Property } from '../../../../../app/globalTypes/property';
+
+interface Property {
+  property_id: string;
+  name: string;
+  address?: string;
+  location?: {
+    coordinates: [number, number];
+  };
+}
 
 interface SelectJobDialogProps {
   open: boolean;
@@ -44,25 +52,26 @@ interface SelectJobDialogProps {
 type TabValue = 'nearby' | 'search';
 
 export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: SelectJobDialogProps) {
+  const { activeProperty, setActiveProperty, setActiveJob } = useMapContext();
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [activeTab, setActiveTab] = useState<TabValue>('nearby');
   const [searchTerm, setSearchTerm] = useState('');
-  const { setActiveJob, setActiveProperty, activeProperty } = useActiveJobContext();
 
-  // If we already have an activeProperty from the map, use it immediately
+  // Set selected property from active property when dialog opens
   useEffect(() => {
-    if (open && activeProperty && !selectedProperty) {
+    if (open && activeProperty) {
       setSelectedProperty(activeProperty);
-      setActiveTab('search'); // Switch to search tab since we have a property
     }
-  }, [open, activeProperty, selectedProperty]);
+  }, [open, activeProperty]);
 
   // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
       setSearchTerm('');
-      setActiveTab(activeProperty ? 'search' : 'nearby'); // Default to search if we have an active property
-      setSelectedProperty(null);
+      setActiveTab('nearby');
+      if (!activeProperty) {
+        setSelectedProperty(null);
+      }
     }
   }, [open, activeProperty]);
 
@@ -145,12 +154,15 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
   }, [setActiveProperty]);
 
   const handleJobSelect = useCallback((job: Job) => {
+    if (job.property) {
+      setActiveProperty(job.property);
+    }
     setActiveJob(job);
     if (onJobSelect) {
       onJobSelect(job);
     }
     onClose();
-  }, [setActiveJob, onJobSelect, onClose]);
+  }, [onJobSelect, onClose, setActiveProperty, setActiveJob]);
 
   const handleBack = useCallback(() => {
     setSelectedProperty(null);
@@ -183,7 +195,7 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
 
     return (
       <List>
-        {nearbyProperties.map((property) => (
+        {nearbyProperties.map((property: Property) => (
           <ListItem key={property.property_id} disablePadding>
             <ListItemButton onClick={() => handlePropertyClick(property)}>
               <ListItemText 
@@ -273,7 +285,6 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
         <Box sx={{ mt: 2 }}>
           {!selectedProperty && (
             <>
-
               <Tabs
                 value={activeTab}
                 onChange={(_, newValue) => setActiveTab(newValue)}
@@ -305,7 +316,6 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
 
               {activeTab === 'search' && (
                 <>
-
                   <TextField
                     fullWidth
                     placeholder="Search properties..."
@@ -339,14 +349,13 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
 
                   {searchTerm.length >= 3 && (
                     <>
-
                       {isLoadingSearch ? (
                         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
                           <CircularProgress />
                         </Box>
                       ) : searchedProperties.length > 0 ? (
                         <List>
-                          {searchedProperties.map((property) => (
+                          {searchedProperties.map((property: Property) => (
                             <ListItem key={property.property_id} disablePadding>
                               <ListItemButton onClick={() => handlePropertyClick(property)}>
                                 <ListItemText 
@@ -363,18 +372,14 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
                         </Typography>
                       )}
                     </>
-
                   )}
                 </>
-
               )}
             </>
-
           )}
 
           {selectedProperty && (
             <>
-
               {isLoadingJobs ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
                   <CircularProgress />
@@ -387,7 +392,6 @@ export function SelectJobDialog({ open, onClose, onJobSelect, userLocation }: Se
                 </Typography>
               )}
             </>
-
           )}
         </Box>
       </DialogContent>

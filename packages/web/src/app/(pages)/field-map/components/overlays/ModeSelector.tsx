@@ -84,21 +84,24 @@ export function ModeSelector({ onAddEquipment, onAddFloorplan }: ModeSelectorPro
   } = useMapContext();
 
   const handleModeChange = (mode: Mode) => {
-    if (mode === 'edit' && !activeJob) {
-      // If trying to enter edit mode without an active job,
-      // let the parent component handle showing the job selection dialog
-      onAddEquipment?.();
-      return;
-    }
+    // Always enter edit mode and show property selection if needed
     setActiveMode(mode);
+    if (mode === 'edit' && !activeJob) {
+      onAddEquipment?.();
+    }
   };
 
   const handleAddEquipment = () => {
+    console.log('ModeSelector: Add Equipment clicked', {
+      activeJob,
+      activeMode
+    });
     if (!activeJob) {
       onAddEquipment?.();
       return;
     }
     setIsAddingEquipment(true);
+    onAddEquipment?.();
   };
 
   const handleAddFloorplan = () => {
@@ -127,17 +130,18 @@ export function ModeSelector({ onAddEquipment, onAddFloorplan }: ModeSelectorPro
           width: 56,
           height: 56,
           '& .floating-button': {
-            transform: activeMode === 'edit' ? 'scale(1)' : 'scale(0)',
-            opacity: activeMode === 'edit' ? 1 : 0,
-            pointerEvents: activeMode === 'edit' ? 'auto' : 'none',
+            // Only show buttons when in edit mode AND have an active job
+            transform: (activeMode === 'edit' && activeJob) ? 'scale(1)' : 'scale(0)',
+            opacity: (activeMode === 'edit' && activeJob) ? 1 : 0,
+            pointerEvents: (activeMode === 'edit' && activeJob) ? 'auto' : 'none',
           },
           '& .button-1': {
-            bottom: activeMode === 'edit' ? '90px' : '0px',
-            left: activeMode === 'edit' ? '0px' : '0px',
+            bottom: (activeMode === 'edit' && activeJob) ? '90px' : '0px',
+            left: (activeMode === 'edit' && activeJob) ? '0px' : '0px',
           },
           '& .button-2': {
-            bottom: activeMode === 'edit' ? '45px' : '0px',
-            left: activeMode === 'edit' ? '70px' : '0px',
+            bottom: (activeMode === 'edit' && activeJob) ? '45px' : '0px',
+            left: (activeMode === 'edit' && activeJob) ? '70px' : '0px',
           }
         }}
       >

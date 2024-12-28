@@ -57,8 +57,10 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
       if (!response.ok) {
         throw new Error('Failed to fetch equipment types');
       }
-      return response.json();
-    }
+      const data = await response.json();
+      return data.types || []; // Ensure we return an array
+    },
+    initialData: []
   });
 
   // Fetch equipment statuses
@@ -73,8 +75,10 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
       if (!response.ok) {
         throw new Error('Failed to fetch equipment statuses');
       }
-      return response.json();
-    }
+      const data = await response.json();
+      return data.statuses || []; // Ensure we return an array
+    },
+    initialData: []
   });
 
   // Equipment placement actions
@@ -181,6 +185,7 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
     isPlacingEquipment,
     placementLocation,
     isAddEquipmentDialogOpen,
+    setIsAddEquipmentDialogOpen,
     isMarkerDialogOpen,
     selectedEquipment,
 

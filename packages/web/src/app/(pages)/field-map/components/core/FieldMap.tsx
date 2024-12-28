@@ -48,6 +48,7 @@ export function FieldMap() {
     statuses: ['active'],
     types: []
   });
+  const [isEditMode, setIsEditMode] = React.useState(false);
 
   const { 
     selectedProperty,
@@ -144,12 +145,16 @@ export function FieldMap() {
   }, [setSelectedProperty]);
 
   const handleWorkOnJob = useCallback((job: Job) => {
+    // Set the active job and enable field equipment layer
+    setActiveJob(job);
     setShowFieldEquipment(true);
     setShowSelectJobDialog(false);
+
+    // Start equipment placement if in edit mode
     if (equipmentLayerRef.current?.handleStartPlacement) {
       equipmentLayerRef.current.handleStartPlacement();
     }
-  }, [setShowFieldEquipment]);
+  }, [setActiveJob, setShowFieldEquipment]);
 
   const handlePropertyBoundaryClick = useCallback(async (propertyId: string, coordinates: [number, number]) => {
     if (!propertyId || !coordinates) return;
@@ -165,9 +170,11 @@ export function FieldMap() {
         throw new Error('No property data received');
       }
 
+      // Set the active property and show the job dialog
       setActiveProperty(propertyData);
       setShowSelectJobDialog(true);
       
+      // Center the map on the property boundary
       const map = mapRef.current?.getMap();
       if (map && propertyData.boundary?.geometry?.coordinates?.[0]) {
         try {
@@ -203,65 +210,57 @@ export function FieldMap() {
         });
       }
     } catch (error) {
-      console.error('Error fetching property details:', error);
+      console.error('Error fetching property:', error);
     }
   }, [setActiveProperty]);
 
-  const handleJobSelect = useCallback((job: Job | null) => {
-    if (!job) {
-      if (isDev) console.warn('No job provided to handleJobSelect');
-      return;
-    }
-    
-    setActiveJob(job);
-    setShowSelectJobDialog(false);
-    setShowFieldEquipment(true);
-    
+  const handleJobSelect = useCallback((job: Job) => {
     try {
-      if (job.property && 
-          typeof job.property === 'object' && 
-          job.property.location?.coordinates && 
-          Array.isArray(job.property.location.coordinates) && 
-          job.property.location.coordinates.length === 2) {
+      if (job.property?.location?.coordinates) {
+        // Set both active states
+        setActiveJob(job);
+        setActiveProperty(job.property);
         
-        setSelectedProperty({
-          id: job.property.property_id,
-          name: job.property.name || 'Unnamed Property',
-          location: {
-            latitude: job.property.location.coordinates[1],
-            longitude: job.property.location.coordinates[0]
-          }
-        });
-
+        // Enable equipment layer
+        setShowFieldEquipment(true);
+        setShowSelectJobDialog(false);
+        
+        // Center the map on the property
         focusOnLocation(
           job.property.location.coordinates[0],
           job.property.location.coordinates[1]
         );
       } else {
         if (isDev) console.warn('Selected job has no valid location data');
-        setSelectedProperty(null);
       }
     } catch (error) {
       console.error('Error setting up job:', error);
       setActiveJob(null);
+      setActiveProperty(null);
       setShowFieldEquipment(false);
-      setSelectedProperty(null);
     }
-  }, [setActiveJob, setSelectedProperty, setShowFieldEquipment, focusOnLocation]);
+  }, [setActiveJob, setActiveProperty, setShowFieldEquipment, focusOnLocation, isDev]);
 
   const handleAddEquipment = useCallback(() => {
+    console.log('Add Equipment clicked', {
+      activeJob,
+      equipmentLayerRef: equipmentLayerRef.current,
+      showFieldEquipment
+    });
     if (!activeJob) {
       setShowSelectJobDialog(true);
       return;
     }
+    setShowFieldEquipment(true);
     if (equipmentLayerRef.current?.handleStartPlacement) {
       equipmentLayerRef.current.handleStartPlacement();
     }
-  }, [activeJob]);
+  }, [activeJob, showFieldEquipment]);
 
   return (
-    <Box sx={{ height: '100%', width: '100%', position: 'relative' }}>
+    <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
       <BaseMap
+        id="map"
         ref={mapRef}
         viewState={viewState}
         onMove={handleViewStateChange}
@@ -270,18 +269,26 @@ export function FieldMap() {
         onTrackingEnd={() => setIsTracking(false)}
         onLocationUpdate={handleLocationUpdate}
       >
-        <PropertyLayer
-          onPropertyClick={handlePropertyClick}
+        <ActiveJobIndicator />
+        
+        {/* Property Layers */}
+        <PropertyBoundaryLayer
+          bounds={mapBounds}
+          filters={filters}
+          onPropertyClick={handlePropertyBoundaryClick}
+          activePropertyId={activeProperty?.property_id}
+          highlightColor={theme.palette.primary.main}
         />
-        {mapBounds && (
-          <PropertyBoundaryLayer
-            bounds={mapBounds}
-            filters={filters}
-            onPropertyClick={handlePropertyBoundaryClick}
-            activePropertyId={activeProperty?.property_id}
-            highlightColor={theme.palette.primary.main}
-          />
-        )}
+        
+        {/* Equipment Layer */}
+        <EquipmentLayer 
+          ref={equipmentLayerRef}
+          visible={showFieldEquipment}
+          bounds={mapBounds}
+          mapRef={mapRef}
+        />
+
+        {/* User Location */}
         {propertiesWithinBounds?.filter(property => 
           property?.location?.coordinates && 
           Array.isArray(property.location.coordinates) && 
@@ -322,18 +329,16 @@ export function FieldMap() {
             </Box>
           </Marker>
         ))}
-        {showFieldEquipment && (
-          <EquipmentLayer
-            ref={equipmentLayerRef}
-            visible={showFieldEquipment}
-            bounds={mapBounds || undefined}
-          />
-        )}
-        <FloorPlanLayer
-          mapRef={mapRef}
-          selectedPropertyId={selectedProperty?.id}
-        />
       </BaseMap>
+
+      {/* Controls */}
+      <MapControls
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onStyleChange={handleStyleChange}
+        onTrackingToggle={() => setIsTracking(!isTracking)}
+        isTracking={isTracking}
+      />
 
       <LayersControl
         propertyFilters={filters}
@@ -344,30 +349,15 @@ export function FieldMap() {
         onAddEquipment={handleAddEquipment}
       />
 
-      <MapControls
-        onStyleChange={handleStyleChange}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        isTracking={isTracking}
-      />
-
-      {selectedPropertyId && (
-        <PropertyDetailsDialog
-          propertyId={selectedPropertyId}
-          onClose={handleClosePropertyDetails}
-          onWorkOnJob={handleWorkOnJob}
-        />
-      )}
-
+      {/* Job Selection Dialog */}
       {showSelectJobDialog && (
         <SelectJobDialog
           open={showSelectJobDialog}
           onClose={() => setShowSelectJobDialog(false)}
           onJobSelect={handleJobSelect}
+          userLocation={userLocation}
         />
       )}
-
-      <ActiveJobIndicator />
     </Box>
   );
 }

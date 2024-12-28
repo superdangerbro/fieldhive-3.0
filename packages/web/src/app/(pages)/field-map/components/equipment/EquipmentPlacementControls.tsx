@@ -4,6 +4,7 @@ import React from 'react';
 import { Box, Button } from '@mui/material';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
+import styled from '@emotion/styled';
 
 interface EquipmentPlacementControlsProps {
   /** Handler for confirming equipment placement */
@@ -11,6 +12,20 @@ interface EquipmentPlacementControlsProps {
   /** Handler for canceling equipment placement */
   onCancel: () => void;
 }
+
+const ControlsContainer = styled.div`
+  position: absolute;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  gap: 8px;
+  background-color: white;
+  padding: 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+`;
 
 /**
  * Controls for equipment placement workflow
@@ -33,22 +48,7 @@ export function EquipmentPlacementControls({
   onCancel
 }: EquipmentPlacementControlsProps) {
   return (
-    <Box
-      sx={{
-        position: 'absolute',
-        bottom: 32,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        display: 'flex',
-        gap: 2,
-        zIndex: 1000,
-        padding: '8px 16px',
-        borderRadius: '12px',
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        backdropFilter: 'blur(8px)',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-      }}
-    >
+    <ControlsContainer>
       <Button
         variant="contained"
         color="error"
@@ -85,6 +85,6 @@ export function EquipmentPlacementControls({
       >
         Place Equipment
       </Button>
-    </Box>
+    </ControlsContainer>
   );
 }

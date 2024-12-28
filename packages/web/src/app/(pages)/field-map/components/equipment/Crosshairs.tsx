@@ -17,10 +17,15 @@ interface CrosshairsProps {
  */
 export function Crosshairs({ onLocationConfirmed }: CrosshairsProps) {
   // Get the current map center when clicked
-  const handleMapClick = () => {
-    // This would need to be implemented to get the actual map center coordinates
-    // For now, using placeholder coordinates
-    onLocationConfirmed([0, 0]);
+  const handleMapClick = (event: React.MouseEvent) => {
+    const mapElement = document.getElementById('map');
+    if (!mapElement) return;
+
+    const map = (mapElement as any).__mbgl;
+    if (!map) return;
+
+    const center = map.getCenter();
+    onLocationConfirmed([center.lng, center.lat]);
   };
 
   return (

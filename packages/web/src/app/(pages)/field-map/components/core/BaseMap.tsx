@@ -31,6 +31,8 @@ interface BaseMapProps {
   onLocationUpdate?: (coords: [number, number]) => void;
   /** Child components to render within the map */
   children?: React.ReactNode;
+  /** HTML ID for the map container */
+  id?: string;
 }
 
 /**
@@ -49,7 +51,8 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
   onTrackingStart,
   onTrackingEnd,
   onLocationUpdate,
-  children
+  children,
+  id
 }, ref) => {
   const theme = useTheme();
   const { mapRef } = useFieldMap();
@@ -161,6 +164,7 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
 
   return (
     <Box 
+      id={id}
       sx={{ 
         height: '100%',
         width: '100%',

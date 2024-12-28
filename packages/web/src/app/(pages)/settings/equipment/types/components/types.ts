@@ -29,9 +29,25 @@ export interface FormField {
     description?: string;
 }
 
+export interface InspectionSection {
+    title: string;
+    description?: string;
+    fields: FormField[];
+    conditions?: Condition[]; // Section-level conditions
+}
+
 // Extend the global EquipmentType interface
 export interface EquipmentTypeConfig extends EquipmentType {
-    fields: FormField[];  // Make fields required and strongly typed
+    fields: FormField[];  // Equipment fields
+    inspectionConfig?: {
+        sections: InspectionSection[];
+        defaultFrequency?: {
+            value: number;
+            unit: 'days' | 'weeks' | 'months' | 'years';
+        };
+        requirePhotos?: boolean;
+        requireNotes?: boolean;
+    };
 }
 
 export interface NewFieldState extends Omit<FormField, 'name'> {

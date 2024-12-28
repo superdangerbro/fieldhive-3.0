@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Box, Tabs, Tab } from '@mui/material';
+import { Box, Tabs, Tab, Paper } from '@mui/material';
 import { EquipmentTab } from './equipment/EquipmentTab';
 import { JobsTab } from './jobs/JobsTab';
 import { AccountsTab } from './accounts/AccountsTab';
@@ -58,27 +58,64 @@ export default function SettingsPage() {
   };
 
   return (
-    <Box sx={{ width: '100%' }}>
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3, pt: 2 }}>
-        <Tabs value={value} onChange={handleChange}>
-          <Tab label="Equipment" />
-          <Tab label="Jobs" />
-          <Tab label="Accounts" />
-          <Tab label="Properties" />
-        </Tabs>
+    <Box sx={{ 
+      width: '100%', 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      position: 'relative',
+      zIndex: 0 // Ensure it's below the AppBar
+    }}>
+      <Paper 
+        elevation={2} 
+        sx={{ 
+          width: '100%',
+          position: 'sticky',
+          top: 0,
+          backgroundColor: 'background.paper',
+          zIndex: 1
+        }}
+      >
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3, pt: 2 }}>
+          <Tabs 
+            value={value} 
+            onChange={handleChange}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{
+              '.MuiTabs-indicator': {
+                backgroundColor: 'primary.main',
+              },
+              '.MuiTab-root': {
+                color: 'text.primary',
+                '&.Mui-selected': {
+                  color: 'primary.main',
+                },
+              },
+            }}
+          >
+            <Tab label="Equipment" />
+            <Tab label="Jobs" />
+            <Tab label="Accounts" />
+            <Tab label="Properties" />
+          </Tabs>
+        </Box>
+      </Paper>
+
+      <Box sx={{ flex: 1, overflow: 'auto', mt: 2 }}>
+        <TabPanel value={value} index={0}>
+          <EquipmentTab />
+        </TabPanel>
+        <TabPanel value={value} index={1}>
+          <JobsTab />
+        </TabPanel>
+        <TabPanel value={value} index={2}>
+          <AccountsTab />
+        </TabPanel>
+        <TabPanel value={value} index={3}>
+          <PropertiesTab />
+        </TabPanel>
       </Box>
-      <TabPanel value={value} index={0}>
-        <EquipmentTab />
-      </TabPanel>
-      <TabPanel value={value} index={1}>
-        <JobsTab />
-      </TabPanel>
-      <TabPanel value={value} index={2}>
-        <AccountsTab />
-      </TabPanel>
-      <TabPanel value={value} index={3}>
-        <PropertiesTab />
-      </TabPanel>
     </Box>
   );
 }

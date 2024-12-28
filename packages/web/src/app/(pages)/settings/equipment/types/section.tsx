@@ -18,12 +18,15 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import AddIcon from '@mui/icons-material/Add';
+import SettingsIcon from '@mui/icons-material/Settings';
 import { useEquipmentTypes, useUpdateEquipmentTypes } from '../hooks/useEquipment';
 import { useCrudDialogs } from '@/app/globalHooks/useCrudDialogs';
 import { CrudFormDialog, CrudDeleteDialog } from '@/app/globalComponents/crud/CrudDialogs';
 import type { EquipmentTypeConfig, FormField } from './components/types';
 import { AddFieldForm } from './components/AddFieldForm';
 import { FieldList } from './components/FieldList';
+import { InspectionFormBuilder } from './components/InspectionFormBuilder';
 
 export function EquipmentTypeSection() {
     console.log('EquipmentTypeSection render');
@@ -33,6 +36,7 @@ export function EquipmentTypeSection() {
     const [expandedType, setExpandedType] = React.useState<string | null>(null);
     const [addingFieldsTo, setAddingFieldsTo] = React.useState<string | null>(null);
     const [editingField, setEditingField] = React.useState<{ typeValue: string; field: FormField } | null>(null);
+    const [configuringInspection, setConfiguringInspection] = React.useState<string | null>(null);
     const formRef = React.useRef<HTMLFormElement>(null);
 
     const handleSave = async (data: EquipmentTypeConfig) => {
@@ -188,14 +192,22 @@ export function EquipmentTypeSection() {
 
                             <Typography sx={{ flex: 1 }}>{type.label}</Typography>
 
-                            <Button
-                                onClick={() => setAddingFieldsTo(type.value)}
-                                variant="outlined"
-                                size="small"
-                                sx={{ mr: 1 }}
-                            >
-                                Add Field
-                            </Button>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                <Button
+                                    size="small"
+                                    onClick={() => setAddingFieldsTo(type.value)}
+                                    startIcon={<AddIcon />}
+                                >
+                                    Add Field
+                                </Button>
+                                <Button
+                                    size="small"
+                                    onClick={() => setConfiguringInspection(type.value)}
+                                    startIcon={<SettingsIcon />}
+                                >
+                                    Configure Inspection Form
+                                </Button>
+                            </Box>
 
                             <IconButton onClick={() => openEditDialog(type)}>
                                 <EditIcon />
@@ -320,6 +332,28 @@ export function EquipmentTypeSection() {
                             existingFields={(types.find(t => t.value === editingField.typeValue)?.fields || [])
                                 .filter(f => f.name !== editingField.field.name)
                                 .map(f => f.name)}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog 
+                open={!!configuringInspection} 
+                onClose={() => setConfiguringInspection(null)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogContent>
+                    {configuringInspection && (
+                        <InspectionFormBuilder
+                            equipmentType={types.find(t => t.value === configuringInspection)!}
+                            onSave={async (updatedType) => {
+                                const updatedTypes = types.map(type => 
+                                    type.value === configuringInspection ? updatedType : type
+                                );
+                                await updateMutation.mutateAsync(updatedTypes);
+                                setConfiguringInspection(null);
+                            }}
                         />
                     )}
                 </DialogContent>

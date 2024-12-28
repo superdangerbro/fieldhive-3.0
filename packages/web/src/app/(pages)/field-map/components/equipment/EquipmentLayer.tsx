@@ -1,20 +1,24 @@
 'use client';
 
-import React, { forwardRef, useImperativeHandle } from 'react';
+import React, { forwardRef, useImperativeHandle, useEffect } from 'react';
 import { Box } from '@mui/material';
 import { Marker } from 'react-map-gl';
 import { Crosshairs } from './Crosshairs';
 import { AddEquipmentDialog } from './AddEquipmentDialog';
 import { EquipmentMarkerDialog } from './EquipmentMarkerDialog';
+import { EquipmentPlacementControls } from './EquipmentPlacementControls';
 import { useEquipment } from '../../../../../app/globalHooks/useEquipment';
 import { useMapContext } from '../../../../../app/globalHooks/useMapContext';
 import type { Equipment, CreateEquipmentDto } from '../../../../../app/globalTypes/equipment';
+import type { MapRef } from 'react-map-gl';
 
 interface EquipmentLayerProps {
   /** Whether equipment markers should be visible */
   visible?: boolean;
   /** Current map bounds */
   bounds?: [number, number, number, number];
+  /** Reference to the map instance */
+  mapRef?: React.RefObject<MapRef>;
 }
 
 export interface EquipmentLayerHandle {
@@ -32,6 +36,7 @@ export interface EquipmentLayerHandle {
 export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerProps>(({
   visible = false,
   bounds,
+  mapRef
 }, ref) => {
   // Get map context
   const {
@@ -44,36 +49,48 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
 
   // Equipment data and state management
   const {
-    equipment = [],  // Provide default empty array
-    addEquipment,
-    updateEquipment,
-    deleteEquipment,
+    equipmentList,
     isLoading,
-    isPlacingEquipment,
+    error,
     placementLocation,
+    isPlacingEquipment,
     isAddEquipmentDialogOpen,
     isMarkerDialogOpen,
     selectedEquipment,
-    startPlacingEquipment,
-    cancelPlacingEquipment,
+    addEquipment,
+    deleteEquipment,
+    updateEquipment,
     setPlacementLocation,
     confirmPlacementLocation,
     openMarkerDialog,
-    closeMarkerDialog
+    closeMarkerDialog,
+    setIsAddEquipmentDialogOpen,
+    cancelPlacingEquipment,
+    startPlacingEquipment
   } = useEquipment({ bounds });
 
   // Validate requirements before allowing equipment placement
   const canPlaceEquipment = activeProperty?.property_id && activeJob?.job_id && activeMode === 'edit';
 
+  // Handle isAddingEquipment changes
+  useEffect(() => {
+    if (isAddingEquipment && canPlaceEquipment) {
+      startPlacingEquipment();
+    }
+  }, [isAddingEquipment, canPlaceEquipment, startPlacingEquipment]);
+
   // Expose the start placement handler to parent components
   useImperativeHandle(ref, () => ({
     handleStartPlacement: () => {
-      if (!canPlaceEquipment) {
-        console.warn('Cannot place equipment: Property and job must be selected');
-        return;
+      console.log('Starting equipment placement with:', {
+        canPlaceEquipment,
+        activeProperty,
+        activeJob,
+        activeMode
+      });
+      if (canPlaceEquipment) {
+        setIsAddingEquipment(true);
       }
-      setIsAddingEquipment(true);
-      startPlacingEquipment();
     }
   }));
 
@@ -82,7 +99,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   return (
     <>
       {/* Equipment Markers */}
-      {Array.isArray(equipment) && equipment.map((eq: Equipment) => {
+      {Array.isArray(equipmentList) && equipmentList.map((eq: Equipment) => {
         if (!eq?.location?.coordinates) return null;
         const [longitude, latitude] = eq.location.coordinates;
 
@@ -116,10 +133,26 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
 
       {/* Equipment placement crosshair */}
       {isPlacingEquipment && canPlaceEquipment && (
-        <Crosshairs onLocationConfirmed={(location) => {
-          setPlacementLocation(location);
-          confirmPlacementLocation();
-        }} />
+        <>
+          <Crosshairs onLocationConfirmed={(location) => {
+            setPlacementLocation(location);
+            setIsAddEquipmentDialogOpen(true);
+          }} />
+          <EquipmentPlacementControls
+            onConfirm={() => {
+              const mapInstance = mapRef?.current?.getMap();
+              if (!mapInstance) return;
+              
+              const center = mapInstance.getCenter();
+              setPlacementLocation([center.lng, center.lat]);
+              setIsAddEquipmentDialogOpen(true);
+            }}
+            onCancel={() => {
+              cancelPlacingEquipment();
+              setIsAddingEquipment(false);
+            }}
+          />
+        </>
       )}
 
       {/* Add equipment dialog */}
@@ -127,6 +160,9 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
         <AddEquipmentDialog
           open={isAddEquipmentDialogOpen}
           location={placementLocation}
+          propertyName={activeProperty.name}
+          propertyType={activeProperty.type}
+          jobType={activeJob.type || 'Unknown'}
           onClose={() => {
             cancelPlacingEquipment();
             setIsAddingEquipment(false);
@@ -135,13 +171,18 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
             const equipmentData: CreateEquipmentDto = {
               ...data,
               property_id: activeProperty.property_id,
+              property_name: activeProperty.name,
+              property_type: activeProperty.type,
               job_id: activeJob.job_id,
+              job_type: activeJob.type,
               location: {
-                coordinates: placementLocation
+                type: 'Point',
+                coordinates: [placementLocation[0], placementLocation[1]]
               }
             };
             await addEquipment.mutateAsync(equipmentData);
             setIsAddingEquipment(false);
+            setIsAddEquipmentDialogOpen(false);
           }}
         />
       )}

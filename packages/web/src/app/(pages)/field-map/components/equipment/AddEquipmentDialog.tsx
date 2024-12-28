@@ -42,6 +42,9 @@ interface AddEquipmentDialogProps {
     status: string;
     data: Record<string, any>;
   }) => Promise<void>;
+  propertyName: string;
+  propertyType: string;
+  jobType: string;
 }
 
 /**
@@ -57,6 +60,9 @@ export function AddEquipmentDialog({
   location,
   onClose,
   onSubmit,
+  propertyName,
+  propertyType,
+  jobType,
 }: AddEquipmentDialogProps) {
   const { equipmentTypes, equipmentStatuses, isLoading } = useEquipment();
   const [selectedType, setSelectedType] = useState('');
@@ -72,7 +78,7 @@ export function AddEquipmentDialog({
       setSelectedType('');
       setSelectedStatus('');
       setEquipmentName('');
-      setFormData({});
+      setFormData({}); // Reset form data when type changes
       setError(null);
     }
   }, [open]);
@@ -137,7 +143,7 @@ export function AddEquipmentDialog({
       setSelectedType('');
       setSelectedStatus('');
       setEquipmentName('');
-      setFormData({});
+      setFormData({}); // Reset form data when type changes
     } catch (err) {
       console.error('Failed to add equipment:', err);
       setError(err instanceof Error ? err.message : 'Failed to add equipment');
@@ -278,9 +284,18 @@ export function AddEquipmentDialog({
             mt: 2,
           }}
         >
-          <Typography variant="body2" color="text.secondary">
-            Location: {location[0].toFixed(6)}, {location[1].toFixed(6)}
-          </Typography>
+          {/* Context Information */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Location: {location[0].toFixed(6)}, {location[1].toFixed(6)}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Property: {propertyName} ({propertyType})
+            </Typography>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Job Type: {jobType}
+            </Typography>
+          </Box>
 
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -304,7 +319,7 @@ export function AddEquipmentDialog({
               label="Equipment Type"
               onChange={(e) => {
                 setSelectedType(e.target.value);
-                setFormData({});  // Reset form data when type changes
+                setFormData({}); // Reset form data when type changes
               }}
               disabled={isSubmitting || isLoading}
               required
