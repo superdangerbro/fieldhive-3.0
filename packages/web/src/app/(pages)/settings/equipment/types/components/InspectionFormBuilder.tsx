@@ -8,17 +8,9 @@ import {
     Paper,
     IconButton,
     TextField,
-    Select,
-    MenuItem,
-    FormControl,
-    FormControlLabel,
-    Switch,
-    InputLabel,
-    Divider,
     Dialog,
     DialogTitle,
     DialogContent,
-    DialogActions,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -35,14 +27,10 @@ interface InspectionFormBuilderProps {
 export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormBuilderProps) {
     const [inspectionConfig, setInspectionConfig] = useState(
         equipmentType.inspectionConfig || {
-            sections: [],
-            defaultFrequency: { value: 1, unit: 'months' },
-            requirePhotos: true,
-            requireNotes: true,
+            sections: []
         }
     );
     const [addingSectionIndex, setAddingSectionIndex] = useState<number | null>(null);
-    const [editingSectionIndex, setEditingSectionIndex] = useState<number | null>(null);
 
     const handleAddSection = () => {
         setInspectionConfig(prev => ({
@@ -102,24 +90,32 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
     const handleDragEnd = (result: any) => {
         if (!result.destination) return;
 
-        const { source, destination } = result;
-        const sections = Array.from(inspectionConfig.sections);
+        const { source, destination, type } = result;
         
-        if (source.droppableId === 'sections') {
+        if (type === 'SECTION') {
+            const sections = Array.from(inspectionConfig.sections);
             const [removed] = sections.splice(source.index, 1);
             sections.splice(destination.index, 0, removed);
             setInspectionConfig(prev => ({ ...prev, sections }));
-        } else {
-            // Handle field reordering within sections
-            const [sourceSection, destSection] = source.droppableId.split('-')[1].split('to');
-            if (sourceSection === destSection) {
-                const section = sections[parseInt(sourceSection)];
-                const fields = Array.from(section.fields);
-                const [removed] = fields.splice(source.index, 1);
-                fields.splice(destination.index, 0, removed);
-                sections[parseInt(sourceSection)] = { ...section, fields };
-                setInspectionConfig(prev => ({ ...prev, sections }));
+        } else if (type === 'FIELD') {
+            const sections = Array.from(inspectionConfig.sections);
+            const sourceSection = sections[parseInt(source.droppableId)];
+            const destSection = sections[parseInt(destination.droppableId)];
+            
+            const sourceFields = Array.from(sourceSection.fields);
+            const [removed] = sourceFields.splice(source.index, 1);
+            
+            if (source.droppableId === destination.droppableId) {
+                sourceFields.splice(destination.index, 0, removed);
+                sections[parseInt(source.droppableId)] = { ...sourceSection, fields: sourceFields };
+            } else {
+                const destFields = Array.from(destSection.fields);
+                destFields.splice(destination.index, 0, removed);
+                sections[parseInt(source.droppableId)] = { ...sourceSection, fields: sourceFields };
+                sections[parseInt(destination.droppableId)] = { ...destSection, fields: destFields };
             }
+            
+            setInspectionConfig(prev => ({ ...prev, sections }));
         }
     };
 
@@ -141,77 +137,14 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
                 </Typography>
             </Box>
 
-            {/* General Settings */}
-            <Paper sx={{ p: 2, mb: 3 }}>
-                <Typography variant="subtitle1" gutterBottom>
-                    General Settings
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                    <TextField
-                        label="Default Frequency Value"
-                        type="number"
-                        value={inspectionConfig.defaultFrequency?.value}
-                        onChange={(e) => setInspectionConfig(prev => ({
-                            ...prev,
-                            defaultFrequency: {
-                                ...prev.defaultFrequency!,
-                                value: parseInt(e.target.value)
-                            }
-                        }))}
-                        sx={{ width: 150 }}
-                    />
-                    <FormControl sx={{ width: 150 }}>
-                        <InputLabel>Frequency Unit</InputLabel>
-                        <Select
-                            value={inspectionConfig.defaultFrequency?.unit}
-                            onChange={(e) => setInspectionConfig(prev => ({
-                                ...prev,
-                                defaultFrequency: {
-                                    ...prev.defaultFrequency!,
-                                    unit: e.target.value as any
-                                }
-                            }))}
-                        >
-                            <MenuItem value="days">Days</MenuItem>
-                            <MenuItem value="weeks">Weeks</MenuItem>
-                            <MenuItem value="months">Months</MenuItem>
-                            <MenuItem value="years">Years</MenuItem>
-                        </Select>
-                    </FormControl>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                    <FormControlLabel
-                        control={
-                            <Switch
-                                checked={inspectionConfig.requirePhotos}
-                                onChange={(e) => setInspectionConfig(prev => ({
-                                    ...prev,
-                                    requirePhotos: e.target.checked
-                                }))}
-                            />
-                        }
-                        label="Require Photos"
-                    />
-                    <FormControlLabel
-                        control={
-                            <Switch
-                                checked={inspectionConfig.requireNotes}
-                                onChange={(e) => setInspectionConfig(prev => ({
-                                    ...prev,
-                                    requireNotes: e.target.checked
-                                }))}
-                            />
-                        }
-                        label="Require Notes"
-                    />
-                </Box>
-            </Paper>
-
-            {/* Sections */}
             <DragDropContext onDragEnd={handleDragEnd}>
-                <Droppable droppableId="sections">
+                <Droppable droppableId="sections" type="SECTION">
                     {(provided) => (
-                        <Box ref={provided.innerRef} {...provided.droppableProps}>
+                        <Box 
+                            ref={provided.innerRef} 
+                            {...provided.droppableProps}
+                            sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+                        >
                             {inspectionConfig.sections.map((section, sectionIndex) => (
                                 <Draggable
                                     key={`section-${sectionIndex}`}
@@ -222,7 +155,7 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
                                         <Paper
                                             ref={provided.innerRef}
                                             {...provided.draggableProps}
-                                            sx={{ mb: 2, p: 2 }}
+                                            sx={{ p: 2 }}
                                         >
                                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                                                 <Box {...provided.dragHandleProps}>
@@ -242,10 +175,18 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
                                                 </IconButton>
                                             </Box>
 
-                                            {/* Fields */}
-                                            <Droppable droppableId={`fields-${sectionIndex}`}>
+                                            <Droppable droppableId={String(sectionIndex)} type="FIELD">
                                                 {(provided) => (
-                                                    <Box ref={provided.innerRef} {...provided.droppableProps}>
+                                                    <Box 
+                                                        ref={provided.innerRef} 
+                                                        {...provided.droppableProps}
+                                                        sx={{ 
+                                                            minHeight: 50,
+                                                            backgroundColor: 'background.default',
+                                                            borderRadius: 1,
+                                                            p: 1
+                                                        }}
+                                                    >
                                                         {section.fields.map((field, fieldIndex) => (
                                                             <Draggable
                                                                 key={`field-${sectionIndex}-${fieldIndex}`}
@@ -261,13 +202,18 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
                                                                             display: 'flex',
                                                                             alignItems: 'center',
                                                                             p: 1,
-                                                                            borderBottom: '1px solid',
-                                                                            borderColor: 'divider'
+                                                                            mb: 1,
+                                                                            backgroundColor: 'background.paper',
+                                                                            borderRadius: 1,
+                                                                            boxShadow: 1
                                                                         }}
                                                                     >
-                                                                        <DragIndicatorIcon sx={{ mr: 1 }} />
+                                                                        <DragIndicatorIcon sx={{ mr: 1, color: 'text.secondary' }} />
                                                                         <Typography>{field.label}</Typography>
                                                                         <Box sx={{ flex: 1 }} />
+                                                                        <Typography variant="caption" color="text.secondary" sx={{ mr: 2 }}>
+                                                                            {field.type}
+                                                                        </Typography>
                                                                         <IconButton
                                                                             onClick={() => handleDeleteField(sectionIndex, fieldIndex)}
                                                                             size="small"

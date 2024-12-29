@@ -39,14 +39,10 @@ export interface InspectionSection {
 // Extend the global EquipmentType interface
 export interface EquipmentTypeConfig extends EquipmentType {
     fields: FormField[];  // Equipment fields
+    barcodeRequired: boolean; // Whether this equipment type requires a barcode
+    photoRequired: boolean; // Whether this equipment type requires a photo
     inspectionConfig?: {
         sections: InspectionSection[];
-        defaultFrequency?: {
-            value: number;
-            unit: 'days' | 'weeks' | 'months' | 'years';
-        };
-        requirePhotos?: boolean;
-        requireNotes?: boolean;
     };
 }
 

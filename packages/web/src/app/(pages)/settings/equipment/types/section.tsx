@@ -7,12 +7,16 @@ import {
     Button,
     List,
     ListItem,
+    ListItemButton,
     IconButton,
     CircularProgress,
     TextField,
     Collapse,
     Dialog,
-    DialogContent
+    DialogContent,
+    FormControlLabel,
+    Switch,
+    Divider
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -20,6 +24,8 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import AddIcon from '@mui/icons-material/Add';
 import SettingsIcon from '@mui/icons-material/Settings';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useEquipmentTypes, useUpdateEquipmentTypes } from '../hooks/useEquipment';
 import { useCrudDialogs } from '@/app/globalHooks/useCrudDialogs';
 import { CrudFormDialog, CrudDeleteDialog } from '@/app/globalComponents/crud/CrudDialogs';
@@ -168,80 +174,119 @@ export function EquipmentTypeSection() {
                 {types.map((type: EquipmentTypeConfig) => (
                     <ListItem
                         key={type.value}
+                        disablePadding
                         sx={{
-                            flexDirection: 'column',
-                            alignItems: 'stretch',
-                            bgcolor: 'background.paper',
-                            mb: 1,
+                            display: 'block',
+                            backgroundColor: 'background.paper',
+                            mb: 2,
                             borderRadius: 1,
-                            border: '1px solid',
-                            borderColor: 'divider'
+                            boxShadow: 1
                         }}
                     >
-                        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                            <IconButton
-                                onClick={() => setExpandedType(expandedType === type.value ? null : type.value)}
-                                size="small"
-                            >
-                                {expandedType === type.value ? (
-                                    <KeyboardArrowDownIcon />
-                                ) : (
-                                    <KeyboardArrowRightIcon />
-                                )}
-                            </IconButton>
-
-                            <Typography sx={{ flex: 1 }}>{type.label}</Typography>
-
-                            <Box sx={{ display: 'flex', gap: 1 }}>
-                                <Button
-                                    size="small"
-                                    onClick={() => setAddingFieldsTo(type.value)}
-                                    startIcon={<AddIcon />}
-                                >
-                                    Add Field
-                                </Button>
-                                <Button
-                                    size="small"
-                                    onClick={() => setConfiguringInspection(type.value)}
-                                    startIcon={<SettingsIcon />}
-                                >
-                                    Configure Inspection Form
-                                </Button>
-                            </Box>
-
-                            <IconButton onClick={() => openEditDialog(type)}>
-                                <EditIcon />
-                            </IconButton>
-                            <IconButton onClick={() => openDeleteDialog(type)}>
-                                <DeleteIcon />
-                            </IconButton>
-                        </Box>
-
-                        <Collapse in={expandedType === type.value} sx={{ width: '100%', pl: 6 }}>
-                            <Box sx={{ py: 1 }}>
-                                <FieldList
-                                    fields={type.fields}
-                                    onDeleteField={(name) => handleDeleteField(type.value, name)}
-                                    onEditField={(field) => setEditingField({ typeValue: type.value, field })}
-                                    onAddCondition={(fieldName, condition) => {
-                                        const field = type.fields.find(f => f.name === fieldName);
-                                        if (field) {
-                                            handleEditField(type.value, field, {
-                                                ...field,
-                                                conditions: [...(field.conditions || []), condition]
-                                            });
-                                        }
-                                    }}
-                                    onDeleteCondition={(fieldName, conditionIndex) => {
-                                        const field = type.fields.find(f => f.name === fieldName);
-                                        if (field && field.conditions) {
-                                            handleEditField(type.value, field, {
-                                                ...field,
-                                                conditions: field.conditions.filter((_, i) => i !== conditionIndex)
-                                            });
-                                        }
-                                    }}
-                                />
+                        <ListItemButton onClick={() => setExpandedType(expandedType === type.value ? null : type.value)} sx={{ p: 2 }}>
+                            <Typography variant="h5" sx={{ flex: 1, fontWeight: 600, fontSize: '1.5rem' }}>
+                                {type.label}
+                            </Typography>
+                            {expandedType === type.value ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                        </ListItemButton>
+                        <Collapse in={expandedType === type.value}>
+                            <Box sx={{ p: 2 }}>
+                                <Box sx={{ pl: 2 }}>
+                                    <Typography variant="caption" color="text.secondary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
+                                        General Settings
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    checked={type.barcodeRequired}
+                                                    onChange={(e) => {
+                                                        const updatedTypes = types.map(t => {
+                                                            if (t.value === type.value) {
+                                                                return {
+                                                                    ...t,
+                                                                    barcodeRequired: e.target.checked
+                                                                };
+                                                            }
+                                                            return t;
+                                                        });
+                                                        updateMutation.mutateAsync(updatedTypes);
+                                                    }}
+                                                    size="small"
+                                                />
+                                            }
+                                            label={<Typography variant="body2">Require Barcode</Typography>}
+                                        />
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    checked={type.photoRequired}
+                                                    onChange={(e) => {
+                                                        const updatedTypes = types.map(t => {
+                                                            if (t.value === type.value) {
+                                                                return {
+                                                                    ...t,
+                                                                    photoRequired: e.target.checked
+                                                                };
+                                                            }
+                                                            return t;
+                                                        });
+                                                        updateMutation.mutateAsync(updatedTypes);
+                                                    }}
+                                                    size="small"
+                                                />
+                                            }
+                                            label={<Typography variant="body2">Require Photo</Typography>}
+                                        />
+                                    </Box>
+                                </Box>
+                                <Box sx={{ py: 1 }}>
+                                    <FieldList
+                                        fields={type.fields}
+                                        onDeleteField={(name) => handleDeleteField(type.value, name)}
+                                        onEditField={(field) => setEditingField({ typeValue: type.value, field })}
+                                        onAddCondition={(fieldName, condition) => {
+                                            const field = type.fields.find(f => f.name === fieldName);
+                                            if (field) {
+                                                handleEditField(type.value, field, {
+                                                    ...field,
+                                                    conditions: [...(field.conditions || []), condition]
+                                                });
+                                            }
+                                        }}
+                                        onDeleteCondition={(fieldName, conditionIndex) => {
+                                            const field = type.fields.find(f => f.name === fieldName);
+                                            if (field && field.conditions) {
+                                                handleEditField(type.value, field, {
+                                                    ...field,
+                                                    conditions: field.conditions.filter((_, i) => i !== conditionIndex)
+                                                });
+                                            }
+                                        }}
+                                    />
+                                </Box>
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                    <Button
+                                        size="small"
+                                        onClick={() => setAddingFieldsTo(type.value)}
+                                        startIcon={<AddIcon />}
+                                    >
+                                        Add Field
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        onClick={() => setConfiguringInspection(type.value)}
+                                        startIcon={<SettingsIcon />}
+                                    >
+                                        Configure Inspection Form
+                                    </Button>
+                                </Box>
+                                <IconButton onClick={() => openEditDialog(type)}>
+                                    <EditIcon />
+                                </IconButton>
+                                <IconButton onClick={() => openDeleteDialog(type)}>
+                                    <DeleteIcon />
+                                </IconButton>
                             </Box>
                         </Collapse>
                     </ListItem>
@@ -283,7 +328,9 @@ export function EquipmentTypeSection() {
                         handleSave({
                             value: name.toLowerCase(),
                             label: name,
-                            fields: dialogState.data?.fields || []
+                            fields: dialogState.data?.fields || [],
+                            barcodeRequired: false,
+                            photoRequired: false
                         });
                     }}>
                         <TextField
