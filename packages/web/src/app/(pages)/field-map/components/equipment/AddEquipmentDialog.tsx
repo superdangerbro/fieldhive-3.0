@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -20,11 +20,16 @@ import {
   TextField,
   Checkbox,
   FormControlLabel,
-  TextareaAutosize
+  TextareaAutosize,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { useQuery } from '@tanstack/react-query';
-import { ENV_CONFIG } from '@/config/environment';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
+import MobileScreenShareIcon from '@mui/icons-material/MobileScreenShare';
+import { useEquipmentTypes } from '@/app/(pages)/settings/equipment/hooks/useEquipment';
+import { useCamera } from '@/app/hooks/useCamera';
+import { useBarcode } from '@/app/hooks/useBarcode';
 import type { 
   Field, 
   FormData, 
@@ -66,33 +71,20 @@ export function AddEquipmentDialog({
   jobType,
   accounts,
 }: AddEquipmentDialogProps) {
-  const { data: equipmentTypes = [], isLoading } = useQuery({
-    queryKey: ['equipment-types'],
-    queryFn: async () => {
-      console.log('Fetching equipment types...');
-      const response = await fetch(`${ENV_CONFIG.api.baseUrl}/settings/equipment/types`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch equipment types');
-      }
-
-      const data = await response.json();
-      console.log('Raw equipment types response:', data);
-      return data;
-    },
-    staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
-    gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
-  });
-
-  console.log('Equipment types in dialog:', equipmentTypes);
-
+  const { data: equipmentTypes = [], isLoading } = useEquipmentTypes();
+  const { openCamera, takePhoto, isLoading: isCameraLoading } = useCamera();
+  const { 
+    scanBarcodeFromCamera, 
+    scanBarcodeFromImage, 
+    cleanup: cleanupBarcode, 
+    isLoading: isBarcodeLoading 
+  } = useBarcode();
   const [selectedType, setSelectedType] = useState('');
   const [formData, setFormData] = useState<FormData>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset state when dialog opens/closes
   useEffect(() => {
@@ -103,33 +95,26 @@ export function AddEquipmentDialog({
     }
   }, [open]);
 
+  // Clean up barcode scanner on dialog close
+  useEffect(() => {
+    if (!open) {
+      cleanupBarcode();
+      setShowBarcodeScanner(false);
+    }
+  }, [open, cleanupBarcode]);
+
   // Get the selected equipment type configuration
-  const selectedTypeConfig = equipmentTypes.find((t) => t.name === selectedType);
+  const selectedTypeConfig = equipmentTypes.find((t) => t.value === selectedType);
 
   // Get visible fields based on conditions
   const getVisibleFields = () => {
     if (!selectedTypeConfig) return [];
-    
-    return selectedTypeConfig.fields.filter((field: Field) => {
-      if (!field.showWhen || field.showWhen.length === 0) return true;
-      
-      return field.showWhen.some((condition: FieldCondition) => {
-        const dependentValue = formData[condition.field];
-        return dependentValue === condition.value;
-      });
-    });
+    return selectedTypeConfig.fields;
   };
 
   // Check if a field is required based on conditions
   const isFieldRequired = (field: Field): boolean => {
-    if (field.required) return true;
-    
-    if (!field.showWhen) return false;
-    
-    return field.showWhen.some((condition: FieldCondition) => {
-      const dependentValue = formData[condition.field];
-      return dependentValue === condition.value && condition.makeRequired;
-    });
+    return field.required ?? false;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -172,6 +157,43 @@ export function AddEquipmentDialog({
   const handleClose = () => {
     if (!isSubmitting) {
       onClose();
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const stream = await openCamera();
+      const photoData = await takePhoto(stream);
+      setFormData({ ...formData, photo: photoData });
+    } catch (err) {
+      console.error('Failed to take photo:', err);
+      setError(err instanceof Error ? err.message : 'Failed to take photo');
+    }
+  };
+
+  const handleScanBarcode = async () => {
+    try {
+      setShowBarcodeScanner(true);
+      const barcode = await scanBarcodeFromCamera();
+      setFormData({ ...formData, barcode });
+      setShowBarcodeScanner(false);
+    } catch (err) {
+      console.error('Failed to scan barcode:', err);
+      setError(err instanceof Error ? err.message : 'Failed to scan barcode');
+      setShowBarcodeScanner(false);
+    }
+  };
+
+  const handleBarcodeImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const barcode = await scanBarcodeFromImage(file);
+      setFormData({ ...formData, barcode });
+    } catch (err) {
+      console.error('Failed to scan barcode from image:', err);
+      setError(err instanceof Error ? err.message : 'Failed to scan barcode from image');
     }
   };
 
@@ -251,16 +273,135 @@ export function AddEquipmentDialog({
           />
         );
 
+      case 'text':
+        if (field.name === 'barcode') {
+          return (
+            <FormControl fullWidth key={field.name}>
+              <TextField
+                label={field.label || field.name}
+                value={formData[field.name] || ''}
+                onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+                required={isFieldRequired(field)}
+                InputProps={{
+                  endAdornment: (
+                    <Box display="flex">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        ref={fileInputRef}
+                        onChange={handleBarcodeImageUpload}
+                      />
+                      <IconButton
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isBarcodeLoading}
+                        title="Upload barcode image"
+                      >
+                        <FileUploadIcon />
+                      </IconButton>
+                      <IconButton 
+                        onClick={handleScanBarcode}
+                        disabled={isBarcodeLoading}
+                        title="Scan with camera"
+                      >
+                        {isBarcodeLoading ? (
+                          <CircularProgress size={24} />
+                        ) : (
+                          <MobileScreenShareIcon />
+                        )}
+                      </IconButton>
+                    </Box>
+                  ),
+                }}
+              />
+              {showBarcodeScanner && (
+                <Box mt={1} position="relative" width="100%" height={300}>
+                  <video
+                    id="video-stream"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                  <Box
+                    position="absolute"
+                    top={0}
+                    left={0}
+                    right={0}
+                    bottom={0}
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <Box
+                      border={2}
+                      borderColor="primary.main"
+                      width={200}
+                      height={200}
+                      sx={{ borderStyle: 'dashed' }}
+                    />
+                  </Box>
+                </Box>
+              )}
+            </FormControl>
+          );
+        } else if (field.name === 'photo') {
+          return (
+            <FormControl fullWidth key={field.name}>
+              <TextField
+                label={field.label || field.name}
+                value={formData[field.name] || ''}
+                onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+                required={isFieldRequired(field)}
+                InputProps={{
+                  endAdornment: (
+                    <IconButton 
+                      onClick={handleTakePhoto}
+                      disabled={isCameraLoading}
+                    >
+                      {isCameraLoading ? (
+                        <CircularProgress size={24} />
+                      ) : (
+                        <PhotoCameraIcon />
+                      )}
+                    </IconButton>
+                  ),
+                }}
+              />
+              {formData[field.name] && (
+                <Box mt={1}>
+                  <img 
+                    src={formData[field.name]} 
+                    alt="Equipment photo" 
+                    style={{ maxWidth: '100%', maxHeight: '200px' }} 
+                  />
+                </Box>
+              )}
+            </FormControl>
+          );
+        }
+        return (
+          <FormControl fullWidth key={field.name}>
+            <TextField
+              label={field.label || field.name}
+              value={formData[field.name] || ''}
+              onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+              required={isFieldRequired(field)}
+            />
+          </FormControl>
+        );
+
       default:
         return (
-          <TextField
-            key={field.name}
-            fullWidth
-            label={field.label || field.name}
-            value={formData[field.name] || ''}
-            onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
-            required={isFieldRequired(field)}
-          />
+          <FormControl fullWidth key={field.name}>
+            <TextField
+              label={field.label || field.name}
+              value={formData[field.name] || ''}
+              onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+              required={isFieldRequired(field)}
+            />
+          </FormControl>
         );
     }
   };
@@ -343,8 +484,8 @@ export function AddEquipmentDialog({
               required
             >
               {Array.isArray(equipmentTypes) && equipmentTypes.map((type) => (
-                <MenuItem key={type.name} value={type.name}>
-                  {type.name}
+                <MenuItem key={type.value} value={type.value}>
+                  {type.value}
                 </MenuItem>
               ))}
             </Select>
