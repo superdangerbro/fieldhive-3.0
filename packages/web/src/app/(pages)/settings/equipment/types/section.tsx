@@ -199,18 +199,29 @@ export function EquipmentTypeSection() {
                                         <FormControlLabel
                                             control={
                                                 <Switch
-                                                    checked={type.barcodeRequired}
+                                                    checked={type.barcodeRequired ?? false}
                                                     onChange={(e) => {
                                                         const updatedTypes = types.map(t => {
                                                             if (t.value === type.value) {
+                                                                const updatedFields = e.target.checked ? [
+                                                                    {
+                                                                        name: 'barcode',
+                                                                        type: 'text',
+                                                                        label: 'Barcode',
+                                                                        required: true
+                                                                    },
+                                                                    ...t.fields.filter(f => f.name !== 'barcode')
+                                                                ] : t.fields.filter(field => field.name !== 'barcode');
+                                                                
                                                                 return {
                                                                     ...t,
-                                                                    barcodeRequired: e.target.checked
+                                                                    barcodeRequired: e.target.checked,
+                                                                    fields: updatedFields
                                                                 };
                                                             }
                                                             return t;
                                                         });
-                                                        updateMutation.mutateAsync(updatedTypes);
+                                                        updateMutation.mutate(updatedTypes);
                                                     }}
                                                     size="small"
                                                 />
@@ -220,18 +231,29 @@ export function EquipmentTypeSection() {
                                         <FormControlLabel
                                             control={
                                                 <Switch
-                                                    checked={type.photoRequired}
+                                                    checked={type.photoRequired ?? false}
                                                     onChange={(e) => {
                                                         const updatedTypes = types.map(t => {
                                                             if (t.value === type.value) {
+                                                                const updatedFields = e.target.checked ? [
+                                                                    {
+                                                                        name: 'photo',
+                                                                        type: 'text',
+                                                                        label: 'Photo',
+                                                                        required: true
+                                                                    },
+                                                                    ...t.fields.filter(f => f.name !== 'photo')
+                                                                ] : t.fields.filter(field => field.name !== 'photo');
+                                                                
                                                                 return {
                                                                     ...t,
-                                                                    photoRequired: e.target.checked
+                                                                    photoRequired: e.target.checked,
+                                                                    fields: updatedFields
                                                                 };
                                                             }
                                                             return t;
                                                         });
-                                                        updateMutation.mutateAsync(updatedTypes);
+                                                        updateMutation.mutate(updatedTypes);
                                                     }}
                                                     size="small"
                                                 />

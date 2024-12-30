@@ -163,6 +163,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
           propertyName={activeProperty.name}
           propertyType={activeProperty.type}
           jobType={activeJob.type || 'Unknown'}
+          accounts={activeProperty.accounts?.map(account => account.name) || []}
           onClose={() => {
             cancelPlacingEquipment();
             setIsAddingEquipment(false);

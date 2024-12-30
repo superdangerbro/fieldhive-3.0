@@ -60,4 +60,10 @@ export interface Property {
     postal_code: string;
     address_id: string;
   };
+  accounts?: Array<{
+    account_id: string;
+    name: string;
+    type: string;
+    status: string;
+  }>;
 }

@@ -23,7 +23,8 @@ import {
   TextareaAutosize
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { useEquipment } from '../../../../../app/globalHooks/useEquipment';
+import { useQuery } from '@tanstack/react-query';
+import { ENV_CONFIG } from '@/config/environment';
 import type { 
   Field, 
   FormData, 
@@ -37,7 +38,6 @@ interface AddEquipmentDialogProps {
   location: [number, number];
   onClose: () => void;
   onSubmit: (data: { 
-    name: string;
     type: string;
     status: string;
     data: Record<string, any>;
@@ -45,6 +45,7 @@ interface AddEquipmentDialogProps {
   propertyName: string;
   propertyType: string;
   jobType: string;
+  accounts?: string[];
 }
 
 /**
@@ -63,11 +64,32 @@ export function AddEquipmentDialog({
   propertyName,
   propertyType,
   jobType,
+  accounts,
 }: AddEquipmentDialogProps) {
-  const { equipmentTypes, equipmentStatuses, isLoading } = useEquipment();
+  const { data: equipmentTypes = [], isLoading } = useQuery({
+    queryKey: ['equipment-types'],
+    queryFn: async () => {
+      console.log('Fetching equipment types...');
+      const response = await fetch(`${ENV_CONFIG.api.baseUrl}/settings/equipment/types`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch equipment types');
+      }
+
+      const data = await response.json();
+      console.log('Raw equipment types response:', data);
+      return data;
+    },
+    staleTime: ENV_CONFIG.queryClient.defaultStaleTime,
+    gcTime: ENV_CONFIG.queryClient.defaultCacheTime,
+  });
+
+  console.log('Equipment types in dialog:', equipmentTypes);
+
   const [selectedType, setSelectedType] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('');
-  const [equipmentName, setEquipmentName] = useState('');
   const [formData, setFormData] = useState<FormData>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,15 +98,13 @@ export function AddEquipmentDialog({
   useEffect(() => {
     if (open) {
       setSelectedType('');
-      setSelectedStatus('');
-      setEquipmentName('');
-      setFormData({}); // Reset form data when type changes
+      setFormData({});
       setError(null);
     }
   }, [open]);
 
   // Get the selected equipment type configuration
-  const selectedTypeConfig = equipmentTypes.find((t: EquipmentType) => t.name === selectedType);
+  const selectedTypeConfig = equipmentTypes.find((t) => t.name === selectedType);
 
   // Get visible fields based on conditions
   const getVisibleFields = () => {
@@ -114,8 +134,8 @@ export function AddEquipmentDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedType || !selectedStatus || !equipmentName.trim()) {
-      setError('Equipment name, type, and status are required');
+    if (!selectedType) {
+      setError('Equipment type is required');
       return;
     }
 
@@ -135,15 +155,12 @@ export function AddEquipmentDialog({
 
     try {
       await onSubmit({
-        name: equipmentName.trim(),
         type: selectedType,
-        status: selectedStatus,
+        status: 'active',
         data: formData
       });
       setSelectedType('');
-      setSelectedStatus('');
-      setEquipmentName('');
-      setFormData({}); // Reset form data when type changes
+      setFormData({});
     } catch (err) {
       console.error('Failed to add equipment:', err);
       setError(err instanceof Error ? err.message : 'Failed to add equipment');
@@ -260,14 +277,29 @@ export function AddEquipmentDialog({
       }}
     >
       <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography variant="h6">Add Equipment</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+          <Box>
+            <Typography variant="h6" gutterBottom>Add Equipment</Typography>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Property: {propertyName} ({propertyType})
+            </Typography>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Accounts: {accounts?.length ? accounts.join(', ') : 'None'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Job Type: {jobType || 'None'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Status: Active
+            </Typography>
+          </Box>
           <IconButton 
             edge="end" 
             color="inherit" 
             onClick={handleClose}
             disabled={isSubmitting}
             aria-label="close"
+            sx={{ alignSelf: 'flex-start' }}
           >
             <CloseIcon />
           </IconButton>
@@ -289,12 +321,6 @@ export function AddEquipmentDialog({
             <Typography variant="body2" color="text.secondary" gutterBottom>
               Location: {location[0].toFixed(6)}, {location[1].toFixed(6)}
             </Typography>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Property: {propertyName} ({propertyType})
-            </Typography>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Job Type: {jobType}
-            </Typography>
           </Box>
 
           {error && (
@@ -304,14 +330,6 @@ export function AddEquipmentDialog({
             </Alert>
           )}
 
-          <TextField
-            fullWidth
-            label="Equipment Name"
-            value={equipmentName}
-            onChange={(e) => setEquipmentName(e.target.value)}
-            required
-          />
-          
           <FormControl fullWidth>
             <InputLabel>Equipment Type</InputLabel>
             <Select
@@ -324,37 +342,9 @@ export function AddEquipmentDialog({
               disabled={isSubmitting || isLoading}
               required
             >
-              {equipmentTypes.map((type: EquipmentType) => (
+              {Array.isArray(equipmentTypes) && equipmentTypes.map((type) => (
                 <MenuItem key={type.name} value={type.name}>
-                  {type.label || type.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl fullWidth>
-            <InputLabel>Status</InputLabel>
-            <Select
-              value={selectedStatus}
-              label="Status"
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              disabled={isSubmitting || isLoading}
-              required
-            >
-              {equipmentStatuses.map((status: EquipmentStatus) => (
-                <MenuItem key={status.name} value={status.name}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box
-                      sx={{
-                        width: 16,
-                        height: 16,
-                        borderRadius: 1,
-                        bgcolor: status.color,
-                        mr: 1
-                      }}
-                    />
-                    {status.label || status.name}
-                  </Box>
+                  {type.name}
                 </MenuItem>
               ))}
             </Select>
@@ -376,7 +366,7 @@ export function AddEquipmentDialog({
           onClick={handleSubmit}
           variant="contained"
           fullWidth
-          disabled={!selectedType || !selectedStatus || !equipmentName.trim() || isSubmitting || isLoading}
+          disabled={!selectedType || isSubmitting || isLoading}
           startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
         >
           {isSubmitting ? 'Adding Equipment...' : 'Add Equipment'}

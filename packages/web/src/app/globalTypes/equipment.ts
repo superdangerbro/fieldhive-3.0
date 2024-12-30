@@ -17,6 +17,8 @@ export interface EquipmentType {
     name: string;
     label: string;
     fields: Field[];
+    barcodeRequired?: boolean;
+    photoRequired?: boolean;
 }
 
 export interface EquipmentStatus {
