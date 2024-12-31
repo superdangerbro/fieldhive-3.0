@@ -178,18 +178,21 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
               const equipmentData = {
                 job_id: activeJob.job_id,
                 equipment_type_id: data.type,
+                type: data.type, // Add type field for display
                 status: data.status || 'active',
                 location: {
-                  latitude: placementLocation[1],
-                  longitude: placementLocation[0]
+                  type: 'Point',
+                  coordinates: [placementLocation[0], placementLocation[1]]
                 },
                 is_georeferenced: true,
+                property_id: activeProperty.property_id,
+                property_name: activeProperty.name,
+                property_type: activeProperty.type,
+                job_title: activeJob.title || 'None',
+                job_type: activeJob.type,
+                accounts: activeProperty.accounts?.map(account => account.name) || [],
                 data: {
-                  ...data.data,
-                  property_id: activeProperty.property_id,
-                  property_name: activeProperty.name,
-                  property_type: activeProperty.type,
-                  job_type: activeJob.type
+                  ...data.data
                 }
               };
               console.log('Submitting equipment:', equipmentData);
@@ -209,7 +212,16 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
           open={isMarkerDialogOpen}
           equipment={selectedEquipment}
           onClose={closeMarkerDialog}
-          onDelete={async (id) => deleteEquipment.mutateAsync(id)}
+          onDelete={async (id) => {
+            console.log('Deleting equipment:', id);
+            try {
+              await deleteEquipment.mutateAsync(id);
+              console.log('Successfully deleted equipment');
+            } catch (error) {
+              console.error('Failed to delete equipment:', error);
+              throw error; // Re-throw to be handled by the dialog
+            }
+          }}
           onUpdateType={async (id, typeId) => 
             updateEquipment.mutateAsync({ 
               id, 

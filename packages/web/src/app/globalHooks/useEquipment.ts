@@ -31,6 +31,7 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
     queryFn: async () => {
       console.log('Fetching equipment with bounds:', bounds);
       const url = new URL(`${ENV_CONFIG.api.baseUrl}/equipment`);
+      url.searchParams.set('status', 'active'); // Only show active equipment
       if (bounds) {
         url.searchParams.set('bounds', bounds.join(','));
       }
@@ -158,16 +159,25 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
 
   const deleteEquipment = useMutation({
     mutationFn: async (id: string) => {
+      console.log('Deleting equipment with ID:', id);
       const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment/${id}`, {
         method: 'DELETE'
       });
       if (!response.ok) {
-        throw new Error('Failed to delete equipment');
+        const error = await response.json().catch(() => ({ message: 'Failed to delete equipment' }));
+        console.error('Delete failed:', error);
+        throw new Error(error.message || 'Failed to delete equipment');
       }
+      return id;
     },
-    onSuccess: () => {
+    onSuccess: (id) => {
+      console.log('Successfully deleted equipment:', id);
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      refetchEquipment(); // Force immediate refetch
       closeMarkerDialog();
+    },
+    onError: (error) => {
+      console.error('Delete mutation error:', error);
     }
   });
 

@@ -56,11 +56,14 @@ export function EquipmentMarkerDialog({
 
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this equipment?')) {
-      setIsDeleting(true);
       try {
+        setIsDeleting(true);
         await onDelete(equipment.equipment_id);
+        onClose();
       } catch (error) {
         console.error('Failed to delete equipment:', error);
+        // Show error message to user
+        alert('Failed to delete equipment. Please try again.');
       } finally {
         setIsDeleting(false);
       }
@@ -93,94 +96,151 @@ export function EquipmentMarkerDialog({
   // Find the type configuration for the current equipment
   const typeConfig = equipmentTypes.find((type: EquipmentType) => type.name === equipment.type);
 
+  console.log('Equipment data in dialog:', {
+    equipment,
+    data: equipment.data,
+    location: equipment.location,
+    type: equipment.type,
+    status: equipment.status
+  });
+
   return (
     <Dialog 
       open={open} 
       onClose={onClose}
-      fullScreen
-      sx={{
-        '& .MuiDialog-paper': {
-          background: (theme) => theme.palette.background.default,
-        },
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          bgcolor: 'background.paper',
+          backgroundImage: 'none',
+          maxHeight: '80vh'
+        }
       }}
     >
       <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography variant="h6">Equipment Details</Typography>
-          <IconButton 
-            edge="end" 
-            color="inherit" 
-            onClick={onClose}
-            disabled={isDeleting}
-            aria-label="close"
-          >
-            <CloseIcon />
-          </IconButton>
-        </Box>
+        Equipment Details
+        <IconButton
+          onClick={onClose}
+          sx={{ position: 'absolute', right: 8, top: 8 }}
+        >
+          <CloseIcon />
+        </IconButton>
       </DialogTitle>
 
-      <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Location
+      <DialogContent dividers>
+        {/* General Information */}
+        <Box mb={3}>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            General Information
+          </Typography>
+          <Typography variant="body2">
+            <strong>Type:</strong> {equipment.type}
+          </Typography>
+          <Box display="flex" alignItems="center" gap={1}>
+            <Typography variant="body2" component="span">
+              <strong>Status:</strong>
             </Typography>
-            <Typography>
-              {equipment.location.coordinates[0].toFixed(6)}, {equipment.location.coordinates[1].toFixed(6)}
-            </Typography>
-          </Box>
-
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Type
-            </Typography>
-            <Typography>{typeConfig?.label || equipment.type}</Typography>
-          </Box>
-
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Status
-            </Typography>
-            <Chip 
-              label={statusConfig?.label || equipment.status}
-              sx={{
-                backgroundColor: statusConfig?.color || '#94a3b8',
-                color: 'white'
-              }}
+            <Chip
+              label={equipment.status}
               size="small"
+              sx={{ bgcolor: statusConfig?.color || 'grey.500', color: 'white' }}
             />
           </Box>
+          <Typography variant="body2">
+            <strong>ID:</strong> {equipment.equipment_id}
+          </Typography>
+        </Box>
 
-          {typeConfig && (
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Fields
+        {/* Location Information */}
+        <Box mb={3}>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Location Details
+          </Typography>
+          <Typography variant="body2">
+            <strong>Property:</strong> {equipment.property_name}
+          </Typography>
+          <Typography variant="body2">
+            <strong>Property Type:</strong> {equipment.property_type}
+          </Typography>
+          <Typography variant="body2">
+            <strong>Job:</strong> {equipment.job_title}
+          </Typography>
+          <Typography variant="body2">
+            <strong>Job Type:</strong> {equipment.job_type}
+          </Typography>
+          <Typography variant="body2">
+            <strong>Coordinates:</strong> {equipment.location?.coordinates?.[1].toFixed(6)}, {equipment.location?.coordinates?.[0].toFixed(6)}
+          </Typography>
+          {Array.isArray(equipment.accounts) && equipment.accounts.length > 0 && (
+            <Box mt={1}>
+              <Typography variant="body2">
+                <strong>Accounts:</strong>
               </Typography>
-              {typeConfig.fields.map((field: Field) => (
-                <Box key={field.name} sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    {field.label || field.name}
-                  </Typography>
-                  <Typography>
-                    {getFieldValue(field)}
-                  </Typography>
-                </Box>
-              ))}
+              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+                {equipment.accounts.map((account: string) => (
+                  <Chip
+                    key={account}
+                    label={account}
+                    size="small"
+                    sx={{ bgcolor: 'action.selected' }}
+                  />
+                ))}
+              </Box>
             </Box>
+          )}
+        </Box>
+
+        {/* Equipment Fields */}
+        {typeConfig?.fields && (
+          <Box mb={3}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              Equipment Details
+            </Typography>
+            {typeConfig.fields.map((field: Field) => (
+              <Typography key={field.name} variant="body2">
+                <strong>{field.label || field.name}:</strong> {getFieldValue(field)}
+              </Typography>
+            ))}
+          </Box>
+        )}
+
+        {/* Inspections */}
+        <Box mb={3}>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Inspections
+          </Typography>
+          {equipment.inspections?.length > 0 ? (
+            equipment.inspections.map((inspection) => (
+              <Box key={inspection.inspection_id} mb={1}>
+                <Typography variant="body2">
+                  <strong>Date:</strong> {new Date(inspection.created_at).toLocaleDateString()}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {inspection.notes || 'No notes'}
+                </Typography>
+              </Box>
+            ))
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              No inspections recorded
+            </Typography>
           )}
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ p: 2, gap: 1 }}>
+      <DialogActions sx={{ p: 2, gap: 1, justifyContent: 'space-between' }}>
         <Button
           onClick={handleDelete}
-          variant="outlined"
           color="error"
-          fullWidth
+          variant="outlined"
           disabled={isDeleting}
           startIcon={<DeleteIcon />}
         >
-          Delete Equipment
+          {isDeleting ? 'Deleting...' : 'Delete'}
+        </Button>
+        <Button onClick={onClose} variant="contained">
+          Close
         </Button>
       </DialogActions>
     </Dialog>

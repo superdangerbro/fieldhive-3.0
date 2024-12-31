@@ -213,17 +213,19 @@ export const BaseMap = forwardRef<MapRef, BaseMapProps>(({
       }}
     >
       <Map
-        ref={ref}
+        id={id}
         {...viewState}
-        reuseMaps
-        mapStyle="mapbox://styles/mapbox/dark-v10"
+        ref={ref}
         onMove={onMove}
         onMoveEnd={handleMoveEnd}
-        attributionControl={false}
-        style={{
-          width: '100%',
-          height: '100%'
-        }}
+        mapboxAccessToken={MAPBOX_TOKEN}
+        mapStyle="mapbox://styles/mapbox/streets-v12"
+        pitchWithRotate={false}
+        dragRotate={false}
+        maxPitch={0}
+        minZoom={3}
+        maxZoom={20}
+        style={{ width: '100%', height: '100%' }}
       >
         <GeolocateControl
           ref={geolocateControlRef}
