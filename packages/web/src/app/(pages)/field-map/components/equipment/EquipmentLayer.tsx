@@ -49,7 +49,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
 
   // Equipment data and state management
   const {
-    equipmentList,
+    equipment,
     isLoading,
     error,
     placementLocation,
@@ -99,9 +99,13 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   return (
     <>
       {/* Equipment Markers */}
-      {Array.isArray(equipmentList) && equipmentList.map((eq: Equipment) => {
-        if (!eq?.location?.coordinates) return null;
+      {Array.isArray(equipment) && equipment.map((eq: Equipment) => {
+        if (!eq?.location?.coordinates) {
+          console.log('Equipment missing coordinates:', eq);
+          return null;
+        }
         const [longitude, latitude] = eq.location.coordinates;
+        console.log('Rendering equipment marker:', eq.equipment_id, longitude, latitude);
 
         return (
           <Marker
@@ -162,28 +166,39 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
           location={placementLocation}
           propertyName={activeProperty.name}
           propertyType={activeProperty.type}
-          jobType={activeJob.type || 'Unknown'}
+          jobType={activeJob.type || 'None'}
+          jobTitle={activeJob.title}
           accounts={activeProperty.accounts?.map(account => account.name) || []}
           onClose={() => {
             cancelPlacingEquipment();
             setIsAddingEquipment(false);
           }}
           onSubmit={async (data) => {
-            const equipmentData: CreateEquipmentDto = {
-              ...data,
-              property_id: activeProperty.property_id,
-              property_name: activeProperty.name,
-              property_type: activeProperty.type,
-              job_id: activeJob.job_id,
-              job_type: activeJob.type,
-              location: {
-                type: 'Point',
-                coordinates: [placementLocation[0], placementLocation[1]]
-              }
-            };
-            await addEquipment.mutateAsync(equipmentData);
-            setIsAddingEquipment(false);
-            setIsAddEquipmentDialogOpen(false);
+            try {
+              const equipmentData = {
+                job_id: activeJob.job_id,
+                equipment_type_id: data.type,
+                status: data.status || 'active',
+                location: {
+                  latitude: placementLocation[1],
+                  longitude: placementLocation[0]
+                },
+                is_georeferenced: true,
+                data: {
+                  ...data.data,
+                  property_id: activeProperty.property_id,
+                  property_name: activeProperty.name,
+                  property_type: activeProperty.type,
+                  job_type: activeJob.type
+                }
+              };
+              console.log('Submitting equipment:', equipmentData);
+              await addEquipment.mutateAsync(equipmentData);
+              setIsAddingEquipment(false);
+              setIsAddEquipmentDialogOpen(false);
+            } catch (error) {
+              console.error('Failed to add equipment:', error);
+            }
           }}
         />
       )}

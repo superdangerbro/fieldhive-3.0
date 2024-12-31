@@ -243,3 +243,67 @@ export function PropertyDetailsDialog({ propertyId, onClose, onWorkOnJob }: Prop
     </Dialog>
   );
 }
+                  </Box>
+                </>
+              )}
+            </Box>
+          ) : (
+            <Typography color="error" sx={{ p: 3 }}>Failed to load property details</Typography>
+          )
+        ) : (
+          // Jobs List View
+          isLoadingJobs ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress />
+            </Box>
+          ) : jobs.length > 0 ? (
+            <List sx={{ py: 0 }}>
+              {jobs.map((job) => (
+                <ListItem key={job.job_id} disablePadding divider>
+                  <ListItemButton onClick={() => handleWorkOnJob(job)}>
+                    <ListItemText
+                      primary={job.title || `Job #${job.job_id}`}
+                      secondary={
+                        <>
+                          Type: {job.type || 'N/A'} • Status: {job.status || 'N/A'}
+                          {job.description && (
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                              {job.description}
+                            </Typography>
+                          )}
+                        </>
+                      }
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          ) : (
+            <Typography sx={{ p: 3 }}>No jobs available for this property</Typography>
+          )
+        )}
+      </DialogContent>
+
+      {!isLoadingProperty && property && !isActiveProperty && !showJobs && (
+        <DialogActions sx={{ p: 2, justifyContent: 'flex-start' }}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<WorkIcon />}
+            onClick={handleWorkClick}
+          >
+            Work on this property
+          </Button>
+        </DialogActions>
+      )}
+      
+      {showJobs && (
+        <DialogActions sx={{ p: 2, justifyContent: 'flex-start' }}>
+          <Button onClick={handleBack}>
+            Back to Details
+          </Button>
+        </DialogActions>
+      )}
+    </Dialog>
+  );
+}

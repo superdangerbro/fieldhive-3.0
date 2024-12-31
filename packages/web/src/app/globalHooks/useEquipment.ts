@@ -22,12 +22,14 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
 
   // Fetch equipment within bounds
   const {
-    data: equipment = [],
+    data: equipmentList = [],
     isLoading: isLoadingEquipment,
-    error: equipmentError
+    error: equipmentError,
+    refetch: refetchEquipment
   } = useQuery({
     queryKey: ['equipment', bounds],
     queryFn: async () => {
+      console.log('Fetching equipment with bounds:', bounds);
       const url = new URL(`${ENV_CONFIG.api.baseUrl}/equipment`);
       if (bounds) {
         url.searchParams.set('bounds', bounds.join(','));
@@ -37,11 +39,12 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
         throw new Error('Failed to fetch equipment');
       }
       const data = await response.json();
+      console.log('Received equipment:', data);
       return data.equipment || []; // Ensure we return an array
     },
     enabled: !!bounds,
     initialData: [],
-    staleTime: 30000,
+    staleTime: 0, // Always refetch
     retry: 1
   });
 
@@ -114,20 +117,25 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
   // Equipment mutations
   const addEquipment = useMutation({
     mutationFn: async (newEquipment: Partial<Equipment>) => {
+      console.log('Adding equipment:', newEquipment);
       const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newEquipment)
       });
       if (!response.ok) {
-        throw new Error('Failed to add equipment');
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to add equipment');
       }
       return response.json();
     },
     onSuccess: () => {
+      console.log('Successfully added equipment, invalidating queries');
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      refetchEquipment(); // Force immediate refetch
       setIsAddEquipmentDialogOpen(false);
       setPlacementLocation(null);
+      setIsPlacingEquipment(false);
     }
   });
 
@@ -165,7 +173,7 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
 
   return {
     // Equipment data
-    equipment,
+    equipment: equipmentList,
     equipmentTypes,
     equipmentStatuses,
 

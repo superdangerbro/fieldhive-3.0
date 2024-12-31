@@ -30,7 +30,6 @@ interface UpdatePropertyBody {
 }
 
 interface PropertyQueryParams {
-    limit?: string;
     offset?: string;
     search?: string;
     accountId?: string;
@@ -49,7 +48,6 @@ export async function getProperties(
 ) {
     try {
         const { 
-            limit = '25', 
             offset = '0',
             search,
             accountId,
@@ -57,7 +55,7 @@ export async function getProperties(
             status
         } = req.query;
 
-        logger.info('Getting properties with params:', { limit, offset, search, accountId, type, status });
+        logger.info('Getting properties with params:', { offset, search, accountId, type, status });
 
         const queryBuilder = repositories.propertyRepository
             .createQueryBuilder('property')
@@ -68,56 +66,44 @@ export async function getProperties(
 
         // Apply search filter
         if (search) {
-            queryBuilder.andWhere('property.name ILIKE :search', { 
-                search: `%${search}%` 
-            });
+            queryBuilder.andWhere(
+                '(LOWER(property.name) LIKE LOWER(:search) OR CAST(property.property_id AS TEXT) LIKE LOWER(:search))',
+                { search: `%${search}%` }
+            );
         }
 
-        // Filter by account
+        // Apply account filter
         if (accountId) {
             queryBuilder.andWhere('accounts.account_id = :accountId', { accountId });
         }
 
-        // Filter by type (case insensitive)
+        // Apply type filter
         if (type) {
-            queryBuilder.andWhere('LOWER(property.type) = LOWER(:type)', { type });
+            queryBuilder.andWhere('property.property_type = :type', { type });
         }
 
-        // Filter by status (case insensitive)
+        // Apply status filter
         if (status) {
-            queryBuilder.andWhere('LOWER(property.status) = LOWER(:status)', { status });
+            queryBuilder.andWhere('property.status = :status', { status });
         }
 
-        // Apply pagination
-        const [properties, total] = await queryBuilder
-            .skip(parseInt(offset))
-            .take(parseInt(limit))
-            .getManyAndCount();
+        // Get total count
+        const total = await queryBuilder.getCount();
 
-        logger.info(`Found ${properties.length} properties`);
-
-        // Format response to match frontend expectations
-        const formattedProperties = properties.map(property => ({
-            ...property,
-            accounts: property.accounts || [],
-            type: property.type || '',
-            status: property.status || '',
-            created_at: property.created_at,
-            updated_at: property.updated_at
-        }));
+        // Get paginated results
+        const properties = await queryBuilder
+            .skip(Number(offset))
+            .getMany();
 
         res.json({
-            properties: formattedProperties,
             total,
-            limit: parseInt(limit),
-            offset: parseInt(offset)
+            properties
         });
     } catch (error) {
-        logger.error('Error fetching properties:', error);
+        logger.error('Error in getProperties:', error);
         res.status(500).json({
             error: 'Internal server error',
-            message: 'Failed to fetch properties',
-            details: error instanceof Error ? error.message : String(error)
+            message: error.message
         });
     }
 }

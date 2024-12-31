@@ -8,17 +8,9 @@ interface PropertyResult {
     name: string;
     property_type: string;
     status: string;
-    service_address_id: string;
-    billing_address_id: string;
-    created_at: Date;
-    updated_at: Date;
     boundary: {
         type: string;
         coordinates: number[][][];
-    } | null;
-    location: {
-        type: string;
-        coordinates: [number, number];
     } | null;
 }
 
@@ -29,25 +21,45 @@ interface CacheOptions {
 
 // Initialize LRU cache with TypeScript types
 const cacheOptions: CacheOptions = {
-    max: 500, // Maximum number of items to store
+    max: 1000, // Increased cache size
     ttl: 1000 * 60 * 5, // Time to live: 5 minutes
 };
 
 const cache = new LRUCache<string, any>(cacheOptions);
+
+// Create spatial index if it doesn't exist
+const createIndexQuery = `
+    DO $$ 
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_indexes 
+            WHERE indexname = 'idx_properties_boundary'
+        ) THEN
+            CREATE INDEX idx_properties_boundary ON properties USING GIST (boundary);
+        END IF;
+        
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_indexes 
+            WHERE indexname = 'idx_properties_status'
+        ) THEN
+            CREATE INDEX idx_properties_status ON properties (status);
+        END IF;
+        
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_indexes 
+            WHERE indexname = 'idx_properties_type'
+        ) THEN
+            CREATE INDEX idx_properties_type ON properties (property_type);
+        END IF;
+    END $$;
+`;
 
 export async function getPropertyBoundaries(req: Request, res: Response) {
     try {
         const boundsStr = req.query.bounds as string;
         const statuses = (req.query.statuses as string || '').split(',').filter(Boolean);
         const types = (req.query.types as string || '').split(',').filter(Boolean);
-        const zoom = Math.floor(Number(req.query.zoom) || 10); // Convert to integer
-
-        logger.info('Request parameters:', {
-            bounds: boundsStr,
-            statuses,
-            types,
-            zoom
-        });
+        const zoom = Math.floor(Number(req.query.zoom) || 10);
 
         if (!boundsStr) {
             return res.status(400).json({
@@ -91,135 +103,70 @@ export async function getPropertyBoundaries(req: Request, res: Response) {
         // Check cache first
         const cachedResult = cache.get(cacheKey);
         if (cachedResult) {
-            logger.info('Returning cached result for:', cacheKey);
             return res.json(cachedResult);
         }
 
-        try {
-            // Build the query with OR logic between filters
-            const query = `
-                WITH bounds AS (
-                    SELECT ST_MakeEnvelope($1, $2, $3, $4, 4326) as geom
-                )
-                SELECT 
-                    p.property_id,
-                    p.name,
-                    p.property_type,
-                    p.status,
-                    p.service_address_id,
-                    p.billing_address_id,
-                    p.created_at,
-                    p.updated_at,
-                    CASE 
-                        WHEN p.boundary IS NOT NULL AND ST_IsValid(p.boundary) THEN
-                            CASE 
-                                WHEN $5::integer < 12 THEN ST_AsGeoJSON(ST_SimplifyPreserveTopology(p.boundary, 0.0001))::json
-                                WHEN $5::integer < 15 THEN ST_AsGeoJSON(ST_SimplifyPreserveTopology(p.boundary, 0.00001))::json
-                                ELSE ST_AsGeoJSON(p.boundary)::json
-                            END
-                        ELSE NULL
-                    END as boundary,
-                    CASE 
-                        WHEN p.location IS NOT NULL AND ST_IsValid(p.location) THEN ST_AsGeoJSON(p.location)::json
-                        ELSE NULL
-                    END as location
-                FROM properties p, bounds b
-                WHERE (
-                    (p.boundary IS NOT NULL AND ST_IsValid(p.boundary) AND ST_Intersects(p.boundary, b.geom))
-                    OR
-                    (p.location IS NOT NULL AND ST_IsValid(p.location) AND ST_Intersects(p.location, b.geom))
-                )
-                AND (
-                    ($6 = '{}'::text[] AND $7 = '{}'::text[])
-                    OR
-                    ($6 = '{}'::text[] AND LOWER(p.property_type) = ANY(SELECT LOWER(unnest($7::text[]))))
-                    OR
-                    ($7 = '{}'::text[] AND LOWER(p.status) = ANY(SELECT LOWER(unnest($6::text[]))))
-                    OR
-                    (LOWER(p.status) = ANY(SELECT LOWER(unnest($6::text[])))
-                     OR LOWER(p.property_type) = ANY(SELECT LOWER(unnest($7::text[]))))
-                )
-            `;
+        // Ensure indexes exist (will only create if they don't exist)
+        await AppDataSource.query(createIndexQuery);
 
-            const queryParams = [
-                minLng, minLat, maxLng, maxLat,
-                zoom,
-                statuses,
-                types
-            ];
+        // Optimized query
+        const query = `
+            WITH bounds AS (
+                SELECT ST_MakeEnvelope($1, $2, $3, $4, 4326) as geom
+            )
+            SELECT 
+                p.property_id,
+                p.name,
+                p.property_type,
+                p.status,
+                CASE 
+                    WHEN p.boundary IS NOT NULL THEN
+                        CASE 
+                            WHEN $5::integer < 12 THEN ST_AsGeoJSON(ST_SimplifyPreserveTopology(p.boundary, 0.0001))::json
+                            WHEN $5::integer < 15 THEN ST_AsGeoJSON(ST_SimplifyPreserveTopology(p.boundary, 0.00001))::json
+                            ELSE ST_AsGeoJSON(p.boundary)::json
+                        END
+                    ELSE NULL
+                END as boundary
+            FROM properties p, bounds b
+            WHERE p.boundary IS NOT NULL 
+            AND ST_Intersects(p.boundary, b.geom)
+            AND ($6 = '{}'::text[] OR LOWER(p.status) = ANY(SELECT LOWER(unnest($6::text[]))))
+            AND ($7 = '{}'::text[] OR LOWER(p.property_type) = ANY(SELECT LOWER(unnest($7::text[]))))
+        `;
 
-            logger.info('Executing property query:', { 
-                paramCount: queryParams.length,
-                params: queryParams,
-                bounds: [minLng, minLat, maxLng, maxLat]
-            });
+        const queryParams = [minLng, minLat, maxLng, maxLat, zoom, statuses, types];
 
-            const result = await AppDataSource.query(query, queryParams);
-            logger.info('Query results:', { count: result.length });
+        const result = await AppDataSource.query(query, queryParams);
 
-            // Format results as GeoJSON Features
-            const formattedResult = result
-                .filter((property: PropertyResult) => 
-                    property && 
-                    (property.boundary || property.location)
-                )
-                .map((property: PropertyResult) => ({
-                    property_id: property.property_id,
-                    name: property.name,
-                    type: property.property_type,
-                    status: property.status,
-                    service_address_id: property.service_address_id,
-                    billing_address_id: property.billing_address_id,
-                    created_at: property.created_at,
-                    updated_at: property.updated_at,
-                    boundary: property.boundary ? {
-                        type: 'Feature',
-                        geometry: property.boundary,
-                        properties: {
-                            property_id: property.property_id,
-                            property_type: property.property_type,
-                            status: property.status
-                        }
-                    } : null,
-                    location: property.location ? {
-                        type: 'Feature',
-                        geometry: property.location,
-                        properties: {
-                            property_id: property.property_id,
-                            property_type: property.property_type,
-                            status: property.status
-                        }
-                    } : null
-                }));
+        // Format results as GeoJSON Features
+        const formattedResult = result
+            .filter((p: PropertyResult) => p && p.boundary)
+            .map((p: PropertyResult) => ({
+                property_id: p.property_id,
+                name: p.name,
+                type: p.property_type,
+                status: p.status,
+                boundary: {
+                    type: 'Feature',
+                    geometry: p.boundary,
+                    properties: {
+                        property_id: p.property_id,
+                        property_type: p.property_type,
+                        status: p.status
+                    }
+                }
+            }));
 
-            logger.info('Formatted results:', { 
-                count: formattedResult.length,
-                sample: formattedResult[0]
-            });
-
-            // Cache the result
-            cache.set(cacheKey, formattedResult);
-
-            res.json(formattedResult);
-        } catch (queryError) {
-            logger.error('Database query error:', {
-                error: queryError,
-                message: queryError instanceof Error ? queryError.message : String(queryError),
-                stack: queryError instanceof Error ? queryError.stack : undefined
-            });
-            throw queryError;
-        }
+        // Cache the result
+        cache.set(cacheKey, formattedResult);
+        
+        return res.json(formattedResult);
     } catch (error) {
-        logger.error('Error in getPropertyBoundaries:', {
-            error,
-            message: error instanceof Error ? error.message : String(error),
-            stack: error instanceof Error ? error.stack : undefined
-        });
-
-        res.status(500).json({
+        logger.error('Error in getPropertyBoundaries:', error);
+        return res.status(500).json({
             error: 'Internal server error',
-            message: 'Failed to fetch property boundaries',
-            details: error instanceof Error ? error.message : String(error)
+            message: error.message
         });
     }
 }

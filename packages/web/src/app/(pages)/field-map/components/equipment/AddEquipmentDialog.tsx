@@ -21,6 +21,7 @@ import {
   Checkbox,
   FormControlLabel,
   TextareaAutosize,
+  InputAdornment,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
@@ -28,8 +29,7 @@ import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import MobileScreenShareIcon from '@mui/icons-material/MobileScreenShare';
 import { useEquipmentTypes } from '@/app/(pages)/settings/equipment/hooks/useEquipment';
-import { useCamera } from '@/app/hooks/useCamera';
-import { useBarcode } from '@/app/hooks/useBarcode';
+import { useCaptureFlow } from '@/app/hooks/useCaptureFlow';
 import type { 
   Field, 
   FormData, 
@@ -50,8 +50,10 @@ interface AddEquipmentDialogProps {
   propertyName: string;
   propertyType: string;
   jobType: string;
+  jobTitle?: string;
   accounts?: string[];
 }
+
 
 /**
  * Dialog for adding new equipment to the map
@@ -61,6 +63,7 @@ interface AddEquipmentDialogProps {
  * - Field validation
  * - Location display
  */
+
 export function AddEquipmentDialog({
   open,
   location,
@@ -69,21 +72,23 @@ export function AddEquipmentDialog({
   propertyName,
   propertyType,
   jobType,
+  jobTitle,
   accounts,
 }: AddEquipmentDialogProps) {
   const { data: equipmentTypes = [], isLoading } = useEquipmentTypes();
-  const { openCamera, takePhoto, isLoading: isCameraLoading } = useCamera();
   const { 
-    scanBarcodeFromCamera, 
-    scanBarcodeFromImage, 
-    cleanup: cleanupBarcode, 
-    isLoading: isBarcodeLoading 
-  } = useBarcode();
+    startCapture,
+    scanBarcode,
+    takePhoto,
+    cleanup: cleanupCapture,
+    currentStep,
+    isLoading: isCaptureLoading,
+  } = useCaptureFlow();
   const [selectedType, setSelectedType] = useState('');
   const [formData, setFormData] = useState<FormData>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [showCaptureView, setShowCaptureView] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset state when dialog opens/closes
@@ -95,13 +100,13 @@ export function AddEquipmentDialog({
     }
   }, [open]);
 
-  // Clean up barcode scanner on dialog close
+  // Clean up capture on dialog close
   useEffect(() => {
     if (!open) {
-      cleanupBarcode();
-      setShowBarcodeScanner(false);
+      cleanupCapture();
+      setShowCaptureView(false);
     }
-  }, [open, cleanupBarcode]);
+  }, [open, cleanupCapture]);
 
   // Get the selected equipment type configuration
   const selectedTypeConfig = equipmentTypes.find((t) => t.value === selectedType);
@@ -115,6 +120,27 @@ export function AddEquipmentDialog({
   // Check if a field is required based on conditions
   const isFieldRequired = (field: Field): boolean => {
     return field.required ?? false;
+  };
+
+  // Base dark theme styles for text fields
+  const darkThemeTextField = {
+    '& .MuiOutlinedInput-root': {
+      '& fieldset': {
+        borderColor: 'rgba(255, 255, 255, 0.23)',
+      },
+      '&:hover fieldset': {
+        borderColor: 'rgba(255, 255, 255, 0.4)',
+      },
+    },
+    '& .MuiInputLabel-root': {
+      color: 'rgba(255, 255, 255, 0.7)',
+    },
+    '& .MuiOutlinedInput-input': {
+      color: 'white',
+    },
+    '& .MuiIconButton-root': {
+      color: 'white',
+    },
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -144,8 +170,7 @@ export function AddEquipmentDialog({
         status: 'active',
         data: formData
       });
-      setSelectedType('');
-      setFormData({});
+      onClose();
     } catch (err) {
       console.error('Failed to add equipment:', err);
       setError(err instanceof Error ? err.message : 'Failed to add equipment');
@@ -160,27 +185,24 @@ export function AddEquipmentDialog({
     }
   };
 
-  const handleTakePhoto = async () => {
+  const handleStartCapture = async () => {
     try {
-      const stream = await openCamera();
-      const photoData = await takePhoto(stream);
-      setFormData({ ...formData, photo: photoData });
+      await startCapture();
+      setShowCaptureView(true);
     } catch (err) {
-      console.error('Failed to take photo:', err);
-      setError(err instanceof Error ? err.message : 'Failed to take photo');
+      setError('Camera access required. Please ensure you have a camera connected and browser permissions are granted.');
+      console.error('Capture error:', err);
     }
   };
 
-  const handleScanBarcode = async () => {
+  const handleTakePhoto = async () => {
     try {
-      setShowBarcodeScanner(true);
-      const barcode = await scanBarcodeFromCamera();
-      setFormData({ ...formData, barcode });
-      setShowBarcodeScanner(false);
+      const photoData = await takePhoto();
+      setFormData(prev => ({ ...prev, photo: photoData }));
+      setShowCaptureView(false);
     } catch (err) {
-      console.error('Failed to scan barcode:', err);
-      setError(err instanceof Error ? err.message : 'Failed to scan barcode');
-      setShowBarcodeScanner(false);
+      console.error('Failed to take photo:', err);
+      setError(err instanceof Error ? err.message : 'Failed to take photo');
     }
   };
 
@@ -189,217 +211,126 @@ export function AddEquipmentDialog({
     if (!file) return;
 
     try {
-      const barcode = await scanBarcodeFromImage(file);
-      setFormData({ ...formData, barcode });
+      // TODO: Implement image upload scanning
+      setError('Image upload not implemented yet');
     } catch (err) {
       console.error('Failed to scan barcode from image:', err);
       setError(err instanceof Error ? err.message : 'Failed to scan barcode from image');
     }
   };
 
+  const handleCancelCapture = () => {
+    cleanupCapture();
+    setShowCaptureView(false);
+  };
+
   const renderField = (field: Field) => {
-    switch (field.type) {
-      case 'select':
+    switch (field.name) {
+      case 'photo':
         return (
-          <FormControl fullWidth key={field.name}>
-            <InputLabel>{field.label || field.name}</InputLabel>
-            <Select
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <TextField
+              fullWidth
+              label={field.label || "Photo"}
               value={formData[field.name] || ''}
-              label={field.label || field.name}
-              onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
-              required={isFieldRequired(field)}
-            >
-              {field.options?.map((option: string) => (
-                <MenuItem key={option} value={option}>
-                  {option}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        );
-
-      case 'boolean':
-        return (
-          <FormControlLabel
-            key={field.name}
-            control={
-              <Checkbox
-                checked={formData[field.name] || false}
-                onChange={(e) => setFormData({ ...formData, [field.name]: e.target.checked })}
-              />
-            }
-            label={field.label || field.name}
-          />
-        );
-
-      case 'textarea':
-        return (
-          <FormControl fullWidth key={field.name}>
-            <Typography variant="subtitle2" gutterBottom>
-              {field.label || field.name}
-              {isFieldRequired(field) && ' *'}
-            </Typography>
-            <TextareaAutosize
-              minRows={3}
-              value={formData[field.name] || ''}
-              onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '8px',
-                borderRadius: '4px',
-                borderColor: '#ccc'
-              }}
-            />
-          </FormControl>
-        );
-
-      case 'number-input':
-      case 'number-stepper':
-      case 'slider':
-        return (
-          <TextField
-            key={field.name}
-            fullWidth
-            label={field.label || field.name}
-            type="number"
-            value={formData[field.name] || ''}
-            onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
-            required={isFieldRequired(field)}
-            inputProps={{
-              min: field.numberConfig?.min,
-              max: field.numberConfig?.max,
-              step: field.numberConfig?.step
-            }}
-          />
-        );
-
-      case 'text':
-        if (field.name === 'barcode') {
-          return (
-            <FormControl fullWidth key={field.name}>
-              <TextField
-                label={field.label || field.name}
-                value={formData[field.name] || ''}
-                onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
-                required={isFieldRequired(field)}
-                InputProps={{
-                  endAdornment: (
-                    <Box display="flex">
+              required={field.required}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      component="label"
+                      title="Upload photo"
+                      edge="end"
+                    >
+                      <FileUploadIcon />
                       <input
                         type="file"
                         accept="image/*"
-                        style={{ display: 'none' }}
-                        ref={fileInputRef}
-                        onChange={handleBarcodeImageUpload}
+                        hidden
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = async (event) => {
+                              const dataUrl = event.target?.result as string;
+                              const compressedDataUrl = await compressImage(dataUrl);
+                              setFormData(prev => ({
+                                ...prev,
+                                [field.name]: compressedDataUrl
+                              }));
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
                       />
-                      <IconButton
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isBarcodeLoading}
-                        title="Upload barcode image"
-                      >
-                        <FileUploadIcon />
-                      </IconButton>
-                      <IconButton 
-                        onClick={handleScanBarcode}
-                        disabled={isBarcodeLoading}
-                        title="Scan with camera"
-                      >
-                        {isBarcodeLoading ? (
-                          <CircularProgress size={24} />
-                        ) : (
-                          <MobileScreenShareIcon />
-                        )}
-                      </IconButton>
-                    </Box>
-                  ),
-                }}
-              />
-              {showBarcodeScanner && (
-                <Box mt={1} position="relative" width="100%" height={300}>
-                  <video
-                    id="video-stream"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                    }}
-                  />
-                  <Box
-                    position="absolute"
-                    top={0}
-                    left={0}
-                    right={0}
-                    bottom={0}
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                  >
-                    <Box
-                      border={2}
-                      borderColor="primary.main"
-                      width={200}
-                      height={200}
-                      sx={{ borderStyle: 'dashed' }}
-                    />
-                  </Box>
-                </Box>
-              )}
-            </FormControl>
-          );
-        } else if (field.name === 'photo') {
-          return (
-            <FormControl fullWidth key={field.name}>
-              <TextField
-                label={field.label || field.name}
-                value={formData[field.name] || ''}
-                onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
-                required={isFieldRequired(field)}
-                InputProps={{
-                  endAdornment: (
-                    <IconButton 
-                      onClick={handleTakePhoto}
-                      disabled={isCameraLoading}
-                    >
-                      {isCameraLoading ? (
-                        <CircularProgress size={24} />
-                      ) : (
-                        <PhotoCameraIcon />
-                      )}
                     </IconButton>
-                  ),
-                }}
-              />
-              {formData[field.name] && (
-                <Box mt={1}>
-                  <img 
-                    src={formData[field.name]} 
-                    alt="Equipment photo" 
-                    style={{ maxWidth: '100%', maxHeight: '200px' }} 
-                  />
-                </Box>
-              )}
-            </FormControl>
-          );
-        }
+                    <IconButton
+                      onClick={() => setShowCaptureView(true)}
+                      title="Take photo"
+                      edge="end"
+                    >
+                      <PhotoCameraIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={darkThemeTextField}
+            />
+            {formData[field.name] && (
+              <Box sx={{ mt: 1 }}>
+                <img 
+                  src={formData[field.name]} 
+                  alt="Equipment" 
+                  style={{ maxWidth: '100%', maxHeight: '200px', objectFit: 'contain' }} 
+                />
+              </Box>
+            )}
+          </FormControl>
+        );
+
+      case 'barcode':
         return (
-          <FormControl fullWidth key={field.name}>
+          <FormControl fullWidth sx={{ mb: 2 }}>
             <TextField
-              label={field.label || field.name}
+              fullWidth
+              label={field.label || "Barcode"}
+              required={field.required}
               value={formData[field.name] || ''}
-              onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
-              required={isFieldRequired(field)}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                [field.name]: e.target.value
+              }))}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton 
+                      onClick={() => setShowCaptureView(true)}
+                      edge="end"
+                      title="Scan barcode"
+                    >
+                      <QrCodeScannerIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={darkThemeTextField}
             />
           </FormControl>
         );
 
       default:
         return (
-          <FormControl fullWidth key={field.name}>
+          <FormControl fullWidth sx={{ mb: 2 }}>
             <TextField
+              fullWidth
               label={field.label || field.name}
               value={formData[field.name] || ''}
-              onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
-              required={isFieldRequired(field)}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                [field.name]: e.target.value
+              }))}
+              required={field.required}
+              sx={darkThemeTextField}
             />
           </FormControl>
         );
@@ -409,94 +340,126 @@ export function AddEquipmentDialog({
   return (
     <Dialog
       open={open}
-      onClose={handleClose}
-      fullScreen
-      sx={{
-        '& .MuiDialog-paper': {
-          background: (theme) => theme.palette.background.default,
-        },
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          bgcolor: 'background.paper',
+          backgroundImage: 'none',
+        }
       }}
     >
       <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-          <Box>
-            <Typography variant="h6" gutterBottom>Add Equipment</Typography>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Property: {propertyName} ({propertyType})
-            </Typography>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Accounts: {accounts?.length ? accounts.join(', ') : 'None'}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Job Type: {jobType || 'None'}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Status: Active
-            </Typography>
-          </Box>
-          <IconButton 
-            edge="end" 
-            color="inherit" 
-            onClick={handleClose}
-            disabled={isSubmitting}
-            aria-label="close"
-            sx={{ alignSelf: 'flex-start' }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </Box>
-      </DialogTitle>
-      <DialogContent>
-        <Box
-          component="form"
-          onSubmit={handleSubmit}
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 2,
-            mt: 2,
-          }}
+        Add Equipment
+        <IconButton
+          onClick={onClose}
+          sx={{ position: 'absolute', right: 8, top: 8 }}
         >
-          {/* Context Information */}
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Location: {location[0].toFixed(6)}, {location[1].toFixed(6)}
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent>
+        {/* Location Details */}
+        <Box mb={3}>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Location Details
+          </Typography>
+          <Typography variant="body2">
+            <strong>Property:</strong> {propertyName}
+          </Typography>
+          <Typography variant="body2">
+            <strong>Property Type:</strong> {propertyType}
+          </Typography>
+          {jobTitle && (
+            <Typography variant="body2">
+              <strong>Job Title:</strong> {jobTitle}
             </Typography>
-          </Box>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              <AlertTitle>Error</AlertTitle>
-              {error}
-            </Alert>
           )}
-
-          <FormControl fullWidth>
-            <InputLabel>Equipment Type</InputLabel>
-            <Select
-              value={selectedType}
-              label="Equipment Type"
-              onChange={(e) => {
-                setSelectedType(e.target.value);
-                setFormData({}); // Reset form data when type changes
-              }}
-              disabled={isSubmitting || isLoading}
-              required
-            >
-              {Array.isArray(equipmentTypes) && equipmentTypes.map((type) => (
-                <MenuItem key={type.value} value={type.value}>
-                  {type.value}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          {selectedTypeConfig && getVisibleFields().map((field: Field) => renderField(field))}
+          <Typography variant="body2">
+            <strong>Job Type:</strong> {jobType}
+          </Typography>
+          <Typography variant="body2">
+            <strong>Coordinates:</strong> {location[0].toFixed(6)}, {location[1].toFixed(6)}
+          </Typography>
         </Box>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            <AlertTitle>Error</AlertTitle>
+            {error}
+          </Alert>
+        )}
+
+        {/* Equipment Type Selection */}
+        <FormControl fullWidth sx={{ mb: 4 }}>
+          <InputLabel>Equipment Type</InputLabel>
+          <Select
+            value={selectedType}
+            label="Equipment Type"
+            onChange={(e) => {
+              setSelectedType(e.target.value);
+              // Reset form data when type changes
+              setFormData({});
+              setError(null);
+            }}
+            disabled={isSubmitting || isLoading}
+            required
+            sx={darkThemeTextField}
+          >
+            {Array.isArray(equipmentTypes) && equipmentTypes.map((type) => (
+              <MenuItem key={type.value} value={type.value}>
+                {type.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        {/* Main capture button for mobile flow */}
+        {!showCaptureView && selectedType && (
+          <Button
+            fullWidth
+            variant="contained"
+            color="primary"
+            onClick={handleStartCapture}
+            disabled={isCaptureLoading}
+            startIcon={<MobileScreenShareIcon />}
+            sx={{ mb: 4 }}
+          >
+            Scan Barcode & Take Photo
+          </Button>
+        )}
+
+        {/* Dynamic form fields */}
+        {selectedType && getVisibleFields().map(field => (
+          <React.Fragment key={field.name}>
+            {renderField(field)}
+          </React.Fragment>
+        ))}
+
+        {/* Camera View */}
+        {showCaptureView && (
+          <Box mt={2} position="relative" width="100%" height={300}>
+            <video
+              id="video-stream"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                borderRadius: '8px',
+              }}
+              autoPlay
+              playsInline
+            />
+            {/* Rest of the camera view UI */}
+          </Box>
+        )}
       </DialogContent>
+
       <DialogActions sx={{ p: 2, gap: 1 }}>
-        <Button 
-          onClick={handleClose}
+        <Button
+          onClick={onClose}
           variant="outlined"
           fullWidth
           disabled={isSubmitting}

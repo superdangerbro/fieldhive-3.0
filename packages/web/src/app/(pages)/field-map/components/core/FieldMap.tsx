@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useMemo } from 'react';
 import { useTheme, Box } from '@mui/material';
 import { MapRef, Marker } from 'react-map-gl';
 import mapboxgl from 'mapbox-gl';
@@ -59,12 +59,20 @@ export function FieldMap() {
   // Use optimized map movement hook
   const { viewState, handleViewStateChange, handleMoveEnd } = useMapMovement({
     onBoundsChange: (bounds) => {
-      setMapBounds(bounds);
-      if (!bounds.some(isNaN)) {
+      // Only update bounds if they are valid
+      if (bounds && !bounds.some(isNaN)) {
+        setMapBounds(bounds);
         debouncedSetBounds(bounds);
       }
-    }
+    },
+    debounceMs: 300 // Reduced from 500ms for better responsiveness
   });
+
+  // Memoize filters to prevent unnecessary rerenders
+  const memoizedFilters = useMemo(() => ({
+    statuses: filters.statuses,
+    types: filters.types
+  }), [filters.statuses, filters.types]);
 
   // Use optimized property queries
   const {
@@ -73,8 +81,8 @@ export function FieldMap() {
     isLoading: isLoadingProperties
   } = usePropertyQueries({
     bounds: mapBounds,
-    filters,
-    enabled: !!mapBounds
+    filters: memoizedFilters,
+    enabled: !!mapBounds && !mapBounds.some(isNaN)
   });
 
   const mapRef = useRef<MapRef>(null);
@@ -170,8 +178,15 @@ export function FieldMap() {
         throw new Error('No property data received');
       }
 
-      // Set the active property and show the job dialog
-      setActiveProperty(propertyData);
+      // Set the active property with location data
+      setActiveProperty({
+        ...propertyData,
+        location: propertyData.location || {
+          type: 'Point',
+          coordinates: coordinates // Use clicked coordinates as fallback
+        }
+      });
+      
       setShowSelectJobDialog(true);
       
       // Center the map on the property boundary
@@ -182,7 +197,8 @@ export function FieldMap() {
           const boundaryCoords = propertyData.boundary.geometry.coordinates[0];
           
           boundaryCoords.forEach((coord: [number, number]) => {
-            if (Array.isArray(coord) && coord.length === 2) {
+            if (Array.isArray(coord) && coord.length === 2 && 
+                !isNaN(coord[0]) && !isNaN(coord[1])) {
               bounds.extend(coord);
             }
           });
@@ -191,26 +207,29 @@ export function FieldMap() {
           
           map.fitBounds(bounds, {
             padding,
-            duration: ANIMATION_DURATION,
-            maxZoom: 19
+            duration: ANIMATION_DURATION
           });
         } catch (error) {
-          console.error('Error fitting to bounds:', error);
+          console.error('Error fitting bounds:', error);
+          // Fallback to centering on clicked coordinates
           map.easeTo({
             center: coordinates,
-            zoom: 17,
-            duration: ANIMATION_DURATION
+            zoom: ZOOM_LEVEL,
+            duration: ANIMATION_DURATION,
+            pitch: MAP_PITCH
           });
         }
       } else {
+        // If no valid boundary, center on clicked coordinates
         map?.easeTo({
           center: coordinates,
-          zoom: 17,
-          duration: ANIMATION_DURATION
+          zoom: ZOOM_LEVEL,
+          duration: ANIMATION_DURATION,
+          pitch: MAP_PITCH
         });
       }
     } catch (error) {
-      console.error('Error fetching property:', error);
+      console.error('Error fetching property details:', error);
     }
   }, [setActiveProperty]);
 
