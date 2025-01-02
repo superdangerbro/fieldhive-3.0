@@ -11,12 +11,14 @@ import {
     MenuItem,
     FormControlLabel,
     Checkbox,
-    Typography
+    Typography,
+    Divider
 } from '@mui/material';
 import type { FieldType, FormField } from './types';
 import { isNumberConfig, isSelectConfig } from './types';
 import { NumberFieldConfig } from '../components/NumberFieldConfig';
 import { SelectFieldConfig } from '../components/SelectFieldConfig';
+import { SavedFields } from './SavedFields';
 
 interface AddFieldFormProps {
     onAdd: (field: FormField) => void;
@@ -59,12 +61,21 @@ export function AddFieldForm({ onAdd, onCancel, existingFields, initialField, mo
         }
 
         onAdd(field);
+        if (mode === 'add') {
+            setField({
+                name: '',
+                label: '',
+                type: 'text',
+                required: false
+            });
+        }
     };
 
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const name = e.target.value;
         console.log('Name change:', { name });
         setField(prev => ({
+
             ...prev,
             name,
             label: name // Use the same value for both
@@ -111,67 +122,85 @@ export function AddFieldForm({ onAdd, onCancel, existingFields, initialField, mo
     };
 
     return (
-        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="h6">
-                {mode === 'add' ? 'Add Field' : 'Edit Field'}
+        <Box>
+            <Typography variant="subtitle2" gutterBottom>
+                Saved Fields
             </Typography>
-            
-            <TextField
-                label="Field Name"
-                value={field.name}
-                onChange={handleNameChange}
-                required
-                helperText="Name shown to users"
+            <SavedFields 
+                onAddFields={(fields) => {
+                    fields.forEach(field => onAdd(field));
+                }} 
+                existingFields={existingFields}
             />
 
-            <FormControl fullWidth>
-                <InputLabel>Field Type</InputLabel>
-                <Select
-                    value={field.type}
-                    onChange={(e) => handleTypeChange(e.target.value as FieldType)}
-                    label="Field Type"
-                    disabled={mode === 'edit'} // Can't change type in edit mode
-                >
-                    {FIELD_TYPES.map(type => (
-                        <MenuItem key={type.value} value={type.value}>
-                            {type.label}
-                        </MenuItem>
-                    ))}
-                </Select>
-            </FormControl>
+            <Divider sx={{ my: 2 }} />
 
-            {renderFieldConfig()}
+            <Typography variant="subtitle2" gutterBottom>
+                Custom Field
+            </Typography>
 
-            <TextField
-                label="Description"
-                value={field.description || ''}
-                onChange={(e) => setField(prev => ({ ...prev, description: e.target.value }))}
-                multiline
-                rows={2}
-                helperText="Optional help text for this field"
-            />
+            <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Typography variant="h6">
+                    {mode === 'add' ? 'Add Field' : 'Edit Field'}
+                </Typography>
+                
+                <TextField
+                    label="Field Name"
+                    value={field.name}
+                    onChange={handleNameChange}
+                    required
+                    helperText="Name shown to users"
+                />
 
-            <FormControlLabel
-                control={
-                    <Checkbox
-                        checked={field.required}
-                        onChange={(e) => setField(prev => ({ ...prev, required: e.target.checked }))}
-                    />
-                }
-                label="Required Field"
-            />
+                <FormControl fullWidth>
+                    <InputLabel>Field Type</InputLabel>
+                    <Select
+                        value={field.type}
+                        onChange={(e) => handleTypeChange(e.target.value as FieldType)}
+                        label="Field Type"
+                        disabled={mode === 'edit'} // Can't change type in edit mode
+                    >
+                        {FIELD_TYPES.map(type => (
+                            <MenuItem key={type.value} value={type.value}>
+                                {type.label}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
 
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                <Button onClick={onCancel}>
-                    Cancel
-                </Button>
-                <Button 
-                    type="submit" 
-                    variant="contained"
-                    disabled={!field.name}
-                >
-                    {mode === 'add' ? 'Add Field' : 'Save Changes'}
-                </Button>
+                {renderFieldConfig()}
+
+                <TextField
+                    label="Description"
+                    value={field.description || ''}
+                    onChange={(e) => setField(prev => ({ ...prev, description: e.target.value }))}
+                    multiline
+                    rows={2}
+                    helperText="Optional help text for this field"
+                />
+
+                <FormControlLabel
+                    control={
+                        <Checkbox
+                            checked={field.required}
+                            onChange={(e) => setField(prev => ({ ...prev, required: e.target.checked }))}
+                        />
+                    }
+                    label="Required Field"
+                />
+
+                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                    <Button onClick={onCancel}>
+                        Cancel
+                    </Button>
+                    <Button 
+                        type="submit" 
+                        variant="contained"
+                        disabled={!field.name}
+                    >
+                        {mode === 'add' ? 'Add Field' : 'Save Changes'}
+                    </Button>
+                </Box>
             </Box>
         </Box>
     );

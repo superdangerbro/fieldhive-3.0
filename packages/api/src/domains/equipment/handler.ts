@@ -17,6 +17,10 @@ interface CreateEquipmentBody {
     location?: LocationInput;
     status?: string;
     is_georeferenced?: boolean;
+    data?: {
+        barcode?: string;
+        photo?: string;
+    };
 }
 
 interface UpdateEquipmentBody {
@@ -92,7 +96,16 @@ export async function getEquipmentById(req: Request, res: Response) {
 export async function createEquipment(req: Request<any, any, CreateEquipmentBody>, res: Response) {
     try {
         // Validate required fields
-        const { job_id, equipment_type_id, location } = req.body;
+        const { job_id, equipment_type_id, location, data = {} } = req.body;
+        logger.info('Received equipment data:', { 
+            job_id, 
+            equipment_type_id, 
+            location, 
+            data,
+            rawFloor: data?.floor,
+            floorType: data?.floor !== undefined ? typeof data.floor : 'undefined'
+        });
+
         if (!job_id) {
             return res.status(400).json({
                 error: 'Validation failed',
@@ -106,12 +119,34 @@ export async function createEquipment(req: Request<any, any, CreateEquipmentBody
             });
         }
 
+        // Handle floor value
+        let floorValue = null;
+        if (data.floor === 'G') {
+            floorValue = 'G';
+        } else if (data.floor !== undefined && data.floor !== null) {
+            const parsed = parseInt(data.floor as string);
+            floorValue = isNaN(parsed) ? data.floor : parsed;
+        }
+
         // Create equipment instance
         const equipment = equipmentRepository.create({
             job_id,
             equipment_type_id,
             status: req.body.status || 'active',
-            is_georeferenced: req.body.is_georeferenced ?? true
+            is_georeferenced: req.body.is_georeferenced ?? true,
+            data: {
+                ...data,
+                floor: floorValue,
+                is_interior: data?.is_interior ?? false,
+                barcode: data?.barcode ?? null,
+                photo: data?.photo ?? null
+            }
+        });
+
+        logger.info('Created equipment instance:', { 
+            data: equipment.data,
+            floor: equipment.data.floor,
+            floorType: equipment.data.floor !== undefined ? typeof equipment.data.floor : 'undefined'
         });
 
         // Handle location if provided
@@ -120,7 +155,12 @@ export async function createEquipment(req: Request<any, any, CreateEquipmentBody
         }
 
         const savedEquipment = await equipmentRepository.save(equipment);
-        logger.info('Equipment created:', savedEquipment.toJSON());
+        logger.info('Saved equipment:', { 
+            id: savedEquipment.equipment_id,
+            data: savedEquipment.data,
+            floor: savedEquipment.data.floor,
+            floorType: savedEquipment.data.floor !== undefined ? typeof savedEquipment.data.floor : 'undefined'
+        });
 
         return res.status(201).json(savedEquipment.toJSON());
     } catch (error) {

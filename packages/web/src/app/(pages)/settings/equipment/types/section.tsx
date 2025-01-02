@@ -199,69 +199,53 @@ export function EquipmentTypeSection() {
                                         <FormControlLabel
                                             control={
                                                 <Switch
-                                                    checked={type.barcodeRequired ?? false}
-                                                    onChange={(e) => {
-                                                        const updatedTypes = types.map(t => {
-                                                            if (t.value === type.value) {
-                                                                const updatedFields = e.target.checked ? [
-                                                                    {
-                                                                        name: 'barcode',
-                                                                        type: 'text',
-                                                                        label: 'Barcode',
-                                                                        required: true
-                                                                    },
-                                                                    ...t.fields.filter(f => f.name !== 'barcode')
-                                                                ] : t.fields.filter(field => field.name !== 'barcode');
-                                                                
-                                                                return {
-                                                                    ...t,
-                                                                    barcodeRequired: e.target.checked,
-                                                                    fields: updatedFields
-                                                                };
-                                                            }
-                                                            return t;
-                                                        });
-                                                        updateMutation.mutate(updatedTypes);
+                                                    checked={type.barcodeRequired}
+                                                    onChange={async (e) => {
+                                                        const updatedType = {
+                                                            ...type,
+                                                            barcodeRequired: e.target.checked
+                                                        };
+                                                        await handleSave(updatedType);
                                                     }}
-                                                    size="small"
                                                 />
                                             }
-                                            label={<Typography variant="body2">Require Barcode</Typography>}
+                                            label="Require Barcode"
                                         />
                                         <FormControlLabel
                                             control={
                                                 <Switch
-                                                    checked={type.photoRequired ?? false}
-                                                    onChange={(e) => {
-                                                        const updatedTypes = types.map(t => {
-                                                            if (t.value === type.value) {
-                                                                const updatedFields = e.target.checked ? [
-                                                                    {
-                                                                        name: 'photo',
-                                                                        type: 'text',
-                                                                        label: 'Photo',
-                                                                        required: true
-                                                                    },
-                                                                    ...t.fields.filter(f => f.name !== 'photo')
-                                                                ] : t.fields.filter(field => field.name !== 'photo');
-                                                                
-                                                                return {
-                                                                    ...t,
-                                                                    photoRequired: e.target.checked,
-                                                                    fields: updatedFields
-                                                                };
-                                                            }
-                                                            return t;
-                                                        });
-                                                        updateMutation.mutate(updatedTypes);
+                                                    checked={type.photoRequired}
+                                                    onChange={async (e) => {
+                                                        const updatedType = {
+                                                            ...type,
+                                                            photoRequired: e.target.checked
+                                                        };
+                                                        await handleSave(updatedType);
                                                     }}
-                                                    size="small"
                                                 />
                                             }
-                                            label={<Typography variant="body2">Require Photo</Typography>}
+                                            label="Require Photo"
                                         />
                                     </Box>
                                 </Box>
+
+                                <Box sx={{ mt: 3, pl: 2 }}>
+                                    <Typography variant="caption" color="text.secondary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
+                                        Fields
+                                    </Typography>
+                                    
+                                    <Box sx={{ mt: 1 }}>
+                                        <Button
+                                            startIcon={<AddIcon />}
+                                            onClick={() => setAddingFieldsTo(type.value)}
+                                            variant="outlined"
+                                            size="small"
+                                        >
+                                            Add Field
+                                        </Button>
+                                    </Box>
+                                </Box>
+
                                 <Box sx={{ py: 1 }}>
                                     <FieldList
                                         fields={type.fields}
@@ -288,13 +272,6 @@ export function EquipmentTypeSection() {
                                     />
                                 </Box>
                                 <Box sx={{ display: 'flex', gap: 1 }}>
-                                    <Button
-                                        size="small"
-                                        onClick={() => setAddingFieldsTo(type.value)}
-                                        startIcon={<AddIcon />}
-                                    >
-                                        Add Field
-                                    </Button>
                                     <Button
                                         size="small"
                                         onClick={() => setConfiguringInspection(type.value)}

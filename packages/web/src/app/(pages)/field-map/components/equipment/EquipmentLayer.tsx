@@ -1,6 +1,6 @@
 'use client';
 
-import React, { forwardRef, useImperativeHandle, useEffect } from 'react';
+import React, { forwardRef, useImperativeHandle, useEffect, useState } from 'react';
 import { Box } from '@mui/material';
 import { Marker } from 'react-map-gl';
 import { Crosshairs } from './Crosshairs';
@@ -52,19 +52,12 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
     equipment,
     isLoading,
     error,
-    placementLocation,
     isPlacingEquipment,
-    isAddEquipmentDialogOpen,
     isMarkerDialogOpen,
     selectedEquipment,
     addEquipment,
     deleteEquipment,
     updateEquipment,
-    setPlacementLocation,
-    confirmPlacementLocation,
-    openMarkerDialog,
-    closeMarkerDialog,
-    setIsAddEquipmentDialogOpen,
     cancelPlacingEquipment,
     startPlacingEquipment
   } = useEquipment({ bounds });
@@ -94,6 +87,57 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
     }
   }));
 
+  const [isAddEquipmentDialogOpen, setIsAddEquipmentDialogOpen] = useState(false);
+  const [placementLocation, setPlacementLocation] = useState<[number, number] | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  // Reset states when dialog closes
+  useEffect(() => {
+    if (!isAddEquipmentDialogOpen) {
+      setShowSuccess(false);
+    }
+  }, [isAddEquipmentDialogOpen]);
+
+  const handleAddEquipment = async (data: any) => {
+    try {
+      const equipmentData = {
+        job_id: activeJob.job_id,
+        equipment_type_id: data.equipment_type_id,
+        status: data.status || 'active',
+        location: data.location,
+        is_georeferenced: data.is_georeferenced,
+        property_id: activeProperty.property_id,
+        property_name: activeProperty.name,
+        property_type: activeProperty.type,
+        job_title: activeJob.title || 'None',
+        job_type: activeJob.type,
+        accounts: activeProperty.accounts?.map(account => account.name) || [],
+        data: data.data
+      };
+      console.log('Submitting equipment:', equipmentData);
+      const result = await addEquipment.mutateAsync(equipmentData);
+      console.log('Equipment added successfully:', result);
+      setShowSuccess(true);
+      return true;
+    } catch (error) {
+      console.error('Failed to add equipment:', error);
+      throw error;
+    }
+  };
+
+  const handleCloseDialog = () => {
+    console.log('Closing dialog');
+    setIsAddEquipmentDialogOpen(false);
+    setIsAddingEquipment(false);
+    setShowSuccess(false);
+    cancelPlacingEquipment();
+  };
+
+  const handleAddAnother = () => {
+    console.log('Adding another');
+    setShowSuccess(false);
+  };
+
   if (!visible) return null;
 
   return (
@@ -114,7 +158,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
             latitude={latitude}
             onClick={(e) => {
               e.originalEvent.stopPropagation();
-              openMarkerDialog(eq);
+              // openMarkerDialog(eq);
             }}
           >
             <Box
@@ -169,40 +213,10 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
           jobType={activeJob.type || 'None'}
           jobTitle={activeJob.title}
           accounts={activeProperty.accounts?.map(account => account.name) || []}
-          onClose={() => {
-            cancelPlacingEquipment();
-            setIsAddingEquipment(false);
-          }}
-          onSubmit={async (data) => {
-            try {
-              const equipmentData = {
-                job_id: activeJob.job_id,
-                equipment_type_id: data.type,
-                type: data.type, // Add type field for display
-                status: data.status || 'active',
-                location: {
-                  type: 'Point',
-                  coordinates: [placementLocation[0], placementLocation[1]]
-                },
-                is_georeferenced: true,
-                property_id: activeProperty.property_id,
-                property_name: activeProperty.name,
-                property_type: activeProperty.type,
-                job_title: activeJob.title || 'None',
-                job_type: activeJob.type,
-                accounts: activeProperty.accounts?.map(account => account.name) || [],
-                data: {
-                  ...data.data
-                }
-              };
-              console.log('Submitting equipment:', equipmentData);
-              await addEquipment.mutateAsync(equipmentData);
-              setIsAddingEquipment(false);
-              setIsAddEquipmentDialogOpen(false);
-            } catch (error) {
-              console.error('Failed to add equipment:', error);
-            }
-          }}
+          showSuccess={showSuccess}
+          onClose={handleCloseDialog}
+          onAddAnother={handleAddAnother}
+          onSubmit={handleAddEquipment}
         />
       )}
 
@@ -211,7 +225,9 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
         <EquipmentMarkerDialog
           open={isMarkerDialogOpen}
           equipment={selectedEquipment}
-          onClose={closeMarkerDialog}
+          onClose={() => {
+            // closeMarkerDialog();
+          }}
           onDelete={async (id) => {
             console.log('Deleting equipment:', id);
             try {

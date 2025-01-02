@@ -37,6 +37,15 @@ export class Equipment implements Omit<IEquipment, 'location'> {
     @Column({ type: 'varchar', name: 'status', default: 'active' })
     status: string;
 
+    @Column('jsonb', { name: 'data', default: {} })
+    data: {
+        is_interior?: boolean;
+        floor?: string | number;
+        barcode?: string | null;
+        photo?: string | null;
+        [key: string]: any;
+    } = {};  
+
     @CreateDateColumn({ name: 'created_at' })
     created_at: string;
 
@@ -53,6 +62,22 @@ export class Equipment implements Omit<IEquipment, 'location'> {
                 latitude: this.locationPoint.coordinates[1],
                 longitude: this.locationPoint.coordinates[0]
             };
+        }
+    }
+
+    @AfterLoad()
+    private convertData() {
+        // Ensure data exists
+        this.data = this.data || {};
+        
+        // Handle floor value
+        if (this.data.floor === null || this.data.floor === undefined) {
+            this.data.floor = null;
+        } else if (this.data.floor === 'G') {
+            this.data.floor = 'G';
+        } else {
+            const parsed = parseInt(this.data.floor as string);
+            this.data.floor = isNaN(parsed) ? this.data.floor : parsed;
         }
     }
 
@@ -81,7 +106,7 @@ export class Equipment implements Omit<IEquipment, 'location'> {
             status: this.status,
             property_id: '', // This will be derived from the job
             job_id: this.job_id,
-            data: {},
+            data: this.data || {},
             created_at: this.created_at,
             updated_at: this.updated_at,
             location: this.locationPoint ? {

@@ -7,25 +7,26 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  Box,
+  Typography,
+  TextField,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Box,
-  Typography,
-  IconButton,
-  CircularProgress,
   Alert,
   AlertTitle,
-  TextField,
-  Checkbox,
+  IconButton,
   FormControlLabel,
-  TextareaAutosize,
   InputAdornment,
+  Switch,
+  Slider,
+  CircularProgress,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import MobileScreenShareIcon from '@mui/icons-material/MobileScreenShare';
 import { useEquipmentTypes } from '@/app/(pages)/settings/equipment/hooks/useEquipment';
@@ -42,11 +43,28 @@ interface AddEquipmentDialogProps {
   open: boolean;
   location: [number, number];
   onClose: () => void;
-  onSubmit: (data: { 
-    type: string;
+  onAddAnother: () => void;
+  onSubmit: (data: {
+    job_id: string;
+    equipment_type_id: string;
     status: string;
-    data: Record<string, any>;
-  }) => Promise<void>;
+    is_georeferenced: boolean;
+    location: {
+      latitude: number;
+      longitude: number;
+    };
+    data: {
+      barcode?: string | null;
+      photo?: string | null;
+      is_interior?: boolean;
+      floor?: string | null;
+      [key: string]: any;
+    };
+  }) => Promise<boolean>;
+  showSuccess: boolean;
+  successTitle?: string;
+  successMessage?: string;
+  successButtonText?: string;
   propertyName: string;
   propertyType: string;
   jobType: string;
@@ -54,27 +72,22 @@ interface AddEquipmentDialogProps {
   accounts?: string[];
 }
 
-
-/**
- * Dialog for adding new equipment to the map
- * Features:
- * - Dynamic form fields based on equipment type
- * - Conditional field visibility
- * - Field validation
- * - Location display
- */
-
-export function AddEquipmentDialog({
+export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   open,
   location,
   onClose,
   onSubmit,
+  onAddAnother,
+  showSuccess,
+  successTitle,
+  successMessage,
+  successButtonText,
   propertyName,
   propertyType,
   jobType,
   jobTitle,
   accounts,
-}: AddEquipmentDialogProps) {
+}) => {
   const { data: equipmentTypes = [], isLoading } = useEquipmentTypes();
   const { 
     startCapture,
@@ -89,16 +102,31 @@ export function AddEquipmentDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCaptureView, setShowCaptureView] = useState(false);
+  const [useCustomFloor, setUseCustomFloor] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  console.log('Initial render - showSuccess:', showSuccess);
 
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (open) {
+      console.log('Dialog opened - resetting state');
       setSelectedType('');
       setFormData({});
       setError(null);
+      setUseCustomFloor(false);
     }
   }, [open]);
+
+  // Set initial floor value when interior is checked
+  useEffect(() => {
+    if (formData.is_interior && !formData.floor) {
+      setFormData(prev => ({
+        ...prev,
+        floor: 'G'
+      }));
+    }
+  }, [formData.is_interior]);
 
   // Clean up capture on dialog close
   useEffect(() => {
@@ -110,6 +138,9 @@ export function AddEquipmentDialog({
 
   // Get the selected equipment type configuration
   const selectedTypeConfig = equipmentTypes.find((t) => t.value === selectedType);
+  const hasBarcode = selectedTypeConfig?.fields.some(f => f.name === 'barcode');
+  const hasPhoto = selectedTypeConfig?.fields.some(f => f.name === 'photo');
+  const showCaptureButtons = hasBarcode && hasPhoto;
 
   // Get visible fields based on conditions
   const getVisibleFields = () => {
@@ -143,37 +174,84 @@ export function AddEquipmentDialog({
     },
   };
 
+  // Generate floor options
+  const generateFloorOptions = () => {
+    const options = [];
+    // Lower floors (L5 to L1)
+    for (let i = 5; i >= 1; i--) {
+      options.push(`L${i}`);
+    }
+    // Ground floor
+    options.push('G');
+    // Upper floors (1 to 10)
+    for (let i = 1; i <= 10; i++) {
+      options.push(i.toString());
+    }
+    return options;
+  };
+
+  const FLOOR_OPTIONS = generateFloorOptions();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedType) {
-      setError('Equipment type is required');
+    if (!selectedType || selectedType.trim() === '') {
+      setError('Please select an equipment type');
       return;
     }
-
-    // Validate required fields
-    const visibleFields = getVisibleFields();
-    const missingFields = visibleFields
-      .filter((field: Field) => isFieldRequired(field) && !formData[field.name])
-      .map((field: Field) => field.name);
-
-    if (missingFields.length > 0) {
-      setError(`Required fields missing: ${missingFields.join(', ')}`);
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
 
     try {
-      await onSubmit({
-        type: selectedType,
+      setIsSubmitting(true);
+      setError(null);
+
+      // Get all fields for the selected type
+      const typeConfig = equipmentTypes.find(t => t.value === selectedType);
+      if (!typeConfig) {
+        throw new Error('Selected type configuration not found');
+      }
+
+      // Extract special fields
+      const { barcode, photo, is_interior, floor, ...otherFields } = formData;
+      console.log('Raw floor value:', floor, typeof floor);
+
+      // Floor value should be kept as is - either 'G' or a number
+      const floorValue = floor === '' ? null : floor;
+      console.log('Final floor value:', floorValue, typeof floorValue);
+
+      // Extract latitude and longitude
+      const [longitude, latitude] = location;
+
+      // Prepare submission data
+      const submissionData = {
+        job_id: jobType,
+        equipment_type_id: typeConfig.value,  
         status: 'active',
-        data: formData
-      });
-      onClose();
+        is_georeferenced: true,
+        location: {
+          latitude,
+          longitude
+        },
+        data: {
+          ...otherFields,
+          is_interior: is_interior || false,
+          floor: floorValue,
+          barcode: barcode || null,
+          photo: photo || null
+        }
+      };
+
+      console.log('Final submission data:', JSON.stringify(submissionData, null, 2));
+      console.log('Submitting equipment...');
+      
+      try {
+        const success = await onSubmit(submissionData);
+        console.log('Submit result:', success);
+      } catch (submitError) {
+        console.error('Error during submit:', submitError);
+        throw submitError;
+      }
     } catch (err) {
-      console.error('Failed to add equipment:', err);
-      setError(err instanceof Error ? err.message : 'Failed to add equipment');
+      console.error('Failed to submit equipment:', err);
+      setError(err instanceof Error ? err.message : 'Failed to submit equipment');
     } finally {
       setIsSubmitting(false);
     }
@@ -181,9 +259,35 @@ export function AddEquipmentDialog({
 
   const handleClose = () => {
     if (!isSubmitting) {
+      console.log('Closing dialog');
       onClose();
     }
   };
+
+  const handleAddAnother = () => {
+    console.log('Adding another, resetting form');
+    setSelectedType('');
+    setFormData({});
+    setError(null);
+    setUseCustomFloor(false);
+    onAddAnother();
+  };
+
+  const handleFinish = () => {
+    console.log('Finishing, closing dialog');
+    handleClose();
+  };
+
+  // Debug effect for dialog state
+  useEffect(() => {
+    console.log('Dialog state changed:', {
+      open,
+      showSuccess,
+      isSubmitting,
+      selectedType,
+      hasError: !!error
+    });
+  }, [open, showSuccess, isSubmitting, selectedType, error]);
 
   const handleStartCapture = async () => {
     try {
@@ -225,13 +329,18 @@ export function AddEquipmentDialog({
   };
 
   const renderField = (field: Field) => {
+    // Get the field configuration from the equipment type
+    const fieldConfig = selectedTypeConfig?.fields.find(f => f.name === field.name);
+    
     switch (field.name) {
       case 'photo':
         return (
-          <FormControl fullWidth sx={{ mb: 2 }}>
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Photo
+            </Typography>
             <TextField
               fullWidth
-              label={field.label || "Photo"}
               value={formData[field.name] || ''}
               required={field.required}
               InputProps={{
@@ -250,87 +359,190 @@ export function AddEquipmentDialog({
                         onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const reader = new FileReader();
-                            reader.onload = async (event) => {
-                              const dataUrl = event.target?.result as string;
-                              const compressedDataUrl = await compressImage(dataUrl);
-                              setFormData(prev => ({
-                                ...prev,
-                                [field.name]: compressedDataUrl
-                              }));
-                            };
-                            reader.readAsDataURL(file);
+                            setFormData(prev => ({
+                              ...prev,
+                              [field.name]: file.name
+                            }));
                           }
                         }}
                       />
                     </IconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+          </FormControl>
+        );
+
+      case 'barcode':
+        return (
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Barcode
+            </Typography>
+            <TextField
+              fullWidth
+              value={formData[field.name] || ''}
+              required={field.required}
+              onChange={(e) => {
+                setFormData(prev => ({
+                  ...prev,
+                  [field.name]: e.target.value
+                }));
+              }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
                     <IconButton
-                      onClick={() => setShowCaptureView(true)}
-                      title="Take photo"
+                      component="label"
+                      title="Upload barcode image"
                       edge="end"
                     >
-                      <PhotoCameraIcon />
+                      <FileUploadIcon />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={handleBarcodeImageUpload}
+                      />
+                    </IconButton>
+                    <IconButton
+                      onClick={() => handleStartCapture('barcode')}
+                      title="Scan barcode"
+                      edge="end"
+                    >
+                      <QrCodeScannerIcon />
                     </IconButton>
                   </InputAdornment>
-                ),
+                )
               }}
-              sx={darkThemeTextField}
             />
-            {formData[field.name] && (
-              <Box sx={{ mt: 1 }}>
-                <img 
-                  src={formData[field.name]} 
-                  alt="Equipment" 
-                  style={{ maxWidth: '100%', maxHeight: '200px', objectFit: 'contain' }} 
+          </FormControl>
+        );
+
+      case 'floor':
+        if (!formData.is_interior) return null;
+        
+        const floorOptions = FLOOR_OPTIONS;
+        const defaultFloorValue = floorOptions.indexOf('G');
+        
+        return (
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="subtitle2">
+                Floor
+              </Typography>
+              <FormControlLabel
+                control={
+                  <Switch
+                    size="small"
+                    checked={useCustomFloor}
+                    onChange={(e) => {
+                      setUseCustomFloor(e.target.checked);
+                      // When switching back to slider, set to 'G'
+                      if (!e.target.checked) {
+                        setFormData(prev => ({
+                          ...prev,
+                          floor: 'G'
+                        }));
+                      }
+                    }}
+                  />
+                }
+                label="Custom"
+                sx={{ m: 0 }}
+              />
+            </Box>
+            
+            {useCustomFloor ? (
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Enter custom floor..."
+                value={formData.floor || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData(prev => ({
+                    ...prev,
+                    floor: value === '' ? null : value
+                  }));
+                }}
+              />
+            ) : (
+              <Box sx={{ px: 1, mt: 3, mb: 2 }}>
+                <Slider
+                  min={0}
+                  max={floorOptions.length - 1}
+                  defaultValue={defaultFloorValue}
+                  value={floorOptions.indexOf(formData.floor || 'G')}
+                  marks={floorOptions.map((label, index) => ({
+                    value: index,
+                    label
+                  }))}
+                  valueLabelDisplay="on"
+                  valueLabelFormat={(index) => floorOptions[index as number]}
+                  onChange={(_, index) => {
+                    const value = floorOptions[index as number];
+                    setFormData(prev => ({
+                      ...prev,
+                      floor: value
+                    }));
+                  }}
+                  sx={{
+                    '& .MuiSlider-valueLabel': {
+                      background: 'rgba(0, 0, 0, 0.8)',
+                      borderRadius: 1,
+                      padding: '2px 6px',
+                      fontSize: '0.75rem',
+                    }
+                  }}
                 />
               </Box>
             )}
           </FormControl>
         );
 
-      case 'barcode':
+      case 'is_interior':
         return (
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <TextField
-              fullWidth
-              label={field.label || "Barcode"}
-              required={field.required}
-              value={formData[field.name] || ''}
-              onChange={(e) => setFormData(prev => ({
-                ...prev,
-                [field.name]: e.target.value
-              }))}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton 
-                      onClick={() => setShowCaptureView(true)}
-                      edge="end"
-                      title="Scan barcode"
-                    >
-                      <QrCodeScannerIcon />
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-              sx={darkThemeTextField}
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={Boolean(formData[field.name])}
+                  onChange={(e) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      [field.name]: e.target.checked,
+                      ...(e.target.checked ? {} : { floor: undefined })
+                    }));
+                  }}
+                />
+              }
+              label={
+                <Typography variant="subtitle2">
+                  Interior Equipment
+                </Typography>
+              }
             />
           </FormControl>
         );
 
       default:
         return (
-          <FormControl fullWidth sx={{ mb: 2 }}>
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              {field.label}
+            </Typography>
             <TextField
               fullWidth
-              label={field.label || field.name}
               value={formData[field.name] || ''}
-              onChange={(e) => setFormData(prev => ({
-                ...prev,
-                [field.name]: e.target.value
-              }))}
               required={field.required}
-              sx={darkThemeTextField}
+              onChange={(e) => {
+                setFormData(prev => ({
+                  ...prev,
+                  [field.name]: e.target.value
+                }));
+              }}
             />
           </FormControl>
         );
@@ -340,9 +552,10 @@ export function AddEquipmentDialog({
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       maxWidth="sm"
       fullWidth
+      disableEscapeKeyDown={showSuccess}
       PaperProps={{
         sx: {
           bgcolor: 'background.paper',
@@ -350,132 +563,190 @@ export function AddEquipmentDialog({
         }
       }}
     >
-      <DialogTitle>
-        Add Equipment
-        <IconButton
-          onClick={onClose}
-          sx={{ position: 'absolute', right: 8, top: 8 }}
-        >
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
+      {showSuccess ? (
+        <>
+          <DialogTitle>
+            {successTitle || 'Success'}
+            <IconButton
+              onClick={handleClose}
+              sx={{ position: 'absolute', right: 8, top: 8 }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent>
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              py: 4 
+            }}>
+              <CheckCircleOutlineIcon 
+                color="success" 
+                sx={{ fontSize: 48, mb: 2 }} 
+              />
+              <Typography variant="h6" sx={{ mb: 3 }}>
+                {successMessage || 'Equipment Added Successfully!'}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Button
+                  variant="contained"
+                  onClick={handleAddAnother}
+                >
+                  {successButtonText || 'Add Another'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={handleClose}
+                >
+                  Finish
+                </Button>
+              </Box>
+            </Box>
+          </DialogContent>
+        </>
+      ) : (
+        <>
+          <DialogTitle>
+            Add Equipment
+            <IconButton
+              onClick={handleClose}
+              sx={{ position: 'absolute', right: 8, top: 8 }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
 
-      <DialogContent>
-        {/* Location Details */}
-        <Box mb={3}>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            Location Details
-          </Typography>
-          <Typography variant="body2">
-            <strong>Property:</strong> {propertyName}
-          </Typography>
-          <Typography variant="body2">
-            <strong>Property Type:</strong> {propertyType}
-          </Typography>
-          {jobTitle && (
-            <Typography variant="body2">
-              <strong>Job Title:</strong> {jobTitle}
-            </Typography>
-          )}
-          <Typography variant="body2">
-            <strong>Job Type:</strong> {jobType}
-          </Typography>
-          <Typography variant="body2">
-            <strong>Coordinates:</strong> {location[0].toFixed(6)}, {location[1].toFixed(6)}
-          </Typography>
-        </Box>
+          <DialogContent>
+            {/* Location Details */}
+            <Box mb={3}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Location Details
+              </Typography>
+              <Typography variant="body2">
+                <strong>Property:</strong> {propertyName}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Property Type:</strong> {propertyType}
+              </Typography>
+              {jobTitle && (
+                <Typography variant="body2">
+                  <strong>Job Title:</strong> {jobTitle}
+                </Typography>
+              )}
+              <Typography variant="body2">
+                <strong>Job Type:</strong> {jobType}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Coordinates:</strong> {location[0].toFixed(6)}, {location[1].toFixed(6)}
+              </Typography>
+            </Box>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-            <AlertTitle>Error</AlertTitle>
-            {error}
-          </Alert>
-        )}
+            {error && (
+              <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+                <AlertTitle>Error</AlertTitle>
+                {error}
+              </Alert>
+            )}
 
-        {/* Equipment Type Selection */}
-        <FormControl fullWidth sx={{ mb: 4 }}>
-          <InputLabel>Equipment Type</InputLabel>
-          <Select
-            value={selectedType}
-            label="Equipment Type"
-            onChange={(e) => {
-              setSelectedType(e.target.value);
-              // Reset form data when type changes
-              setFormData({});
-              setError(null);
-            }}
-            disabled={isSubmitting || isLoading}
-            required
-            sx={darkThemeTextField}
-          >
-            {Array.isArray(equipmentTypes) && equipmentTypes.map((type) => (
-              <MenuItem key={type.value} value={type.value}>
-                {type.label}
-              </MenuItem>
+            {/* Equipment Type Selection */}
+            <FormControl fullWidth sx={{ mb: 4 }}>
+              <InputLabel>Equipment Type</InputLabel>
+              <Select
+                value={selectedType}
+                label="Equipment Type"
+                onChange={(e) => {
+                  setSelectedType(e.target.value);
+                  // Reset form data when type changes
+                  setFormData({});
+                  setError(null);
+                }}
+                disabled={isSubmitting || isLoading}
+                required
+                sx={darkThemeTextField}
+              >
+                {Array.isArray(equipmentTypes) && equipmentTypes.map((type) => (
+                  <MenuItem key={type.value} value={type.value}>
+                    {type.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Main capture button for mobile flow */}
+            {!showCaptureView && selectedType && (
+              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                {showCaptureButtons && (
+                  <>
+                    <Button
+                      variant="outlined"
+                      startIcon={<QrCodeScannerIcon />}
+                      onClick={() => handleStartCapture('barcode')}
+                      disabled={isCaptureLoading}
+                    >
+                      Scan Barcode
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<PhotoCameraIcon />}
+                      onClick={() => handleStartCapture('photo')}
+                      disabled={isCaptureLoading}
+                    >
+                      Take Photo
+                    </Button>
+                  </>
+                )}
+              </Box>
+            )}
+
+            {/* Dynamic form fields */}
+            {selectedType && getVisibleFields().map(field => (
+              <React.Fragment key={field.name}>
+                {renderField(field)}
+              </React.Fragment>
             ))}
-          </Select>
-        </FormControl>
 
-        {/* Main capture button for mobile flow */}
-        {!showCaptureView && selectedType && (
-          <Button
-            fullWidth
-            variant="contained"
-            color="primary"
-            onClick={handleStartCapture}
-            disabled={isCaptureLoading}
-            startIcon={<MobileScreenShareIcon />}
-            sx={{ mb: 4 }}
-          >
-            Scan Barcode & Take Photo
-          </Button>
-        )}
+            {/* Camera View */}
+            {showCaptureView && (
+              <Box mt={2} position="relative" width="100%" height={300}>
+                <video
+                  id="video-stream"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    borderRadius: '8px',
+                  }}
+                  autoPlay
+                  playsInline
+                />
+                {/* Rest of the camera view UI */}
+              </Box>
+            )}
+          </DialogContent>
 
-        {/* Dynamic form fields */}
-        {selectedType && getVisibleFields().map(field => (
-          <React.Fragment key={field.name}>
-            {renderField(field)}
-          </React.Fragment>
-        ))}
-
-        {/* Camera View */}
-        {showCaptureView && (
-          <Box mt={2} position="relative" width="100%" height={300}>
-            <video
-              id="video-stream"
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                borderRadius: '8px',
-              }}
-              autoPlay
-              playsInline
-            />
-            {/* Rest of the camera view UI */}
-          </Box>
-        )}
-      </DialogContent>
-
-      <DialogActions sx={{ p: 2, gap: 1 }}>
-        <Button
-          onClick={onClose}
-          variant="outlined"
-          fullWidth
-          disabled={isSubmitting}
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          variant="contained"
-          fullWidth
-          disabled={!selectedType || isSubmitting || isLoading}
-          startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
-        >
-          {isSubmitting ? 'Adding Equipment...' : 'Add Equipment'}
-        </Button>
-      </DialogActions>
+          <DialogActions sx={{ p: 2, gap: 1 }}>
+            <Button
+              onClick={handleClose}
+              variant="outlined"
+              fullWidth
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              variant="contained"
+              fullWidth
+              disabled={!selectedType || isSubmitting || isLoading}
+              startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
+            >
+              {isSubmitting ? 'Adding Equipment...' : 'Add Equipment'}
+            </Button>
+          </DialogActions>
+        </>
+      )}
     </Dialog>
   );
-}
+};
