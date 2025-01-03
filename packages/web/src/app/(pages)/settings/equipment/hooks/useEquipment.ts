@@ -123,8 +123,8 @@ const transformApiType = (apiType: ApiEquipmentType): EquipmentTypeConfig => {
         value: apiType.name.toLowerCase(),
         label: apiType.name,
         fields: apiType.fields.map(transformApiField),
-        barcodeRequired: apiType.barcodeRequired ?? false,
-        photoRequired: apiType.photoRequired ?? false
+        barcodeRequired: apiType.barcodeRequired,
+        photoRequired: apiType.photoRequired
     };
 
     // Validate the transformed type
@@ -150,8 +150,8 @@ const transformToApiType = (type: EquipmentTypeConfig): ApiEquipmentType => {
     const transformed = {
         name: type.label || type.value,
         fields: type.fields.map(transformToApiField),
-        barcodeRequired: type.barcodeRequired ?? false,
-        photoRequired: type.photoRequired ?? false
+        barcodeRequired: type.barcodeRequired,
+        photoRequired: type.photoRequired
     };
 
     console.log('Transformed to API type:', transformed);
@@ -233,6 +233,71 @@ export const useUpdateEquipmentTypes = () => {
     });
 };
 
+export const defaultFields: FormField[] = [
+  {
+    name: 'photo',
+    type: 'photo',
+    label: 'Photo',
+    required: true,
+    description: 'Take a photo of the equipment'
+  },
+  {
+    name: 'barcode',
+    type: 'barcode',
+    label: 'Barcode',
+    required: true,
+    description: 'Scan or enter the barcode'
+  },
+  {
+    name: 'is_interior',
+    type: 'boolean',
+    label: 'Interior Equipment',
+    description: 'Whether this equipment is located inside a building',
+    config: {
+      defaultValue: false
+    }
+  },
+  {
+    name: 'floor',
+    type: 'slider',
+    label: 'Floor',
+    description: 'Floor number where the equipment is located',
+    config: {
+      min: 1,
+      max: 10,
+      step: 1,
+      marks: [
+        { value: 1, label: 'G' },
+        { value: 2, label: 'L1' },
+        { value: 3, label: 'L2' },
+        { value: 4, label: 'L3' },
+        { value: 5, label: 'L4' },
+        { value: 6, label: 'L5' },
+        { value: 7, label: 'L6' },
+        { value: 8, label: 'L7' },
+        { value: 9, label: 'L8' },
+        { value: 10, label: 'L9' }
+      ]
+    },
+    conditions: [
+      {
+        field: 'is_interior',
+        value: true
+      }
+    ]
+  },
+  {
+    name: 'target_species',
+    type: 'select',
+    label: 'Target Species',
+    required: true,
+    description: 'Species this equipment is intended for',
+    config: {
+      options: ['Mouse', 'Rat', 'Both']
+    }
+  }
+];
+
 // Equipment Statuses Hooks
 export const useEquipmentStatuses = () => {
     return useQuery<EquipmentStatus[]>({
@@ -281,6 +346,30 @@ export const useUpdateEquipmentStatuses = () => {
         onSuccess: (data) => {
             console.log('Update successful, setting query data:', data);
             queryClient.setQueryData(['equipmentStatuses'], data);
+        },
+    });
+};
+
+export const useUpdateEquipmentStatus = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation<void, Error, { id: string; status: string }>({
+        mutationFn: async ({ id, status }) => {
+            console.log('Updating equipment status:', { id, status });
+
+            const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment/${id}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status }),
+                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+            });
+
+            if (!response.ok) {
+                await handleApiError(response);
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['equipment'] });
         },
     });
 };

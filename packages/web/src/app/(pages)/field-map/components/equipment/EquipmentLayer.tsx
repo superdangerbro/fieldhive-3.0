@@ -52,14 +52,15 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   // Equipment data and state management
   const {
     equipment,
+    addEquipment,
+    deleteEquipment,
+    updateEquipment,
+    updateEquipmentStatus,
     isLoading,
     error,
     isPlacingEquipment,
     cancelPlacingEquipment,
-    startPlacingEquipment,
-    addEquipment,
-    deleteEquipment,
-    updateEquipment
+    startPlacingEquipment
   } = useEquipment({ bounds });
 
   // Local state
@@ -170,23 +171,27 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
     console.log('Add inspection for equipment:', equipment);
   }, []);
 
-  const handleDeleteEquipment = useCallback(async (id: string) => {
+  const handleDeleteEquipment = async (id: string) => {
     try {
-      // TODO: Implement delete functionality
-      console.log('Delete equipment:', id);
+      await updateEquipmentStatus.mutateAsync({ id, status: 'inactive' });
+      setIsMarkerDialogOpen(false);
+      setSelectedEquipment(null);
     } catch (error) {
-      console.error('Failed to delete equipment:', error);
+      console.error('Failed to deactivate equipment:', error);
+      alert('Failed to deactivate equipment. Please try again.');
     }
-  }, []);
+  };
 
-  const handleUpdateEquipmentType = useCallback(async (id: string, typeId: string) => {
+  const handleUpdateEquipmentType = async (id: string, typeId: string) => {
     try {
-      // TODO: Implement update type functionality
-      console.log('Update equipment type:', id, typeId);
+      await updateEquipment.mutateAsync({
+        id,
+        data: { equipment_type_id: typeId }
+      });
     } catch (error) {
       console.error('Failed to update equipment type:', error);
     }
-  }, []);
+  };
 
   if (!visible) return null;
 
@@ -278,8 +283,8 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
       {/* Equipment Marker Dialog */}
       {selectedEquipment && (
         <EquipmentMarkerDialog
-          open={isMarkerDialogOpen}
           equipment={selectedEquipment}
+          open={isMarkerDialogOpen}
           onClose={handleMarkerDialogClose}
           onDelete={handleDeleteEquipment}
           onUpdateType={handleUpdateEquipmentType}

@@ -22,6 +22,7 @@ import {
   Switch,
   Slider,
   CircularProgress,
+  FormHelperText
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
@@ -138,12 +139,12 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
         barcode: initialData.data.barcode || null,
         photo: initialData.data.photo || null,
         is_interior: initialData.data.is_interior || false,
-        floor: initialData.data.floor || null
+        floor: initialData.data.floor || 'G'
       });
     }
   }, [editMode, initialData, open]);
 
-  // Set initial floor value when interior is checked
+  // Set default floor value when interior is checked
   useEffect(() => {
     if (formData.is_interior && !formData.floor) {
       setFormData(prev => ({
@@ -163,40 +164,95 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
 
   // Get the selected equipment type configuration
   const selectedTypeConfig = equipmentTypes.find((t) => t.value === selectedType);
-  const hasBarcode = selectedTypeConfig?.fields.some(f => f.name === 'barcode');
-  const hasPhoto = selectedTypeConfig?.fields.some(f => f.name === 'photo');
-  const showCaptureButtons = hasBarcode && hasPhoto;
+  const barcodeRequired = selectedTypeConfig?.barcodeRequired ?? false;
+  const photoRequired = selectedTypeConfig?.photoRequired ?? false;
 
-  // Get visible fields based on conditions
-  const getVisibleFields = () => {
-    if (!selectedTypeConfig) return [];
-    return selectedTypeConfig.fields;
+  // Get fields for selected type
+  const getFieldsForType = (typeId: string) => {
+    const type = equipmentTypes.find(t => t.value === typeId);
+    if (!type) return [];
+
+    return [
+      {
+        name: 'photo',
+        type: 'photo',
+        label: 'Photo',
+        required: true,
+        description: 'Take a photo of the equipment'
+      },
+      {
+        name: 'barcode',
+        type: 'barcode',
+        label: 'Barcode',
+        required: true,
+        description: 'Scan or enter the barcode'
+      },
+      {
+        name: 'is_interior',
+        type: 'boolean',
+        label: 'Interior Equipment',
+        description: 'Whether this equipment is located inside a building'
+      },
+      {
+        name: 'floor',
+        type: 'slider',
+        label: 'Floor',
+        description: 'Floor number where the equipment is located',
+        conditions: [
+          {
+            field: 'is_interior',
+            value: true
+          }
+        ]
+      },
+      {
+        name: 'target_species',
+        type: 'select',
+        label: 'Target Species',
+        required: true,
+        description: 'Species this equipment is intended for',
+        config: {
+          options: ['Mouse', 'Rat', 'Both']
+        }
+      }
+    ];
   };
 
-  // Check if a field is required based on conditions
-  const isFieldRequired = (field: Field): boolean => {
-    return field.required ?? false;
+  // Render fields based on selected type
+  const renderFields = () => {
+    if (!selectedType) return null;
+    const fields = getFieldsForType(selectedType);
+    
+    return fields.map(field => {
+      // Check conditions
+      if (field.conditions) {
+        const shouldShow = field.conditions.every(condition => {
+          return formData[condition.field] === condition.value;
+        });
+        if (!shouldShow) return null;
+      }
+      
+      return renderField(field);
+    });
   };
 
   // Base dark theme styles for text fields
   const darkThemeTextField = {
-    '& .MuiOutlinedInput-root': {
-      '& fieldset': {
-        borderColor: 'rgba(255, 255, 255, 0.23)',
-      },
-      '&:hover fieldset': {
-        borderColor: 'rgba(255, 255, 255, 0.4)',
-      },
-    },
-    '& .MuiInputLabel-root': {
-      color: 'rgba(255, 255, 255, 0.7)',
-    },
-    '& .MuiOutlinedInput-input': {
+    input: {
       color: 'white',
+    },
+    '& fieldset': {
+      borderColor: 'rgba(255, 255, 255, 0.23)',
+    },
+    '&:hover fieldset': {
+      borderColor: 'rgba(255, 255, 255, 0.4)',
+    },
+    '& label': {
+      color: 'rgba(255, 255, 255, 0.7)',
     },
     '& .MuiIconButton-root': {
       color: 'white',
-    },
+    }
   };
 
   // Generate floor options
@@ -352,7 +408,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       setFormData(prev => ({ ...prev, photo: photoData }));
       setShowCaptureView(false);
     } catch (err) {
-      console.error('Failed to take photo:', err);
+    console.error('Failed to take photo:', err);
       setError(err instanceof Error ? err.message : 'Failed to take photo');
     }
   };
@@ -375,225 +431,289 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
     setShowCaptureView(false);
   };
 
+  const switchStyles = {
+    '& .MuiSwitch-switchBase': {
+      color: '#fff',
+      '&.Mui-checked': {
+        color: '#6366f1',
+        '& + .MuiSwitch-track': {
+          backgroundColor: '#4f46e5',
+          opacity: 0.5
+        }
+      }
+    },
+    '& .MuiSwitch-track': {
+      backgroundColor: '#374151',
+      opacity: 0.3
+    }
+  };
+
   const renderField = (field: Field) => {
-    // Get the field configuration from the equipment type
-    const fieldConfig = selectedTypeConfig?.fields.find(f => f.name === field.name);
-    
-    switch (field.name) {
-      case 'photo':
+    switch (field.type) {
+      case 'boolean':
         return (
-          <FormControl fullWidth sx={{ mb: 3 }}>
-            <Typography variant="subtitle2" gutterBottom>
-              Photo
-            </Typography>
-            <TextField
-              fullWidth
-              value={formData[field.name] || ''}
-              required={field.required}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      component="label"
-                      title="Upload photo"
-                      edge="end"
-                    >
-                      <FileUploadIcon />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setFormData(prev => ({
-                              ...prev,
-                              [field.name]: file.name
-                            }));
-                          }
-                        }}
-                      />
-                    </IconButton>
-                  </InputAdornment>
-                )
-              }}
+          <FormControl key={field.name} fullWidth sx={{ mb: 2 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData[field.name] || false}
+                  onChange={(e) => handleFormChange(field.name, e.target.checked)}
+                  sx={switchStyles}
+                />
+              }
+              label={field.label}
             />
+            <FormHelperText>{field.description}</FormHelperText>
+          </FormControl>
+        );
+
+      case 'slider':
+        // Only show floor controls if is_interior is true
+        if (field.name === 'floor' && !formData.is_interior) {
+          return null;
+        }
+
+        return (
+          <FormControl key={field.name} fullWidth sx={{ mb: 2 }}>
+            <Box sx={{ width: '100%' }}>
+              <Typography gutterBottom>{field.label}</Typography>
+              
+              {/* Custom Floor Toggle */}
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={useCustomFloor}
+                    onChange={(e) => setUseCustomFloor(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label="Custom Floor"
+                sx={{ mb: 2 }}
+              />
+
+              {useCustomFloor ? (
+                <TextField
+                  value={formData[field.name] || 'G'}
+                  onChange={(e) => handleFormChange(field.name, e.target.value)}
+                  placeholder="Enter custom floor"
+                  fullWidth
+                  sx={darkThemeTextField}
+                />
+              ) : (
+                <Slider
+                  value={FLOOR_OPTIONS.indexOf(formData[field.name] || 'G')}
+                  onChange={(_, index) => handleFormChange(field.name, FLOOR_OPTIONS[index as number])}
+                  min={0}
+                  max={FLOOR_OPTIONS.length - 1}
+                  step={1}
+                  marks={FLOOR_OPTIONS.map((label, index) => ({
+                    value: index,
+                    label
+                  }))}
+                  valueLabelDisplay="auto"
+                  valueLabelFormat={(index) => FLOOR_OPTIONS[index]}
+                  sx={{
+                    color: 'primary.main',
+                    '& .MuiSlider-thumb': {
+                      backgroundColor: '#fff',
+                    },
+                    '& .MuiSlider-track': {
+                      backgroundColor: 'primary.main',
+                    },
+                    '& .MuiSlider-rail': {
+                      backgroundColor: 'rgba(255, 255, 255, 0.23)',
+                    },
+                    '& .MuiSlider-mark': {
+                      backgroundColor: 'rgba(255, 255, 255, 0.23)',
+                    },
+                    '& .MuiSlider-markLabel': {
+                      color: 'rgba(255, 255, 255, 0.7)',
+                    }
+                  }}
+                />
+              )}
+            </Box>
+            <FormHelperText>{field.description}</FormHelperText>
+          </FormControl>
+        );
+
+      case 'select':
+        const selectConfig = field.config as SelectConfig;
+        if (!selectConfig || !selectConfig.options) {
+          console.error('Select field missing config or options:', field);
+          return null;
+        }
+        return (
+          <FormControl key={field.name} fullWidth sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              {field.label} {field.required && '*'}
+            </Typography>
+            <Select
+              value={formData[field.name] || ''}
+              onChange={(e) => handleFormChange(field.name, e.target.value)}
+              required={field.required}
+              error={field.required && !formData[field.name]}
+              sx={{
+                '& .MuiSelect-select': {
+                  color: 'white'
+                },
+                ...darkThemeTextField
+              }}
+            >
+              {selectConfig.options.map((option) => (
+                <MenuItem key={option} value={option}>
+                  {option}
+                </MenuItem>
+              ))}
+            </Select>
+            {field.description && (
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                {field.description}
+              </Typography>
+            )}
+            {field.required && !formData[field.name] && (
+              <Typography variant="caption" color="error" sx={{ mt: 1 }}>
+                {field.label} is required
+              </Typography>
+            )}
+          </FormControl>
+        );
+
+      case 'multiselect':
+        const multiSelectConfig = field.config as MultiSelectConfig;
+        if (!multiSelectConfig || !multiSelectConfig.options) {
+          console.error('MultiSelect field missing config or options:', field);
+          return null;
+        }
+        return (
+          <FormControl key={field.name} fullWidth sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              {field.label} {field.required && '*'}
+            </Typography>
+            <Select
+              multiple
+              value={formData[field.name] || []}
+              onChange={(e) => handleFormChange(field.name, e.target.value)}
+              required={field.required}
+              error={field.required && (!formData[field.name] || formData[field.name].length === 0)}
+              sx={{
+                '& .MuiSelect-select': {
+                  color: 'white'
+                },
+                ...darkThemeTextField
+              }}
+              renderValue={(selected) => (Array.isArray(selected) ? selected.join(', ') : '')}
+            >
+              {multiSelectConfig.options.map((option) => (
+                <MenuItem key={option} value={option}>
+                  {option}
+                </MenuItem>
+              ))}
+            </Select>
+            {field.description && (
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                {field.description}
+              </Typography>
+            )}
+            {field.required && (!formData[field.name] || formData[field.name].length === 0) && (
+              <Typography variant="caption" color="error" sx={{ mt: 1 }}>
+                {field.label} is required
+              </Typography>
+            )}
           </FormControl>
         );
 
       case 'barcode':
         return (
-          <FormControl fullWidth sx={{ mb: 3 }}>
+          <FormControl key={field.name} fullWidth sx={{ mb: 3 }}>
             <Typography variant="subtitle2" gutterBottom>
-              Barcode
+              Barcode {field.required && '*'}
             </Typography>
             <TextField
               fullWidth
-              value={formData[field.name] || ''}
+              value={formData.barcode || ''}
+              onChange={(e) => handleFormChange('barcode', e.target.value)}
               required={field.required}
-              onChange={(e) => {
-                setFormData(prev => ({
-                  ...prev,
-                  [field.name]: e.target.value
-                }));
-              }}
+              error={field.required && !formData.barcode}
+              helperText={field.required && !formData.barcode ? 'Barcode is required' : ''}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton
-                      component="label"
-                      title="Upload barcode image"
-                      edge="end"
-                    >
-                      <FileUploadIcon />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        onChange={handleBarcodeImageUpload}
-                      />
-                    </IconButton>
-                    <IconButton
-                      onClick={() => handleStartCapture('barcode')}
-                      title="Scan barcode"
-                      edge="end"
-                    >
+                    <IconButton onClick={handleStartCapture} edge="end">
                       <QrCodeScannerIcon />
                     </IconButton>
                   </InputAdornment>
-                )
+                ),
+                ...darkThemeTextField
               }}
             />
           </FormControl>
         );
 
-      case 'floor':
-        if (!formData.is_interior) return null;
-        
-        const floorOptions = FLOOR_OPTIONS;
-        const defaultFloorValue = floorOptions.indexOf('G');
-        
+      case 'photo':
         return (
-          <FormControl fullWidth sx={{ mb: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Typography variant="subtitle2">
-                Floor
-              </Typography>
-              <FormControlLabel
-                control={
-                  <Switch
-                    size="small"
-                    checked={useCustomFloor}
-                    onChange={(e) => {
-                      setUseCustomFloor(e.target.checked);
-                      // When switching back to slider, set to 'G'
-                      if (!e.target.checked) {
-                        setFormData(prev => ({
-                          ...prev,
-                          floor: 'G'
-                        }));
-                      }
-                    }}
-                  />
-                }
-                label="Custom"
-                sx={{ m: 0 }}
-              />
-            </Box>
-            
-            {useCustomFloor ? (
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Enter custom floor..."
-                value={formData.floor || ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData(prev => ({
-                    ...prev,
-                    floor: value === '' ? null : value
-                  }));
-                }}
-              />
-            ) : (
-              <Box sx={{ px: 1, mt: 3, mb: 2 }}>
-                <Slider
-                  min={0}
-                  max={floorOptions.length - 1}
-                  defaultValue={defaultFloorValue}
-                  value={floorOptions.indexOf(formData.floor || 'G')}
-                  marks={floorOptions.map((label, index) => ({
-                    value: index,
-                    label
-                  }))}
-                  valueLabelDisplay="on"
-                  valueLabelFormat={(index) => floorOptions[index as number]}
-                  onChange={(_, index) => {
-                    const value = floorOptions[index as number];
-                    setFormData(prev => ({
-                      ...prev,
-                      floor: value
-                    }));
-                  }}
-                  sx={{
-                    '& .MuiSlider-valueLabel': {
-                      background: 'rgba(0, 0, 0, 0.8)',
-                      borderRadius: 1,
-                      padding: '2px 6px',
-                      fontSize: '0.75rem',
-                    }
-                  }}
-                />
-              </Box>
-            )}
-          </FormControl>
-        );
-
-      case 'is_interior':
-        return (
-          <FormControl fullWidth sx={{ mb: 3 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={Boolean(formData[field.name])}
-                  onChange={(e) => {
-                    setFormData(prev => ({
-                      ...prev,
-                      [field.name]: e.target.checked,
-                      ...(e.target.checked ? {} : { floor: undefined })
-                    }));
-                  }}
-                />
-              }
-              label={
-                <Typography variant="subtitle2">
-                  Interior Equipment
-                </Typography>
-              }
+          <FormControl key={field.name} fullWidth sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Photo {field.required && '*'}
+            </Typography>
+            <TextField
+              fullWidth
+              value={formData.photo || ''}
+              onChange={(e) => handleFormChange('photo', e.target.value)}
+              required={field.required}
+              error={field.required && !formData.photo}
+              helperText={field.required && !formData.photo ? 'Photo is required' : ''}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton onClick={handleStartCapture} edge="end">
+                      <PhotoCameraIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+                ...darkThemeTextField
+              }}
             />
           </FormControl>
         );
 
+      case 'text':
       default:
         return (
-          <FormControl fullWidth sx={{ mb: 3 }}>
+          <FormControl key={field.name} fullWidth sx={{ mb: 3 }}>
             <Typography variant="subtitle2" gutterBottom>
-              {field.label}
+              {field.label} {field.required && '*'}
             </Typography>
             <TextField
               fullWidth
               value={formData[field.name] || ''}
+              onChange={(e) => handleFormChange(field.name, e.target.value)}
               required={field.required}
-              onChange={(e) => {
-                setFormData(prev => ({
-                  ...prev,
-                  [field.name]: e.target.value
-                }));
+              error={field.required && !formData[field.name]}
+              helperText={field.required && !formData[field.name] ? `${field.label} is required` : ''}
+              InputProps={{
+                ...darkThemeTextField
               }}
             />
+            {field.description && (
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                {field.description}
+              </Typography>
+            )}
           </FormControl>
         );
     }
+  };
+
+  const handleFormChange = (field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value,
+      // Reset floor when interior is turned off
+      ...(field === 'is_interior' && !value ? { floor: null } : {}),
+      // Set default floor when interior is turned on
+      ...(field === 'is_interior' && value && !prev.floor ? { floor: 'G' } : {})
+    }));
   };
 
   return (
@@ -666,106 +786,48 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
           </DialogTitle>
 
           <DialogContent>
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="h6" sx={{ mb: 2, color: 'text.primary' }}>
-                Location Details
-              </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Typography variant="body2" color="text.secondary">Property:</Typography>
-                  <Typography variant="body2" color="text.primary">{propertyName}</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Typography variant="body2" color="text.secondary">Property Type:</Typography>
-                  <Typography variant="body2" color="text.primary">{propertyType}</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Typography variant="body2" color="text.secondary">Job Type:</Typography>
-                  <Typography variant="body2" color="text.primary">{jobType}</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Typography variant="body2" color="text.secondary">Coordinates:</Typography>
-                  <Typography variant="body2" color="text.primary">
-                    {location[1].toFixed(6)}, {location[0].toFixed(6)}
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
+            <form onSubmit={handleSubmit}>
+              {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  <AlertTitle>Error</AlertTitle>
+                  {error}
+                </Alert>
+              )}
 
-            {/* Equipment Type Selection */}
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>Equipment Type</InputLabel>
-              <Select
-                value={selectedType}
-                label="Equipment Type"
-                onChange={(e) => {
-                  setSelectedType(e.target.value);
-                  // Reset form data when type changes
-                  setFormData({});
-                  setError(null);
-                }}
-                disabled={isSubmitting || isLoading}
-                required
-                sx={darkThemeTextField}
-              >
-                {Array.isArray(equipmentTypes) && equipmentTypes.map((type) => (
-                  <MenuItem key={type.value} value={type.value}>
-                    {type.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Main capture button for mobile flow */}
-            {!showCaptureView && selectedType && (
-              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                {showCaptureButtons && (
-                  <>
-                    <Button
-                      variant="outlined"
-                      startIcon={<QrCodeScannerIcon />}
-                      onClick={() => handleStartCapture('barcode')}
-                      disabled={isCaptureLoading}
-                    >
-                      Scan Barcode
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      startIcon={<PhotoCameraIcon />}
-                      onClick={() => handleStartCapture('photo')}
-                      disabled={isCaptureLoading}
-                    >
-                      Take Photo
-                    </Button>
-                  </>
-                )}
-              </Box>
-            )}
-
-            {/* Dynamic form fields */}
-            {selectedType && getVisibleFields().map(field => (
-              <React.Fragment key={field.name}>
-                {renderField(field)}
-              </React.Fragment>
-            ))}
-
-            {/* Camera View */}
-            {showCaptureView && (
-              <Box mt={2} position="relative" width="100%" height={300}>
-                <video
-                  id="video-stream"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    borderRadius: '8px',
+              {/* Equipment Type Selection */}
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel id="equipment-type-label" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                  Equipment Type
+                </InputLabel>
+                <Select
+                  labelId="equipment-type-label"
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value)}
+                  label="Equipment Type"
+                  sx={{
+                    color: 'white',
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'rgba(255, 255, 255, 0.23)',
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'rgba(255, 255, 255, 0.4)',
+                    },
+                    '& .MuiSvgIcon-root': {
+                      color: 'white',
+                    }
                   }}
-                  autoPlay
-                  playsInline
-                />
-                {/* Rest of the camera view UI */}
-              </Box>
-            )}
+                >
+                  {equipmentTypes.map((type) => (
+                    <MenuItem key={type.value} value={type.value}>
+                      {type.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              {/* Dynamic Fields */}
+              {selectedType && renderFields()}
+            </form>
           </DialogContent>
 
           <DialogActions sx={{ p: 2, gap: 1 }}>

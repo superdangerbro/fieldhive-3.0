@@ -272,6 +272,30 @@ export class EquipmentHandler {
             });
         }
     }
+
+    // Delete equipment
+    async deleteEquipment(req: Request, res: Response) {
+        try {
+            const equipment = await equipmentRepository.findOne({ 
+                where: { equipment_id: req.params.id } 
+            });
+
+            if (!equipment) {
+                return res.status(404).json({ message: 'Equipment not found' });
+            }
+
+            await equipmentRepository.remove(equipment);
+            logger.info('Equipment deleted:', { id: req.params.id });
+
+            return res.json({ success: true, message: 'Equipment deleted successfully' });
+        } catch (error) {
+            logger.error('Error deleting equipment:', error);
+            return res.status(500).json({ 
+                message: 'Failed to delete equipment',
+                error: error instanceof Error ? error.message : 'Unknown error'
+            });
+        }
+    }
 }
 
 export const equipmentHandler = new EquipmentHandler();

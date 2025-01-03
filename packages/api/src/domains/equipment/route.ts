@@ -15,6 +15,9 @@ router.post('/', equipmentHandler.createEquipment.bind(equipmentHandler));
 // Update equipment
 router.put('/:id', equipmentHandler.updateEquipment.bind(equipmentHandler));
 
+// Delete equipment
+router.delete('/:id', equipmentHandler.deleteEquipment.bind(equipmentHandler));
+
 // Archive equipment
 router.post('/:id/archive', equipmentHandler.archiveEquipment.bind(equipmentHandler));
 

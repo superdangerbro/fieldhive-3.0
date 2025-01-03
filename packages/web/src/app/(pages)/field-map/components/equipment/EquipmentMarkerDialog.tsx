@@ -88,19 +88,18 @@ export function EquipmentMarkerDialog({
   onEdit,
   onAddInspection
 }: EquipmentMarkerDialogProps) {
-  const { equipmentTypes, equipmentStatuses } = useEquipment();
+  const { equipmentTypes, equipmentStatuses, updateEquipmentStatus } = useEquipment();
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this equipment?')) {
+    if (window.confirm('Are you sure you want to deactivate this equipment? This will hide it from the map.')) {
       try {
         setIsDeleting(true);
-        await onDelete(equipment.equipment_id);
+        await updateEquipmentStatus.mutateAsync({ id: equipment.equipment_id, status: 'inactive' });
         onClose();
       } catch (error) {
-        console.error('Failed to delete equipment:', error);
-        // Show error message to user
-        alert('Failed to delete equipment. Please try again.');
+        console.error('Failed to deactivate equipment:', error);
+        alert('Failed to deactivate equipment. Please try again.');
       } finally {
         setIsDeleting(false);
       }
@@ -231,8 +230,7 @@ export function EquipmentMarkerDialog({
                 {(equipment.job?.serviceAddress?.formatted_address || 
                   equipment.job?.property?.serviceAddress?.formatted_address || 
                   formatAddress(equipment.job?.serviceAddress) || 
-                  formatAddress(equipment.job?.property?.serviceAddress)) || '-'}
-              </span>
+                  formatAddress(equipment.job?.property?.serviceAddress)) || '-'}</span>
             </div>
           </div>
         </div>
@@ -291,7 +289,7 @@ export function EquipmentMarkerDialog({
           disabled={isDeleting}
           startIcon={<DeleteIcon />}
         >
-          {isDeleting ? 'Deleting...' : 'Delete'}
+          {isDeleting ? 'Deactivating...' : 'Deactivate'}
         </Button>
         <Button onClick={onClose} variant="contained">
           Close

@@ -48,9 +48,19 @@ export function EquipmentTypeSection() {
     const handleSave = async (data: EquipmentTypeConfig) => {
         console.log('Saving type:', { mode: dialogState.mode, data });
         try {
+            // If we're updating an existing type (not in dialog mode)
+            if (!dialogState.isOpen) {
+                const updatedTypes = types.map(type => 
+                    type.value === data.value ? data : type
+                );
+                await updateMutation.mutateAsync(updatedTypes);
+                return;
+            }
+
+            // If we're in dialog mode (creating or editing)
             const updatedTypes = dialogState.mode === 'create'
                 ? [...types, data]
-                : types.map((type: EquipmentTypeConfig) => 
+                : types.map(type => 
                     type.value === dialogState.data?.value ? data : type
                 );
             

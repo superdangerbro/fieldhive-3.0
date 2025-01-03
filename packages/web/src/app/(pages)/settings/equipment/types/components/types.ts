@@ -1,6 +1,6 @@
 import type { EquipmentType } from '@/app/globalTypes/equipment';
 
-export type FieldType = 'text' | 'number' | 'select' | 'checkbox' | 'textarea';
+export type FieldType = 'text' | 'number' | 'select' | 'multiselect' | 'checkbox' | 'textarea' | 'boolean' | 'slider';
 
 export interface NumberConfig {
     min?: number;
@@ -10,7 +10,17 @@ export interface NumberConfig {
 
 export interface SelectConfig {
     options: string[];
-    multiple?: boolean;
+}
+
+export interface MultiSelectConfig {
+    options: string[];
+}
+
+export interface SliderConfig {
+    min: number;
+    max: number;
+    step?: number;
+    marks?: { value: number; label: string; }[];
 }
 
 export interface Condition {
@@ -25,7 +35,7 @@ export interface FormField {
     type: FieldType;
     required?: boolean;
     conditions?: Condition[];
-    config?: NumberConfig | SelectConfig;
+    config?: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig;
     description?: string;
 }
 
@@ -51,10 +61,18 @@ export interface NewFieldState extends Omit<FormField, 'name'> {
 }
 
 // Type guards
-export function isSelectConfig(config: NumberConfig | SelectConfig | undefined): config is SelectConfig {
-    return config !== undefined && 'options' in config;
+export function isSelectConfig(config: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig | undefined): config is SelectConfig {
+    return config !== undefined && 'options' in config && !(config as MultiSelectConfig).multiple !== undefined;
 }
 
-export function isNumberConfig(config: NumberConfig | SelectConfig | undefined): config is NumberConfig {
+export function isMultiSelectConfig(config: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig | undefined): config is MultiSelectConfig {
+    return config !== undefined && 'options' in config && !(config as MultiSelectConfig).multiple === undefined;
+}
+
+export function isNumberConfig(config: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig | undefined): config is NumberConfig {
     return config !== undefined && ('min' in config || 'max' in config || 'step' in config);
+}
+
+export function isSliderConfig(config: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig | undefined): config is SliderConfig {
+    return config !== undefined && 'min' in config && 'max' in config;
 }

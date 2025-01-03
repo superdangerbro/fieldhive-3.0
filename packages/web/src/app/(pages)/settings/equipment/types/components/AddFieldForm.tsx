@@ -12,7 +12,8 @@ import {
     FormControlLabel,
     Checkbox,
     Typography,
-    Divider
+    Divider,
+    Slider
 } from '@mui/material';
 import type { FieldType, FormField } from './types';
 import { isNumberConfig, isSelectConfig } from './types';
@@ -32,8 +33,11 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
     { value: 'text', label: 'Text' },
     { value: 'number', label: 'Number' },
     { value: 'select', label: 'Dropdown' },
+    { value: 'multiselect', label: 'Multiselect' },
     { value: 'checkbox', label: 'Checkbox' },
-    { value: 'textarea', label: 'Text Area' }
+    { value: 'textarea', label: 'Text Area' },
+    { value: 'boolean', label: 'Boolean Switch' },
+    { value: 'slider', label: 'Slider' }
 ];
 
 export function AddFieldForm({ onAdd, onCancel, existingFields, initialField, mode = 'add' }: AddFieldFormProps) {
@@ -82,13 +86,43 @@ export function AddFieldForm({ onAdd, onCancel, existingFields, initialField, mo
         }));
     };
 
-    const handleTypeChange = (type: FieldType) => {
-        console.log('Type change:', { type });
-        setField(prev => ({
-            ...prev,
-            type,
-            config: undefined // Reset config when type changes
-        }));
+    const handleFieldTypeChange = (type: FieldType) => {
+        setField(prev => {
+            const newField = { ...prev, type };
+            
+            // Initialize config based on type
+            switch (type) {
+                case 'number':
+                    newField.config = { min: 0, max: 100, step: 1 };
+                    break;
+                case 'select':
+                case 'multiselect':
+                    newField.config = { options: [] };
+                    break;
+                case 'slider':
+                    newField.config = { 
+                        min: -5, 
+                        max: 10,
+                        step: 1,
+                        marks: [
+                            { value: -5, label: 'L5' },
+                            { value: -4, label: 'L4' },
+                            { value: -3, label: 'L3' },
+                            { value: -2, label: 'L2' },
+                            { value: -1, label: 'L1' },
+                            { value: 0, label: 'G' },
+                            { value: 1, label: '1' },
+                            { value: 5, label: '5' },
+                            { value: 10, label: '10' }
+                        ]
+                    };
+                    break;
+                default:
+                    newField.config = undefined;
+            }
+            
+            return newField;
+        });
     };
 
     const handleConfigChange = (config: any) => {
@@ -100,25 +134,51 @@ export function AddFieldForm({ onAdd, onCancel, existingFields, initialField, mo
     };
 
     const renderFieldConfig = () => {
-        if (field.type === 'number') {
-            return (
-                <NumberFieldConfig
-                    config={isNumberConfig(field.config) ? field.config : undefined}
-                    onChange={handleConfigChange}
-                />
-            );
+        switch (field.type) {
+            case 'number':
+                return (
+                    <Box sx={{ mt: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                            Number Configuration
+                        </Typography>
+                        <NumberFieldConfig
+                            config={field.config as NumberConfig}
+                            onChange={(config) => setField(prev => ({ ...prev, config }))}
+                        />
+                    </Box>
+                );
+            case 'select':
+            case 'multiselect':
+                return (
+                    <Box sx={{ mt: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                            Options
+                        </Typography>
+                        <SelectFieldConfig
+                            config={field.config as SelectConfig | MultiSelectConfig}
+                            onChange={(config) => setField(prev => ({ ...prev, config }))}
+                        />
+                    </Box>
+                );
+            case 'slider':
+                return (
+                    <Box sx={{ mt: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                            Slider Configuration
+                        </Typography>
+                        <Slider
+                            min={field.config.min}
+                            max={field.config.max}
+                            step={field.config.step}
+                            marks={field.config.marks}
+                            value={field.value}
+                            onChange={(e, value) => setField(prev => ({ ...prev, value }))}
+                        />
+                    </Box>
+                );
+            default:
+                return null;
         }
-
-        if (field.type === 'select') {
-            return (
-                <SelectFieldConfig
-                    config={isSelectConfig(field.config) ? field.config : undefined}
-                    onChange={handleConfigChange}
-                />
-            );
-        }
-
-        return null;
     };
 
     return (
@@ -156,7 +216,7 @@ export function AddFieldForm({ onAdd, onCancel, existingFields, initialField, mo
                     <InputLabel>Field Type</InputLabel>
                     <Select
                         value={field.type}
-                        onChange={(e) => handleTypeChange(e.target.value as FieldType)}
+                        onChange={(e) => handleFieldTypeChange(e.target.value as FieldType)}
                         label="Field Type"
                         disabled={mode === 'edit'} // Can't change type in edit mode
                     >
