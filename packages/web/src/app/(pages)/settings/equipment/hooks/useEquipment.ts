@@ -8,7 +8,8 @@ import { validateApiResponse, validateEquipmentType, validateFieldConfig } from 
 
 const ENDPOINTS = {
     types: '/settings/equipment/types',
-    statuses: '/settings/equipment/statuses'
+    statuses: '/settings/equipment/statuses',
+    equipment: '/equipment'
 } as const;
 
 interface ApiFieldConfig {
@@ -233,6 +234,18 @@ export const useUpdateEquipmentTypes = () => {
     });
 };
 
+export const useEquipment = () => {
+    const { data: equipmentTypes = [] } = useEquipmentTypes();
+    const { data: equipmentStatuses = [] } = useEquipmentStatuses();
+    const updateEquipmentStatus = useUpdateEquipmentStatus();
+
+    return {
+        equipmentTypes,
+        equipmentStatuses,
+        updateEquipmentStatus
+    };
+};
+
 export const defaultFields: FormField[] = [
   {
     name: 'photo',
@@ -357,15 +370,44 @@ export const useUpdateEquipmentStatus = () => {
         mutationFn: async ({ id, status }) => {
             console.log('Updating equipment status:', { id, status });
 
-            const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment/${id}/status`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status }),
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-            });
+            try {
+                // First, get the current equipment data
+                const getResponse = await fetch(buildUrl(`${ENDPOINTS.equipment}/${id}`), {
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+                });
 
-            if (!response.ok) {
-                await handleApiError(response);
+                if (!getResponse.ok) {
+                    const errorData = await getResponse.json().catch(() => ({ message: 'Unknown error occurred' }));
+                    throw new Error(errorData.message || `Failed to fetch equipment: ${getResponse.statusText}`);
+                }
+
+                const equipment = await getResponse.json();
+
+                // Then update the equipment with the new status
+                const updateResponse = await fetch(buildUrl(`${ENDPOINTS.equipment}/${id}`), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...equipment,
+                        status
+                    }),
+                    signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+                });
+
+                if (!updateResponse.ok) {
+                    const errorData = await updateResponse.json().catch(() => ({ message: 'Unknown error occurred' }));
+                    throw new Error(errorData.message || `Failed to update equipment status: ${updateResponse.statusText}`);
+                }
+
+                const data = await updateResponse.json().catch(() => null);
+                return data;
+            } catch (error) {
+                console.error('Error updating equipment status:', error);
+                if (error instanceof Error) {
+                    throw error;
+                }
+                throw new Error('Failed to update equipment status');
             }
         },
         onSuccess: () => {

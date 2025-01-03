@@ -20,9 +20,8 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import { useEquipment } from '@/app/globalHooks/useEquipment';
+import { useEquipment } from '@/app/(pages)/settings/equipment/hooks/useEquipment';
 import type { Equipment, Field, EquipmentStatus, EquipmentType } from '@/app/globalTypes/equipment';
-import { formatAddress } from '../../../../../app/utils/formatAddress';
 
 // Helper function to format address
 const formatAddress = (address: any) => {
@@ -92,14 +91,22 @@ export function EquipmentMarkerDialog({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
+    if (!equipment?.equipment_id) {
+      console.error('No equipment ID found');
+      return;
+    }
+
     if (window.confirm('Are you sure you want to deactivate this equipment? This will hide it from the map.')) {
       try {
         setIsDeleting(true);
-        await updateEquipmentStatus.mutateAsync({ id: equipment.equipment_id, status: 'inactive' });
+        await updateEquipmentStatus.mutateAsync({ 
+          id: equipment.equipment_id, 
+          status: 'inactive' 
+        });
         onClose();
       } catch (error) {
         console.error('Failed to deactivate equipment:', error);
-        alert('Failed to deactivate equipment. Please try again.');
+        alert(error instanceof Error ? error.message : 'Failed to deactivate equipment. Please try again.');
       } finally {
         setIsDeleting(false);
       }
