@@ -257,20 +257,23 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
     }
   };
 
-  const handleClose = () => {
-    if (!isSubmitting) {
-      console.log('Closing dialog');
-      onClose();
-    }
-  };
-
   const handleAddAnother = () => {
-    console.log('Adding another, resetting form');
+    console.log('Add Another clicked');
+    // Reset form state
     setSelectedType('');
     setFormData({});
     setError(null);
     setUseCustomFloor(false);
+    // Notify parent to start new placement
     onAddAnother();
+  };
+
+  const handleClose = () => {
+    console.log('Handle close called, isSubmitting:', isSubmitting);
+    if (!isSubmitting) {
+      console.log('Closing dialog');
+      onClose();
+    }
   };
 
   const handleFinish = () => {

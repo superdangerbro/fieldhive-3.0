@@ -13,7 +13,7 @@ interface IEquipment {
 }
 
 @Entity('field_equipment')
-export class Equipment implements Omit<IEquipment, 'location'> {
+export class Equipment implements IEquipment {
     @PrimaryGeneratedColumn('uuid', { name: 'equipment_id' })
     equipment_id: string;
 
@@ -40,7 +40,7 @@ export class Equipment implements Omit<IEquipment, 'location'> {
     @Column('jsonb', { name: 'data', default: {} })
     data: {
         is_interior?: boolean;
-        floor?: string | number;
+        floor?: string | number | null;
         barcode?: string | null;
         photo?: string | null;
         [key: string]: any;
@@ -52,7 +52,6 @@ export class Equipment implements Omit<IEquipment, 'location'> {
     @UpdateDateColumn({ name: 'updated_at' })
     updated_at: string;
 
-    // Virtual property to match the shared interface
     location?: { latitude: number; longitude: number };
 
     @AfterLoad()
@@ -76,8 +75,8 @@ export class Equipment implements Omit<IEquipment, 'location'> {
         } else if (this.data.floor === 'G') {
             this.data.floor = 'G';
         } else {
-            const parsed = parseInt(this.data.floor as string);
-            this.data.floor = isNaN(parsed) ? this.data.floor : parsed;
+            const parsed = parseInt(String(this.data.floor));
+            this.data.floor = isNaN(parsed) ? String(this.data.floor) : parsed;
         }
     }
 

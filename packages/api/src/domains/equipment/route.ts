@@ -1,21 +1,21 @@
 import { Router } from 'express';
-import { getEquipment, getEquipmentById, createEquipment, updateEquipment, archiveEquipment } from './handler';
+import { equipmentHandler } from './handler';
 
 const router = Router();
 
 // Get all equipment with optional filters
-router.get('/', getEquipment);
+router.get('/', equipmentHandler.getEquipment.bind(equipmentHandler));
 
 // Get equipment by ID
-router.get('/:id', getEquipmentById);
+router.get('/:id', equipmentHandler.getEquipmentById.bind(equipmentHandler));
 
 // Create new equipment
-router.post('/', createEquipment);
+router.post('/', equipmentHandler.createEquipment.bind(equipmentHandler));
 
 // Update equipment
-router.put('/:id', updateEquipment);
+router.put('/:id', equipmentHandler.updateEquipment.bind(equipmentHandler));
 
 // Archive equipment
-router.post('/:id/archive', archiveEquipment);
+router.post('/:id/archive', equipmentHandler.archiveEquipment.bind(equipmentHandler));
 
 export default router;

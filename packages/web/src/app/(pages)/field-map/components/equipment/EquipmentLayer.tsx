@@ -1,8 +1,10 @@
 'use client';
 
-import React, { forwardRef, useImperativeHandle, useEffect, useState } from 'react';
-import { Box } from '@mui/material';
-import { Marker } from 'react-map-gl';
+import React, { forwardRef, useImperativeHandle, useEffect, useState, useRef, useCallback } from 'react';
+import { Box, Typography, Button, IconButton } from '@mui/material';
+import { Marker, Popup } from 'react-map-gl';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { Crosshairs } from './Crosshairs';
 import { AddEquipmentDialog } from './AddEquipmentDialog';
 import { EquipmentMarkerDialog } from './EquipmentMarkerDialog';
@@ -43,8 +45,8 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
     activeJob,
     activeProperty,
     activeMode,
-    isAddingEquipment,
-    setIsAddingEquipment
+    isAddingEquipment: isAddingFromContext,
+    setIsAddingEquipment: setIsAddingFromContext
   } = useMapContext();
 
   // Equipment data and state management
@@ -53,24 +55,29 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
     isLoading,
     error,
     isPlacingEquipment,
-    isMarkerDialogOpen,
-    selectedEquipment,
+    cancelPlacingEquipment,
+    startPlacingEquipment,
     addEquipment,
     deleteEquipment,
-    updateEquipment,
-    cancelPlacingEquipment,
-    startPlacingEquipment
+    updateEquipment
   } = useEquipment({ bounds });
+
+  // Local state
+  const [isAddEquipmentDialogOpen, setIsAddEquipmentDialogOpen] = useState(false);
+  const [placementLocation, setPlacementLocation] = useState<[number, number] | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
+  const [isMarkerDialogOpen, setIsMarkerDialogOpen] = useState(false);
 
   // Validate requirements before allowing equipment placement
   const canPlaceEquipment = activeProperty?.property_id && activeJob?.job_id && activeMode === 'edit';
 
   // Handle isAddingEquipment changes
   useEffect(() => {
-    if (isAddingEquipment && canPlaceEquipment) {
+    if (isAddingFromContext && canPlaceEquipment) {
       startPlacingEquipment();
     }
-  }, [isAddingEquipment, canPlaceEquipment, startPlacingEquipment]);
+  }, [isAddingFromContext, canPlaceEquipment, startPlacingEquipment]);
 
   // Expose the start placement handler to parent components
   useImperativeHandle(ref, () => ({
@@ -82,122 +89,168 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
         activeMode
       });
       if (canPlaceEquipment) {
-        setIsAddingEquipment(true);
+        setIsAddingFromContext(true);
       }
     }
   }));
 
-  const [isAddEquipmentDialogOpen, setIsAddEquipmentDialogOpen] = useState(false);
-  const [placementLocation, setPlacementLocation] = useState<[number, number] | null>(null);
-  const [showSuccess, setShowSuccess] = useState(false);
-
   // Reset states when dialog closes
   useEffect(() => {
     if (!isAddEquipmentDialogOpen) {
+      setPlacementLocation(null);
       setShowSuccess(false);
     }
   }, [isAddEquipmentDialogOpen]);
 
+  const handleStartPlacement = () => {
+    setIsAddingFromContext(true);
+  };
+
+  const handleCancelPlacement = () => {
+    setIsAddingFromContext(false);
+    setPlacementLocation(null);
+    setIsAddEquipmentDialogOpen(false);
+    cancelPlacingEquipment();
+  };
+
   const handleAddEquipment = async (data: any) => {
     try {
-      const equipmentData = {
-        job_id: activeJob.job_id,
-        equipment_type_id: data.equipment_type_id,
-        status: data.status || 'active',
-        location: data.location,
-        is_georeferenced: data.is_georeferenced,
-        property_id: activeProperty.property_id,
-        property_name: activeProperty.name,
-        property_type: activeProperty.type,
-        job_title: activeJob.title || 'None',
-        job_type: activeJob.type,
-        accounts: activeProperty.accounts?.map(account => account.name) || [],
-        data: data.data
-      };
-      console.log('Submitting equipment:', equipmentData);
-      const result = await addEquipment.mutateAsync(equipmentData);
-      console.log('Equipment added successfully:', result);
-      setShowSuccess(true);
-      return true;
+      // Add the equipment
+      const success = await addEquipment.mutateAsync(data);
+      if (success) {
+        setShowSuccess(true);
+      }
+      return success;
     } catch (error) {
       console.error('Failed to add equipment:', error);
-      throw error;
+      return false;
     }
+  };
+
+  const handleAddAnother = () => {
+    console.log('Starting new equipment placement');
+    setShowSuccess(false);
+    setIsAddEquipmentDialogOpen(false);
+    // Start the placement process again
+    setIsAddingFromContext(true);
   };
 
   const handleCloseDialog = () => {
     console.log('Closing dialog');
     setIsAddEquipmentDialogOpen(false);
-    setIsAddingEquipment(false);
+    setIsAddingFromContext(false);
     setShowSuccess(false);
     cancelPlacingEquipment();
   };
 
-  const handleAddAnother = () => {
-    console.log('Adding another');
-    setShowSuccess(false);
-  };
+  const handleMarkerClick = useCallback((e: React.MouseEvent, equipment: Equipment) => {
+    e.originalEvent.stopPropagation();
+    setSelectedEquipment(equipment);
+    setIsMarkerDialogOpen(true);
+  }, []);
+
+  const handleMarkerDialogClose = useCallback(() => {
+    setSelectedEquipment(null);
+    setIsMarkerDialogOpen(false);
+  }, []);
+
+  const handleDeleteEquipment = useCallback(async (id: string) => {
+    try {
+      // TODO: Implement delete functionality
+      console.log('Delete equipment:', id);
+    } catch (error) {
+      console.error('Failed to delete equipment:', error);
+    }
+  }, []);
+
+  const handleUpdateEquipmentType = useCallback(async (id: string, typeId: string) => {
+    try {
+      // TODO: Implement update type functionality
+      console.log('Update equipment type:', id, typeId);
+    } catch (error) {
+      console.error('Failed to update equipment type:', error);
+    }
+  }, []);
 
   if (!visible) return null;
 
   return (
     <>
-      {/* Equipment Markers */}
-      {Array.isArray(equipment) && equipment.map((eq: Equipment) => {
-        if (!eq?.location?.coordinates) {
-          console.log('Equipment missing coordinates:', eq);
+      {/* Equipment markers */}
+      {Array.isArray(equipment) && equipment.map((eq) => {
+        // Safely extract coordinates
+        const longitude = eq.location?.coordinates?.[0] ?? eq.location?.longitude;
+        const latitude = eq.location?.coordinates?.[1] ?? eq.location?.latitude;
+
+        // Skip if coordinates are invalid
+        if (!longitude || !latitude || isNaN(longitude) || isNaN(latitude)) {
+          console.warn('Invalid coordinates for equipment:', eq.equipment_id, eq.location);
           return null;
         }
-        const [longitude, latitude] = eq.location.coordinates;
-        console.log('Rendering equipment marker:', eq.equipment_id, longitude, latitude);
 
         return (
           <Marker
             key={eq.equipment_id}
             longitude={longitude}
             latitude={latitude}
-            onClick={(e) => {
-              e.originalEvent.stopPropagation();
-              // openMarkerDialog(eq);
-            }}
+            onClick={(e) => handleMarkerClick(e, eq)}
           >
             <Box
               sx={{
                 width: 24,
                 height: 24,
-                backgroundColor: 'primary.main',
                 borderRadius: '50%',
+                bgcolor: 'primary.main',
                 border: '2px solid white',
-                boxShadow: 2,
                 cursor: 'pointer',
+                transition: 'transform 0.2s',
                 '&:hover': {
-                  transform: 'scale(1.1)',
-                }
+                  transform: 'scale(1.2)',
+                },
               }}
             />
           </Marker>
         );
       })}
 
-      {/* Equipment placement crosshair */}
-      {isPlacingEquipment && canPlaceEquipment && (
+      {/* Equipment Marker Dialog */}
+      {selectedEquipment && (
+        <EquipmentMarkerDialog
+          open={isMarkerDialogOpen}
+          equipment={selectedEquipment}
+          onClose={handleMarkerDialogClose}
+          onDelete={handleDeleteEquipment}
+          onUpdateType={handleUpdateEquipmentType}
+        />
+      )}
+
+      {/* Crosshairs for equipment placement */}
+      {isAddingFromContext && !isAddEquipmentDialogOpen && mapRef?.current && (
         <>
-          <Crosshairs onLocationConfirmed={(location) => {
-            setPlacementLocation(location);
-            setIsAddEquipmentDialogOpen(true);
-          }} />
+          <Crosshairs mapRef={mapRef} />
           <EquipmentPlacementControls
             onConfirm={() => {
-              const mapInstance = mapRef?.current?.getMap();
-              if (!mapInstance) return;
+              const center = mapRef.current?.getCenter();
+              if (!center) {
+                console.warn('Map center not available');
+                return;
+              }
               
-              const center = mapInstance.getCenter();
-              setPlacementLocation([center.lng, center.lat]);
+              const lng = center.lng;
+              const lat = center.lat;
+              
+              if (!lng || !lat || isNaN(lng) || isNaN(lat)) {
+                console.warn('Invalid map center coordinates:', lng, lat);
+                return;
+              }
+
+              console.log('Setting placement location:', [lng, lat]);
+              setPlacementLocation([lng, lat]);
               setIsAddEquipmentDialogOpen(true);
             }}
             onCancel={() => {
-              cancelPlacingEquipment();
-              setIsAddingEquipment(false);
+              handleCancelPlacement();
+              setIsAddingFromContext(false);
             }}
           />
         </>
@@ -217,33 +270,6 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
           onClose={handleCloseDialog}
           onAddAnother={handleAddAnother}
           onSubmit={handleAddEquipment}
-        />
-      )}
-
-      {/* Equipment marker dialog */}
-      {isMarkerDialogOpen && selectedEquipment && (
-        <EquipmentMarkerDialog
-          open={isMarkerDialogOpen}
-          equipment={selectedEquipment}
-          onClose={() => {
-            // closeMarkerDialog();
-          }}
-          onDelete={async (id) => {
-            console.log('Deleting equipment:', id);
-            try {
-              await deleteEquipment.mutateAsync(id);
-              console.log('Successfully deleted equipment');
-            } catch (error) {
-              console.error('Failed to delete equipment:', error);
-              throw error; // Re-throw to be handled by the dialog
-            }
-          }}
-          onUpdateType={async (id, typeId) => 
-            updateEquipment.mutateAsync({ 
-              id, 
-              data: { type: typeId } 
-            })
-          }
         />
       )}
     </>
