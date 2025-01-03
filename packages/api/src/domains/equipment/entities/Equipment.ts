@@ -43,12 +43,16 @@ export class Equipment implements IEquipment {
     @Column({ type: 'varchar', name: 'status', default: 'active' })
     status: string;
 
+    @Column({ type: 'varchar', name: 'barcode', nullable: true })
+    barcode: string | null;
+
+    @Column({ type: 'varchar', name: 'photo_url', nullable: true })
+    photo_url: string | null;
+
     @Column('jsonb', { name: 'data', default: {} })
     data: {
         is_interior?: boolean;
         floor?: string | number | null;
-        barcode?: string | null;
-        photo?: string | null;
         [key: string]: any;
     } = {};  
 

@@ -31,6 +31,7 @@ import FileUploadIcon from '@mui/icons-material/FileUpload';
 import MobileScreenShareIcon from '@mui/icons-material/MobileScreenShare';
 import { useEquipmentTypes } from '@/app/(pages)/settings/equipment/hooks/useEquipment';
 import { useCaptureFlow } from '@/app/hooks/useCaptureFlow';
+import { useMapContext } from '@/app/globalHooks/useMapContext';
 import type { 
   Field, 
   FormData, 
@@ -84,7 +85,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   onClose,
   onSubmit,
   onAddAnother,
-  showSuccess,
+  showSuccess = false,
   successTitle = 'Equipment Added',
   successMessage = 'The equipment has been successfully added.',
   successButtonText = 'Add Another',
@@ -105,6 +106,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
     currentStep,
     isLoading: isCaptureLoading,
   } = useCaptureFlow();
+  const { activeJob } = useMapContext();
   const [selectedType, setSelectedType] = useState('');
   const [formData, setFormData] = useState<FormData>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -222,6 +224,16 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       return;
     }
 
+    if (!activeJob?.job_id) {
+      setError('No active job selected');
+      return;
+    }
+
+    if (!location || location.length !== 2) {
+      setError('Invalid location coordinates');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setError(null);
@@ -242,23 +254,29 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
 
       // Extract latitude and longitude
       const [longitude, latitude] = location;
+      console.log('Location coordinates:', { longitude, latitude });
+
+      // Create location object in the format the API expects
+      const locationData = {
+        latitude,
+        longitude
+      };
+      console.log('Location data:', locationData);
 
       // Prepare submission data
       const submissionData = {
-        job_id: jobType,
-        equipment_type_id: typeConfig.value,  
+        name: typeConfig.label || typeConfig.value,
+        equipment_type_id: typeConfig.value,
+        job_id: activeJob.job_id,
+        property_id: activeJob.property_id,
         status: 'active',
-        is_georeferenced: true,
-        location: {
-          latitude,
-          longitude
-        },
+        barcode: barcode || null,
+        photo_url: photo || null,
+        location: locationData,
         data: {
           ...otherFields,
           is_interior: is_interior || false,
-          floor: floorValue,
-          barcode: barcode || null,
-          photo: photo || null
+          floor: floorValue
         }
       };
 
@@ -268,9 +286,12 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       try {
         const success = await onSubmit(submissionData);
         console.log('Submit result:', success);
+        if (!success) {
+          throw new Error('Failed to submit equipment');
+        }
       } catch (submitError) {
         console.error('Error during submit:', submitError);
-        throw submitError;
+        throw new Error(submitError instanceof Error ? submitError.message : 'Failed to submit equipment');
       }
     } catch (err) {
       console.error('Failed to submit equipment:', err);

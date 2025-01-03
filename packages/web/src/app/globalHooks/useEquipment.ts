@@ -119,16 +119,25 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
   const addEquipment = useMutation({
     mutationFn: async (newEquipment: Partial<Equipment>) => {
       console.log('Adding equipment:', newEquipment);
-      const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newEquipment)
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to add equipment');
+      try {
+        const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newEquipment)
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+          console.error('Server error:', data);
+          throw new Error(data.message || `Failed to add equipment: ${response.status}`);
+        }
+
+        return data;
+      } catch (error) {
+        console.error('Error adding equipment:', error);
+        throw error;
       }
-      return response.json();
     },
     onSuccess: () => {
       console.log('Successfully added equipment, invalidating queries');

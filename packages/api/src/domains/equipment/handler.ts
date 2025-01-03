@@ -18,9 +18,11 @@ interface CreateEquipmentBody {
     status?: string;
     is_georeferenced?: boolean;
     data?: {
-        barcode?: string;
-        photo?: string;
+        floor?: string;
+        is_interior?: boolean;
     };
+    barcode?: string;
+    photo_url?: string;
 }
 
 interface UpdateEquipmentBody {
@@ -29,6 +31,8 @@ interface UpdateEquipmentBody {
     location?: LocationInput | null;
     status?: string;
     is_georeferenced?: boolean;
+    barcode?: string;
+    photo_url?: string;
 }
 
 export class EquipmentHandler {
@@ -155,19 +159,21 @@ export class EquipmentHandler {
                 equipment_type_id,
                 status: req.body.status || 'active',
                 is_georeferenced: req.body.is_georeferenced ?? true,
+                barcode: req.body.barcode || null,
+                photo_url: req.body.photo_url || null,
                 data: {
                     ...data,
                     floor: floorValue,
-                    is_interior: data?.is_interior ?? false,
-                    barcode: data?.barcode ?? null,
-                    photo: data?.photo ?? null
+                    is_interior: data?.is_interior ?? false
                 }
             });
 
             logger.info('Created equipment instance:', { 
                 data: equipment.data,
                 floor: equipment.data.floor,
-                floorType: equipment.data.floor !== undefined ? typeof equipment.data.floor : 'undefined'
+                floorType: equipment.data.floor !== undefined ? typeof equipment.data.floor : 'undefined',
+                barcode: equipment.barcode,
+                photo_url: equipment.photo_url
             });
 
             // Handle location if provided
@@ -180,7 +186,9 @@ export class EquipmentHandler {
                 id: savedEquipment.equipment_id,
                 data: savedEquipment.data,
                 floor: savedEquipment.data.floor,
-                floorType: savedEquipment.data.floor !== undefined ? typeof savedEquipment.data.floor : 'undefined'
+                floorType: savedEquipment.data.floor !== undefined ? typeof savedEquipment.data.floor : 'undefined',
+                barcode: savedEquipment.barcode,
+                photo_url: savedEquipment.photo_url
             });
 
             return res.status(201).json(savedEquipment.toJSON());
@@ -221,7 +229,9 @@ export class EquipmentHandler {
                 job_id: updateData.job_id,
                 equipment_type_id: updateData.equipment_type_id,
                 status: updateData.status,
-                is_georeferenced: updateData.is_georeferenced
+                is_georeferenced: updateData.is_georeferenced,
+                barcode: updateData.barcode,
+                photo_url: updateData.photo_url
             };
 
             equipmentRepository.merge(equipment, mergeData);
