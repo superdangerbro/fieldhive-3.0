@@ -1,5 +1,6 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, AfterLoad } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, AfterLoad, ManyToOne, JoinColumn } from 'typeorm';
 import { Point } from 'geojson';
+import { Job } from '../../jobs/entities/Job';
 
 interface IEquipment {
     equipment_id: string;
@@ -10,6 +11,7 @@ interface IEquipment {
     status: string;
     created_at: string;
     updated_at: string;
+    job?: Job;
 }
 
 @Entity('field_equipment')
@@ -19,6 +21,10 @@ export class Equipment implements IEquipment {
 
     @Column({ name: 'job_id' })
     job_id: string;
+
+    @ManyToOne(() => Job)
+    @JoinColumn({ name: 'job_id' })
+    job: Job;
 
     @Column({ name: 'equipment_type_id' })
     equipment_type_id: string;
@@ -64,20 +70,13 @@ export class Equipment implements IEquipment {
         }
     }
 
-    @AfterLoad()
-    private convertData() {
-        // Ensure data exists
-        this.data = this.data || {};
-        
-        // Handle floor value
-        if (this.data.floor === null || this.data.floor === undefined) {
-            this.data.floor = null;
-        } else if (this.data.floor === 'G') {
-            this.data.floor = 'G';
-        } else {
-            const parsed = parseInt(String(this.data.floor));
-            this.data.floor = isNaN(parsed) ? String(this.data.floor) : parsed;
-        }
+    toJSON() {
+        const { locationPoint, ...rest } = this;
+        return {
+            ...rest,
+            location: this.location,
+            type: this.equipment_type_id // Add type for consistency
+        };
     }
 
     // Helper method to set location from lat/lng
@@ -93,24 +92,5 @@ export class Equipment implements IEquipment {
     clearLocation() {
         this.locationPoint = undefined;
         this.location = undefined;
-    }
-
-    // Transform data for frontend
-    toJSON() {
-        const { locationPoint, ...rest } = this;
-        return {
-            equipment_id: this.equipment_id,
-            name: `Equipment ${this.equipment_id.slice(0, 8)}`, // Generate a name since we don't store it
-            type: this.equipment_type_id,
-            status: this.status,
-            property_id: '', // This will be derived from the job
-            job_id: this.job_id,
-            data: this.data || {},
-            created_at: this.created_at,
-            updated_at: this.updated_at,
-            location: this.locationPoint ? {
-                coordinates: this.locationPoint.coordinates
-            } : undefined
-        };
     }
 }

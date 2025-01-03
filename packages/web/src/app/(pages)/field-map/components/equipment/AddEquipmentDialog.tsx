@@ -70,6 +70,12 @@ interface AddEquipmentDialogProps {
   jobType: string;
   jobTitle?: string;
   accounts?: string[];
+  editMode?: boolean;
+  initialData?: {
+    equipment_type_id: string;
+    status: string;
+    data: Record<string, any>;
+  };
 }
 
 export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
@@ -79,14 +85,16 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   onSubmit,
   onAddAnother,
   showSuccess,
-  successTitle,
-  successMessage,
-  successButtonText,
+  successTitle = 'Equipment Added',
+  successMessage = 'The equipment has been successfully added.',
+  successButtonText = 'Add Another',
   propertyName,
   propertyType,
   jobType,
   jobTitle,
   accounts,
+  editMode = false,
+  initialData
 }) => {
   const { data: equipmentTypes = [], isLoading } = useEquipmentTypes();
   const { 
@@ -117,6 +125,21 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       setUseCustomFloor(false);
     }
   }, [open]);
+
+  // Initialize form with initial data if in edit mode
+  useEffect(() => {
+    if (editMode && initialData && open) {
+      setSelectedType(initialData.equipment_type_id);
+      setFormData({
+        ...initialData.data,
+        name: initialData.data.name || '',
+        barcode: initialData.data.barcode || null,
+        photo: initialData.data.photo || null,
+        is_interior: initialData.data.is_interior || false,
+        floor: initialData.data.floor || null
+      });
+    }
+  }, [editMode, initialData, open]);
 
   // Set initial floor value when interior is checked
   useEffect(() => {
@@ -612,7 +635,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       ) : (
         <>
           <DialogTitle>
-            Add Equipment
+            {editMode ? 'Edit Equipment' : 'Add Equipment'}
             <IconButton
               onClick={handleClose}
               sx={{ position: 'absolute', right: 8, top: 8 }}
@@ -622,39 +645,34 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
           </DialogTitle>
 
           <DialogContent>
-            {/* Location Details */}
-            <Box mb={3}>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h6" sx={{ mb: 2, color: 'text.primary' }}>
                 Location Details
               </Typography>
-              <Typography variant="body2">
-                <strong>Property:</strong> {propertyName}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Property Type:</strong> {propertyType}
-              </Typography>
-              {jobTitle && (
-                <Typography variant="body2">
-                  <strong>Job Title:</strong> {jobTitle}
-                </Typography>
-              )}
-              <Typography variant="body2">
-                <strong>Job Type:</strong> {jobType}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Coordinates:</strong> {location[0].toFixed(6)}, {location[1].toFixed(6)}
-              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Typography variant="body2" color="text.secondary">Property:</Typography>
+                  <Typography variant="body2" color="text.primary">{propertyName}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Typography variant="body2" color="text.secondary">Property Type:</Typography>
+                  <Typography variant="body2" color="text.primary">{propertyType}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Typography variant="body2" color="text.secondary">Job Type:</Typography>
+                  <Typography variant="body2" color="text.primary">{jobType}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Typography variant="body2" color="text.secondary">Coordinates:</Typography>
+                  <Typography variant="body2" color="text.primary">
+                    {location[1].toFixed(6)}, {location[0].toFixed(6)}
+                  </Typography>
+                </Box>
+              </Box>
             </Box>
 
-            {error && (
-              <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-                <AlertTitle>Error</AlertTitle>
-                {error}
-              </Alert>
-            )}
-
             {/* Equipment Type Selection */}
-            <FormControl fullWidth sx={{ mb: 4 }}>
+            <FormControl fullWidth sx={{ mb: 3 }}>
               <InputLabel>Equipment Type</InputLabel>
               <Select
                 value={selectedType}
@@ -745,7 +763,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
               disabled={!selectedType || isSubmitting || isLoading}
               startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
             >
-              {isSubmitting ? 'Adding Equipment...' : 'Add Equipment'}
+              {isSubmitting ? (editMode ? 'Saving...' : 'Adding Equipment...') : (editMode ? 'Save Changes' : 'Add Equipment')}
             </Button>
           </DialogActions>
         </>

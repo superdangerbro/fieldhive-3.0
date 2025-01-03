@@ -37,7 +37,11 @@ export class EquipmentHandler {
         try {
             const { type, status, bounds } = req.query;
             const queryBuilder = equipmentRepository
-                .createQueryBuilder('equipment');
+                .createQueryBuilder('equipment')
+                .leftJoinAndSelect('equipment.job', 'job')
+                .leftJoinAndSelect('job.property', 'property')
+                .leftJoinAndSelect('property.serviceAddress', 'propertyServiceAddress')
+                .leftJoinAndSelect('job.serviceAddress', 'jobServiceAddress');
 
             if (type) {
                 queryBuilder.andWhere('equipment.equipment_type_id = :type', { type });
@@ -59,8 +63,24 @@ export class EquipmentHandler {
 
             const [equipment, total] = await queryBuilder.getManyAndCount();
 
-            // Transform data for frontend using toJSON
-            const transformedEquipment = equipment.map(eq => eq.toJSON());
+            // Transform data for frontend
+            const transformedEquipment = equipment.map(eq => {
+                const base = eq.toJSON();
+                const jobData = eq.job ? {
+                    ...eq.job,
+                    property: eq.job.property ? {
+                        ...eq.job.property,
+                        type: eq.job.property.type || '-', // Use the type column directly
+                        address: eq.job.property.serviceAddress
+                    } : undefined,
+                    serviceAddress: eq.job.serviceAddress
+                } : undefined;
+
+                return {
+                    ...base,
+                    job: jobData
+                };
+            });
 
             return res.json({ equipment: transformedEquipment, total });
         } catch (error) {

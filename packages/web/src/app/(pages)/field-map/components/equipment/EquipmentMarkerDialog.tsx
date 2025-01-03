@@ -19,20 +19,55 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import { useEquipment } from '@/app/globalHooks/useEquipment';
 import type { Equipment, Field, EquipmentStatus, EquipmentType } from '@/app/globalTypes/equipment';
+import { formatAddress } from '../../../../../app/utils/formatAddress';
+
+// Helper function to format address
+const formatAddress = (address: any) => {
+  if (!address) return null;
+  const parts = [
+    address.address1,
+    address.address2,
+    address.city,
+    address.province,
+    address.postal_code,
+    address.country
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(', ') : null;
+};
+
+// Status chip component that maps status to color
+const StatusChip = ({ status }: { status: string }) => {
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return 'bg-[#22c55e]';
+      case 'inactive':
+        return 'bg-[#ef4444]';
+      case 'pending':
+        return 'bg-[#f59e0b]';
+      default:
+        return 'bg-[#6b7280]';
+    }
+  };
+
+  return (
+    <span className={`inline-block text-sm px-3 py-1 rounded-full text-white font-medium capitalize ${getStatusColor(status)}`}>
+      {status}
+    </span>
+  );
+};
 
 interface EquipmentMarkerDialogProps {
-  /** Whether the dialog is open */
-  open: boolean;
-  /** The equipment data to display */
   equipment: Equipment;
-  /** Handler for closing the dialog */
+  open: boolean;
   onClose: () => void;
-  /** Handler for deleting equipment */
   onDelete: (id: string) => Promise<void>;
-  /** Handler for updating equipment type */
   onUpdateType: (id: string, typeId: string) => Promise<void>;
+  onEdit?: (equipment: Equipment) => void;
+  onAddInspection?: (equipment: Equipment) => void;
 }
 
 /**
@@ -45,11 +80,13 @@ interface EquipmentMarkerDialogProps {
  * - Type updates
  */
 export function EquipmentMarkerDialog({
-  open,
   equipment,
+  open,
   onClose,
   onDelete,
-  onUpdateType
+  onUpdateType,
+  onEdit,
+  onAddInspection
 }: EquipmentMarkerDialogProps) {
   const { equipmentTypes, equipmentStatuses } = useEquipment();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -128,105 +165,122 @@ export function EquipmentMarkerDialog({
         </IconButton>
       </DialogTitle>
 
-      <DialogContent dividers>
-        {/* General Information */}
-        <Box mb={3}>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            General Information
-          </Typography>
-          <Typography variant="body2">
-            <strong>Type:</strong> {equipment.type}
-          </Typography>
-          <Box display="flex" alignItems="center" gap={1}>
-            <Typography variant="body2" component="span">
-              <strong>Status:</strong>
-            </Typography>
-            <Chip
-              label={equipment.status}
+      <DialogContent className="flex flex-col gap-16 p-8">
+        <div className="flex flex-col gap-8">
+          <div className="flex justify-between items-center">
+            <h3 className="text-base font-semibold text-white">General Information</h3>
+            <Button
+              variant="outlined"
+              color="primary"
               size="small"
-              sx={{ bgcolor: statusConfig?.color || 'grey.500', color: 'white' }}
-            />
-          </Box>
-          <Typography variant="body2">
-            <strong>ID:</strong> {equipment.equipment_id}
-          </Typography>
-        </Box>
+              startIcon={<EditIcon />}
+              onClick={() => onEdit?.(equipment)}
+            >
+              Edit Equipment
+            </Button>
+          </div>
+          <div className="flex flex-col gap-6">
+            <div className="flex items-center gap-3" style={{lineHeight: '2rem'}}>
+              <span className="text-sm font-semibold text-purple-400 min-w-[140px]">Type: </span>
+              <span className="text-sm text-white">{equipment.type || '-'}</span>
+            </div>
+            <div className="flex items-center gap-3" style={{lineHeight: '2rem'}}>
+              <span className="text-sm font-semibold text-purple-400 min-w-[140px]">Status: </span>
+              <span style={{
+                backgroundColor: equipment.status === 'active' ? '#22c55e' : 
+                               equipment.status === 'inactive' ? '#ef4444' : 
+                               equipment.status === 'pending' ? '#f59e0b' : '#6b7280',
+                color: 'white',
+                padding: '4px 12px',
+                borderRadius: '9999px',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+              }}>
+                {equipment.status}
+              </span>
+            </div>
+            <div className="flex items-center gap-3" style={{lineHeight: '2rem'}}>
+              <span className="text-sm font-semibold text-purple-400 min-w-[140px]">ID: </span>
+              <span className="text-sm font-mono text-white">{equipment.equipment_id}</span>
+            </div>
+          </div>
+        </div>
 
-        {/* Location Information */}
-        <Box mb={3}>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            Location Details
-          </Typography>
-          <Typography variant="body2">
-            <strong>Property:</strong> {equipment.property_name}
-          </Typography>
-          <Typography variant="body2">
-            <strong>Property Type:</strong> {equipment.property_type}
-          </Typography>
-          <Typography variant="body2">
-            <strong>Job:</strong> {equipment.job_title}
-          </Typography>
-          <Typography variant="body2">
-            <strong>Job Type:</strong> {equipment.job_type}
-          </Typography>
-          <Typography variant="body2">
-            <strong>Coordinates:</strong> {equipment.location?.coordinates?.[1].toFixed(6)}, {equipment.location?.coordinates?.[0].toFixed(6)}
-          </Typography>
-          {Array.isArray(equipment.accounts) && equipment.accounts.length > 0 && (
-            <Box mt={1}>
-              <Typography variant="body2">
-                <strong>Accounts:</strong>
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
-                {equipment.accounts.map((account: string) => (
-                  <Chip
-                    key={account}
-                    label={account}
-                    size="small"
-                    sx={{ bgcolor: 'action.selected' }}
-                  />
-                ))}
-              </Box>
-            </Box>
-          )}
-        </Box>
+        <div className="flex flex-col gap-8">
+          <h3 className="text-base font-semibold text-white">Job Details</h3>
+          <div className="flex flex-col gap-6">
+            <div className="flex items-start gap-3" style={{lineHeight: '2rem'}}>
+              <span className="text-sm font-semibold text-purple-400 min-w-[140px]">Property: </span>
+              <span className="text-sm text-white">{equipment.job?.property?.name || '-'}</span>
+            </div>
+            <div className="flex items-start gap-3" style={{lineHeight: '2rem'}}>
+              <span className="text-sm font-semibold text-purple-400 min-w-[140px]">Property Type: </span>
+              <span className="text-sm text-white">{equipment.job?.property?.type || '-'}</span>
+            </div>
+            <div className="flex items-start gap-3" style={{lineHeight: '2rem'}}>
+              <span className="text-sm font-semibold text-purple-400 min-w-[140px]">Job: </span>
+              <span className="text-sm text-white">{equipment.job?.title || '-'}</span>
+            </div>
+            <div className="flex items-start gap-3" style={{lineHeight: '2rem'}}>
+              <span className="text-sm font-semibold text-purple-400 min-w-[140px]">Job Type: </span>
+              <span className="text-sm text-white">{equipment.job?.job_type_id || '-'}</span>
+            </div>
+            <div className="flex items-start gap-3" style={{lineHeight: '2rem'}}>
+              <span className="text-sm font-semibold text-purple-400 min-w-[140px]">Address: </span>
+              <span className="text-sm text-white">
+                {(equipment.job?.serviceAddress?.formatted_address || 
+                  equipment.job?.property?.serviceAddress?.formatted_address || 
+                  formatAddress(equipment.job?.serviceAddress) || 
+                  formatAddress(equipment.job?.property?.serviceAddress)) || '-'}
+              </span>
+            </div>
+          </div>
+        </div>
 
         {/* Equipment Fields */}
         {typeConfig?.fields && (
-          <Box mb={3}>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Equipment Details
-            </Typography>
-            {typeConfig.fields.map((field: Field) => (
-              <Typography key={field.name} variant="body2">
-                <strong>{field.label || field.name}:</strong> {getFieldValue(field)}
-              </Typography>
-            ))}
-          </Box>
+          <div className="flex flex-col gap-8">
+            <h3 className="text-base font-semibold text-white">Equipment Details</h3>
+            <div className="flex flex-col gap-6">
+              {typeConfig.fields.map((field: Field) => (
+                <div key={field.name} className="flex items-start gap-3" style={{lineHeight: '2rem'}}>
+                  <span className="text-sm font-semibold text-purple-400 min-w-[140px]">{field.label || field.name}: </span>
+                  <span className="text-sm text-white">{getFieldValue(field)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Inspections */}
-        <Box mb={3}>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            Inspections
-          </Typography>
-          {equipment.inspections?.length > 0 ? (
-            equipment.inspections.map((inspection) => (
-              <Box key={inspection.inspection_id} mb={1}>
-                <Typography variant="body2">
-                  <strong>Date:</strong> {new Date(inspection.created_at).toLocaleDateString()}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {inspection.notes || 'No notes'}
-                </Typography>
-              </Box>
-            ))
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              No inspections recorded
-            </Typography>
-          )}
-        </Box>
+        <div className="flex flex-col gap-8">
+          <div className="flex justify-between items-center">
+            <h3 className="text-base font-semibold text-white">Inspections</h3>
+            <Button
+              variant="outlined"
+              color="primary"
+              size="small"
+              onClick={() => onAddInspection?.(equipment)}
+            >
+              Add Inspection
+            </Button>
+          </div>
+          <div className="flex flex-col gap-6">
+            {equipment.inspections?.length > 0 ? (
+              equipment.inspections.map((inspection) => (
+                <div key={inspection.inspection_id} className="flex flex-col gap-2">
+                  <div className="flex items-start gap-3" style={{lineHeight: '2rem'}}>
+                    <span className="text-sm font-semibold text-purple-400 min-w-[140px]">Date: </span>
+                    <span className="text-sm text-white">{new Date(inspection.created_at).toLocaleDateString()}</span>
+                  </div>
+                  <span className="text-sm text-gray-400 ml-[156px]" style={{lineHeight: '2rem'}}>{inspection.notes || 'No notes'}</span>
+                </div>
+              ))
+            ) : (
+              <span className="text-sm text-gray-400" style={{lineHeight: '2rem'}}>No inspections recorded</span>
+            )}
+          </div>
+        </div>
       </DialogContent>
 
       <DialogActions sx={{ p: 2, gap: 1, justifyContent: 'space-between' }}>

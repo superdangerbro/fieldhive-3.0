@@ -1,7 +1,7 @@
 'use client';
 
 import React, { forwardRef, useImperativeHandle, useEffect, useState, useRef, useCallback } from 'react';
-import { Box, Typography, Button, IconButton } from '@mui/material';
+import { Box, Typography, Button, IconButton, Tooltip } from '@mui/material';
 import { Marker, Popup } from 'react-map-gl';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -150,8 +150,24 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   }, []);
 
   const handleMarkerDialogClose = useCallback(() => {
-    setSelectedEquipment(null);
     setIsMarkerDialogOpen(false);
+    setSelectedEquipment(null);
+  }, []);
+
+  const handleEditEquipment = useCallback(() => {
+    setIsMarkerDialogOpen(false);
+    // Set the location from the selected equipment
+    setPlacementLocation([
+      selectedEquipment.location?.coordinates?.[0] || selectedEquipment.location?.longitude || 0,
+      selectedEquipment.location?.coordinates?.[1] || selectedEquipment.location?.latitude || 0
+    ]);
+    // Open the add equipment dialog with the existing data
+    setIsAddEquipmentDialogOpen(true);
+  }, [selectedEquipment]);
+
+  const handleAddInspection = useCallback((equipment: Equipment) => {
+    // TODO: Implement add inspection functionality
+    console.log('Add inspection for equipment:', equipment);
   }, []);
 
   const handleDeleteEquipment = useCallback(async (id: string) => {
@@ -195,23 +211,69 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
             latitude={latitude}
             onClick={(e) => handleMarkerClick(e, eq)}
           >
-            <Box
-              sx={{
-                width: 24,
-                height: 24,
-                borderRadius: '50%',
-                bgcolor: 'primary.main',
-                border: '2px solid white',
-                cursor: 'pointer',
-                transition: 'transform 0.2s',
-                '&:hover': {
-                  transform: 'scale(1.2)',
-                },
-              }}
-            />
+            <Tooltip 
+              title={
+                <Box>
+                  <Typography variant="body2" fontWeight="bold">
+                    {eq.type || 'Equipment'}
+                  </Typography>
+                  <Typography variant="caption" display="block">
+                    Job: {eq.job?.title || 'N/A'}
+                  </Typography>
+                </Box>
+              }
+              arrow 
+              placement="top"
+            >
+              <Box
+                sx={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  bgcolor: 'primary.main',
+                  border: '2px solid white',
+                  cursor: 'pointer',
+                  transition: 'transform 0.2s',
+                  '&:hover': {
+                    transform: 'scale(1.2)',
+                  },
+                }}
+              />
+            </Tooltip>
           </Marker>
         );
       })}
+
+      {/* Add Equipment Dialog */}
+      <AddEquipmentDialog
+        open={isAddEquipmentDialogOpen}
+        location={placementLocation || [0, 0]}
+        onClose={handleCloseDialog}
+        onSubmit={handleAddEquipment}
+        onAddAnother={handleAddAnother}
+        showSuccess={showSuccess}
+        propertyName={selectedEquipment ? selectedEquipment.job?.property?.name : activeProperty?.name || ''}
+        propertyType={selectedEquipment ? selectedEquipment.job?.property?.type : activeProperty?.type || ''}
+        jobType={selectedEquipment ? selectedEquipment.job?.job_type_id : activeJob?.job_type_id || ''}
+        jobTitle={selectedEquipment ? selectedEquipment.job?.title : activeJob?.title}
+        accounts={selectedEquipment ? selectedEquipment.job?.accounts : activeJob?.accounts}
+        editMode={!!selectedEquipment}
+        initialData={selectedEquipment ? {
+          equipment_type_id: selectedEquipment.type,
+          status: selectedEquipment.status,
+          data: {
+            ...selectedEquipment.data,
+            name: selectedEquipment.name,
+            barcode: selectedEquipment.data?.barcode,
+            photo: selectedEquipment.data?.photo,
+            is_interior: selectedEquipment.data?.is_interior,
+            floor: selectedEquipment.data?.floor
+          }
+        } : undefined}
+        successTitle={selectedEquipment ? 'Equipment Updated' : 'Equipment Added'}
+        successMessage={selectedEquipment ? 'The equipment has been successfully updated.' : 'The equipment has been successfully added.'}
+        successButtonText={selectedEquipment ? 'Close' : 'Add Another'}
+      />
 
       {/* Equipment Marker Dialog */}
       {selectedEquipment && (
@@ -221,6 +283,8 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
           onClose={handleMarkerDialogClose}
           onDelete={handleDeleteEquipment}
           onUpdateType={handleUpdateEquipmentType}
+          onEdit={handleEditEquipment}
+          onAddInspection={handleAddInspection}
         />
       )}
 
@@ -254,23 +318,6 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
             }}
           />
         </>
-      )}
-
-      {/* Add equipment dialog */}
-      {isAddEquipmentDialogOpen && placementLocation && canPlaceEquipment && activeProperty?.property_id && activeJob?.job_id && (
-        <AddEquipmentDialog
-          open={isAddEquipmentDialogOpen}
-          location={placementLocation}
-          propertyName={activeProperty.name}
-          propertyType={activeProperty.type}
-          jobType={activeJob.type || 'None'}
-          jobTitle={activeJob.title}
-          accounts={activeProperty.accounts?.map(account => account.name) || []}
-          showSuccess={showSuccess}
-          onClose={handleCloseDialog}
-          onAddAnother={handleAddAnother}
-          onSubmit={handleAddEquipment}
-        />
       )}
     </>
   );
