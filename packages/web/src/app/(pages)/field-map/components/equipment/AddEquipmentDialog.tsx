@@ -24,6 +24,7 @@ import {
   CircularProgress,
   FormHelperText
 } from '@mui/material';
+import { styled } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
@@ -79,6 +80,43 @@ interface AddEquipmentDialogProps {
     data: Record<string, any>;
   };
 }
+
+const DarkTextField = styled(TextField)({
+  '& .MuiInputBase-input': {
+    color: 'white',
+  },
+  '& .MuiOutlinedInput-root': {
+    '& fieldset': {
+      borderColor: 'rgba(255, 255, 255, 0.23)',
+    },
+    '&:hover fieldset': {
+      borderColor: 'rgba(255, 255, 255, 0.4)',
+    },
+  },
+  '& .MuiInputLabel-root': {
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  '& .MuiIconButton-root': {
+    color: 'white',
+  }
+});
+
+const DarkSelect = styled(Select)({
+  '& .MuiSelect-select': {
+    color: 'white'
+  },
+  '& .MuiOutlinedInput-root': {
+    '& fieldset': {
+      borderColor: 'rgba(255, 255, 255, 0.23)',
+    },
+    '&:hover fieldset': {
+      borderColor: 'rgba(255, 255, 255, 0.4)',
+    },
+  },
+  '& .MuiInputLabel-root': {
+    color: 'rgba(255, 255, 255, 0.7)',
+  }
+});
 
 export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   open,
@@ -236,22 +274,20 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
     });
   };
 
-  // Base dark theme styles for text fields
-  const darkThemeTextField = {
-    input: {
-      color: 'white',
+  const switchStyles = {
+    '& .MuiSwitch-switchBase': {
+      color: '#fff',
+      '&.Mui-checked': {
+        color: '#6366f1',
+        '& + .MuiSwitch-track': {
+          backgroundColor: '#4f46e5',
+          opacity: 0.5
+        }
+      }
     },
-    '& fieldset': {
-      borderColor: 'rgba(255, 255, 255, 0.23)',
-    },
-    '&:hover fieldset': {
-      borderColor: 'rgba(255, 255, 255, 0.4)',
-    },
-    '& label': {
-      color: 'rgba(255, 255, 255, 0.7)',
-    },
-    '& .MuiIconButton-root': {
-      color: 'white',
+    '& .MuiSwitch-track': {
+      backgroundColor: '#374151',
+      opacity: 0.3
     }
   };
 
@@ -431,23 +467,6 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
     setShowCaptureView(false);
   };
 
-  const switchStyles = {
-    '& .MuiSwitch-switchBase': {
-      color: '#fff',
-      '&.Mui-checked': {
-        color: '#6366f1',
-        '& + .MuiSwitch-track': {
-          backgroundColor: '#4f46e5',
-          opacity: 0.5
-        }
-      }
-    },
-    '& .MuiSwitch-track': {
-      backgroundColor: '#374151',
-      opacity: 0.3
-    }
-  };
-
   const renderField = (field: Field) => {
     switch (field.type) {
       case 'boolean':
@@ -492,12 +511,11 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
               />
 
               {useCustomFloor ? (
-                <TextField
+                <DarkTextField
                   value={formData[field.name] || 'G'}
                   onChange={(e) => handleFormChange(field.name, e.target.value)}
                   placeholder="Enter custom floor"
                   fullWidth
-                  sx={darkThemeTextField}
                 />
               ) : (
                 <Slider
@@ -548,7 +566,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
             <Typography variant="subtitle2" gutterBottom>
               {field.label} {field.required && '*'}
             </Typography>
-            <Select
+            <DarkSelect
               value={formData[field.name] || ''}
               onChange={(e) => handleFormChange(field.name, e.target.value)}
               required={field.required}
@@ -556,8 +574,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
               sx={{
                 '& .MuiSelect-select': {
                   color: 'white'
-                },
-                ...darkThemeTextField
+                }
               }}
             >
               {selectConfig.options.map((option) => (
@@ -565,7 +582,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
                   {option}
                 </MenuItem>
               ))}
-            </Select>
+            </DarkSelect>
             {field.description && (
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
                 {field.description}
@@ -590,7 +607,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
             <Typography variant="subtitle2" gutterBottom>
               {field.label} {field.required && '*'}
             </Typography>
-            <Select
+            <DarkSelect
               multiple
               value={formData[field.name] || []}
               onChange={(e) => handleFormChange(field.name, e.target.value)}
@@ -599,8 +616,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
               sx={{
                 '& .MuiSelect-select': {
                   color: 'white'
-                },
-                ...darkThemeTextField
+                }
               }}
               renderValue={(selected) => (Array.isArray(selected) ? selected.join(', ') : '')}
             >
@@ -609,7 +625,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
                   {option}
                 </MenuItem>
               ))}
-            </Select>
+            </DarkSelect>
             {field.description && (
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
                 {field.description}
@@ -629,7 +645,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
             <Typography variant="subtitle2" gutterBottom>
               Barcode {field.required && '*'}
             </Typography>
-            <TextField
+            <DarkTextField
               fullWidth
               value={formData.barcode || ''}
               onChange={(e) => handleFormChange('barcode', e.target.value)}
@@ -643,8 +659,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
                       <QrCodeScannerIcon />
                     </IconButton>
                   </InputAdornment>
-                ),
-                ...darkThemeTextField
+                )
               }}
             />
           </FormControl>
@@ -656,7 +671,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
             <Typography variant="subtitle2" gutterBottom>
               Photo {field.required && '*'}
             </Typography>
-            <TextField
+            <DarkTextField
               fullWidth
               value={formData.photo || ''}
               onChange={(e) => handleFormChange('photo', e.target.value)}
@@ -670,8 +685,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
                       <PhotoCameraIcon />
                     </IconButton>
                   </InputAdornment>
-                ),
-                ...darkThemeTextField
+                )
               }}
             />
           </FormControl>
@@ -684,16 +698,13 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
             <Typography variant="subtitle2" gutterBottom>
               {field.label} {field.required && '*'}
             </Typography>
-            <TextField
+            <DarkTextField
               fullWidth
               value={formData[field.name] || ''}
               onChange={(e) => handleFormChange(field.name, e.target.value)}
               required={field.required}
               error={field.required && !formData[field.name]}
               helperText={field.required && !formData[field.name] ? `${field.label} is required` : ''}
-              InputProps={{
-                ...darkThemeTextField
-              }}
             />
             {field.description && (
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
