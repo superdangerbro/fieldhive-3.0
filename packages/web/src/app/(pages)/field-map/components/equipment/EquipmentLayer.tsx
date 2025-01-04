@@ -7,6 +7,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { Crosshairs } from './Crosshairs';
 import { AddEquipmentDialog } from './AddEquipmentDialog';
+import { EditEquipmentDialog } from './EditEquipmentDialog';
 import { EquipmentMarkerDialog } from './EquipmentMarkerDialog';
 import { EquipmentPlacementControls } from './EquipmentPlacementControls';
 import { useEquipment } from '../../../../../app/globalHooks/useEquipment';
@@ -51,9 +52,8 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
 
   // Equipment data and state management
   const {
-    equipment,
+    data: equipment,
     addEquipment,
-    deleteEquipment,
     updateEquipment,
     updateEquipmentStatus,
     isLoading,
@@ -63,8 +63,13 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
     startPlacingEquipment
   } = useEquipment({ bounds });
 
+  useEffect(() => {
+    console.log('Equipment data:', equipment);
+  }, [equipment]);
+
   // Local state
   const [isAddEquipmentDialogOpen, setIsAddEquipmentDialogOpen] = useState(false);
+  const [isEditEquipmentDialogOpen, setIsEditEquipmentDialogOpen] = useState(false);
   const [placementLocation, setPlacementLocation] = useState<[number, number] | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
@@ -155,16 +160,24 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
     setSelectedEquipment(null);
   }, []);
 
-  const handleEditEquipment = useCallback(() => {
+  const handleEditEquipment = (equipment: Equipment) => {
+    setSelectedEquipment(equipment);
+    setIsEditEquipmentDialogOpen(true);
     setIsMarkerDialogOpen(false);
-    // Set the location from the selected equipment
-    setPlacementLocation([
-      selectedEquipment.location?.coordinates?.[0] || selectedEquipment.location?.longitude || 0,
-      selectedEquipment.location?.coordinates?.[1] || selectedEquipment.location?.latitude || 0
-    ]);
-    // Open the add equipment dialog with the existing data
-    setIsAddEquipmentDialogOpen(true);
-  }, [selectedEquipment]);
+  };
+
+  const handleUpdateEquipment = async (data: any) => {
+    try {
+      console.log('Updating equipment with data:', data);
+      await updateEquipment(data);
+      setIsEditEquipmentDialogOpen(false);
+      setSelectedEquipment(null);
+      return true;
+    } catch (error) {
+      console.error('Failed to update equipment:', error);
+      return false;
+    }
+  };
 
   const handleAddInspection = useCallback((equipment: Equipment) => {
     // TODO: Implement add inspection functionality
@@ -184,10 +197,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
 
   const handleUpdateEquipmentType = async (id: string, typeId: string) => {
     try {
-      await updateEquipment.mutateAsync({
-        id,
-        data: { equipment_type_id: typeId }
-      });
+      await updateEquipment({ id, data: { equipment_type_id: typeId } });
     } catch (error) {
       console.error('Failed to update equipment type:', error);
     }
@@ -198,7 +208,9 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   return (
     <>
       {/* Equipment markers */}
-      {Array.isArray(equipment) && equipment.map((eq) => {
+      {Array.isArray(equipment) && equipment.length > 0 && equipment.map((eq) => {
+        if (!eq) return null;
+
         // Safely extract coordinates
         const longitude = eq.location?.coordinates?.[0] ?? eq.location?.longitude;
         const latitude = eq.location?.coordinates?.[1] ?? eq.location?.latitude;
@@ -257,28 +269,25 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
         onSubmit={handleAddEquipment}
         onAddAnother={handleAddAnother}
         showSuccess={showSuccess}
-        propertyName={selectedEquipment ? selectedEquipment.job?.property?.name : activeProperty?.name || ''}
-        propertyType={selectedEquipment ? selectedEquipment.job?.property?.type : activeProperty?.type || ''}
-        jobType={selectedEquipment ? selectedEquipment.job?.job_type_id : activeJob?.job_type_id || ''}
-        jobTitle={selectedEquipment ? selectedEquipment.job?.title : activeJob?.title}
-        accounts={selectedEquipment ? selectedEquipment.job?.accounts : activeJob?.accounts}
-        editMode={!!selectedEquipment}
-        initialData={selectedEquipment ? {
-          equipment_type_id: selectedEquipment.type,
-          status: selectedEquipment.status,
-          data: {
-            ...selectedEquipment.data,
-            name: selectedEquipment.name,
-            barcode: selectedEquipment.data?.barcode,
-            photo: selectedEquipment.data?.photo,
-            is_interior: selectedEquipment.data?.is_interior,
-            floor: selectedEquipment.data?.floor
-          }
-        } : undefined}
-        successTitle={selectedEquipment ? 'Equipment Updated' : 'Equipment Added'}
-        successMessage={selectedEquipment ? 'The equipment has been successfully updated.' : 'The equipment has been successfully added.'}
-        successButtonText={selectedEquipment ? 'Close' : 'Add Another'}
+        propertyName={activeProperty?.name || ''}
+        propertyType={activeProperty?.type || ''}
+        jobType={activeJob?.job_type_id || ''}
+        jobTitle={activeJob?.title}
+        accounts={activeJob?.accounts}
       />
+
+      {/* Edit Equipment Dialog */}
+      {selectedEquipment && (
+        <EditEquipmentDialog
+          open={isEditEquipmentDialogOpen}
+          equipment={selectedEquipment}
+          onClose={() => {
+            setIsEditEquipmentDialogOpen(false);
+            setSelectedEquipment(null);
+          }}
+          onSubmit={handleUpdateEquipment}
+        />
+      )}
 
       {/* Equipment Marker Dialog */}
       {selectedEquipment && (

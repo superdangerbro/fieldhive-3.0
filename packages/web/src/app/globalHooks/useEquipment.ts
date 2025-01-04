@@ -40,10 +40,10 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
         throw new Error('Failed to fetch equipment');
       }
       const data = await response.json();
-      console.log('Received equipment:', data);
+      console.log('Received equipment data:', data);
       return data.equipment || []; // Ensure we return an array
     },
-    enabled: !!bounds,
+    enabled: true, // Always fetch equipment
     initialData: [],
     staleTime: 0, // Always refetch
     retry: 1
@@ -116,24 +116,24 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
   }, []);
 
   // Equipment mutations
-  const addEquipment = useMutation({
-    mutationFn: async (newEquipment: Partial<Equipment>) => {
-      console.log('Adding equipment:', newEquipment);
+  const addEquipmentMutation = useMutation({
+    mutationFn: async (data: any) => {
+      console.log('Adding equipment:', data);
       try {
         const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newEquipment)
+          body: JSON.stringify(data)
         });
 
-        const data = await response.json();
+        const dataResponse = await response.json();
         
         if (!response.ok) {
-          console.error('Server error:', data);
-          throw new Error(data.message || `Failed to add equipment: ${response.status}`);
+          console.error('Server error:', dataResponse);
+          throw new Error(dataResponse.message || `Failed to add equipment: ${response.status}`);
         }
 
-        return data;
+        return dataResponse;
       } catch (error) {
         console.error('Error adding equipment:', error);
         throw error;
@@ -149,24 +149,49 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
     }
   });
 
-  const updateEquipment = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Equipment> }) => {
-      const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment/${id}`, {
-        method: 'PATCH',
+  // Update equipment mutation
+  const updateEquipmentMutation = useMutation({
+    mutationFn: async (data: any) => {
+      console.log('Updating equipment:', data);
+      const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment/${data.equipment_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Failed to update equipment:', errorData);
+        throw new Error(errorData.message || 'Failed to update equipment');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+    },
+  });
+
+  const updateEquipmentStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment/${id}/status`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify({ status }),
       });
       if (!response.ok) {
-        throw new Error('Failed to update equipment');
+        throw new Error('Failed to update equipment status');
       }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
-    }
+    },
   });
 
-  const deleteEquipment = useMutation({
+  const deleteEquipmentMutation = useMutation({
     mutationFn: async (id: string) => {
       console.log('Deleting equipment with ID:', id);
       const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment/${id}`, {
@@ -191,42 +216,23 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
   });
 
   return {
-    // Equipment data
-    equipment: equipmentList,
+    data: equipmentList,
+    isLoading: isLoadingEquipment || isLoadingTypes || isLoadingStatuses,
+    error: equipmentError || typesError || statusesError,
+    addEquipment: addEquipmentMutation.mutateAsync,
+    updateEquipment: updateEquipmentMutation.mutateAsync,
+    updateEquipmentStatus: updateEquipmentStatusMutation.mutateAsync,
+    deleteEquipment: deleteEquipmentMutation.mutateAsync,
+    isPlacingEquipment,
+    startPlacingEquipment,
+    cancelPlacingEquipment,
     equipmentTypes,
     equipmentStatuses,
-
-    // Loading states
-    isLoading: isLoadingEquipment || isLoadingTypes || isLoadingStatuses,
-    isLoadingEquipment,
-    isLoadingTypes,
-    isLoadingStatuses,
-
-    // Errors
-    error: equipmentError || typesError || statusesError,
-    equipmentError,
-    typesError,
-    statusesError,
-
-    // Equipment placement state
-    isPlacingEquipment,
-    placementLocation,
     isAddEquipmentDialogOpen,
     setIsAddEquipmentDialogOpen,
     isMarkerDialogOpen,
     selectedEquipment,
-
-    // Equipment placement actions
-    startPlacingEquipment,
-    cancelPlacingEquipment,
-    setPlacementLocation,
-    confirmPlacementLocation,
     openMarkerDialog,
     closeMarkerDialog,
-
-    // Equipment mutations
-    addEquipment,
-    updateEquipment,
-    deleteEquipment
   };
 }

@@ -46,77 +46,15 @@ interface AddEquipmentDialogProps {
   open: boolean;
   location: [number, number];
   onClose: () => void;
+  onSubmit: (data: any) => Promise<boolean>;
   onAddAnother: () => void;
-  onSubmit: (data: {
-    job_id: string;
-    equipment_type_id: string;
-    status: string;
-    is_georeferenced: boolean;
-    location: {
-      latitude: number;
-      longitude: number;
-    };
-    data: {
-      barcode?: string | null;
-      photo?: string | null;
-      is_interior?: boolean;
-      floor?: string | null;
-      [key: string]: any;
-    };
-  }) => Promise<boolean>;
   showSuccess: boolean;
-  successTitle?: string;
-  successMessage?: string;
-  successButtonText?: string;
-  propertyName: string;
-  propertyType: string;
-  jobType: string;
+  propertyName?: string;
+  propertyType?: string;
+  jobType?: string;
   jobTitle?: string;
   accounts?: string[];
-  editMode?: boolean;
-  initialData?: {
-    equipment_type_id: string;
-    status: string;
-    data: Record<string, any>;
-  };
 }
-
-const DarkTextField = styled(TextField)({
-  '& .MuiInputBase-input': {
-    color: 'white',
-  },
-  '& .MuiOutlinedInput-root': {
-    '& fieldset': {
-      borderColor: 'rgba(255, 255, 255, 0.23)',
-    },
-    '&:hover fieldset': {
-      borderColor: 'rgba(255, 255, 255, 0.4)',
-    },
-  },
-  '& .MuiInputLabel-root': {
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  '& .MuiIconButton-root': {
-    color: 'white',
-  }
-});
-
-const DarkSelect = styled(Select)({
-  '& .MuiSelect-select': {
-    color: 'white'
-  },
-  '& .MuiOutlinedInput-root': {
-    '& fieldset': {
-      borderColor: 'rgba(255, 255, 255, 0.23)',
-    },
-    '&:hover fieldset': {
-      borderColor: 'rgba(255, 255, 255, 0.4)',
-    },
-  },
-  '& .MuiInputLabel-root': {
-    color: 'rgba(255, 255, 255, 0.7)',
-  }
-});
 
 export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   open,
@@ -124,17 +62,12 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   onClose,
   onSubmit,
   onAddAnother,
-  showSuccess = false,
-  successTitle = 'Equipment Added',
-  successMessage = 'The equipment has been successfully added.',
-  successButtonText = 'Add Another',
+  showSuccess,
   propertyName,
   propertyType,
   jobType,
   jobTitle,
   accounts,
-  editMode = false,
-  initialData
 }) => {
   const { data: equipmentTypes = [], isLoading } = useEquipmentTypes();
   const { 
@@ -156,49 +89,15 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
 
   console.log('Initial render - showSuccess:', showSuccess);
 
-  // Reset state when dialog opens/closes
+  // Initialize form when dialog opens
   useEffect(() => {
-    if (open) {
-      console.log('Dialog opened - resetting state');
+    if (!open) {
       setSelectedType('');
       setFormData({});
       setError(null);
       setUseCustomFloor(false);
     }
   }, [open]);
-
-  // Initialize form with initial data if in edit mode
-  useEffect(() => {
-    if (editMode && initialData && open) {
-      setSelectedType(initialData.equipment_type_id);
-      setFormData({
-        ...initialData.data,
-        name: initialData.data.name || '',
-        barcode: initialData.data.barcode || null,
-        photo: initialData.data.photo || null,
-        is_interior: initialData.data.is_interior || false,
-        floor: initialData.data.floor || 'G'
-      });
-    }
-  }, [editMode, initialData, open]);
-
-  // Set default floor value when interior is checked
-  useEffect(() => {
-    if (formData.is_interior && !formData.floor) {
-      setFormData(prev => ({
-        ...prev,
-        floor: 'G'
-      }));
-    }
-  }, [formData.is_interior]);
-
-  // Clean up capture on dialog close
-  useEffect(() => {
-    if (!open) {
-      cleanupCapture();
-      setShowCaptureView(false);
-    }
-  }, [open, cleanupCapture]);
 
   // Get the selected equipment type configuration
   const selectedTypeConfig = equipmentTypes.find((t) => t.value === selectedType);
@@ -316,16 +215,6 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       return;
     }
 
-    if (!activeJob?.job_id) {
-      setError('No active job selected');
-      return;
-    }
-
-    if (!location || location.length !== 2) {
-      setError('Invalid location coordinates');
-      return;
-    }
-
     try {
       setIsSubmitting(true);
       setError(null);
@@ -337,23 +226,16 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       }
 
       // Extract special fields
-      const { barcode, photo, is_interior, floor, ...otherFields } = formData;
-      console.log('Raw floor value:', floor, typeof floor);
-
-      // Floor value should be kept as is - either 'G' or a number
-      const floorValue = floor === '' ? null : floor;
-      console.log('Final floor value:', floorValue, typeof floorValue);
+      const { barcode, photo, is_interior, floor, target_species, ...otherFields } = formData;
 
       // Extract latitude and longitude
       const [longitude, latitude] = location;
-      console.log('Location coordinates:', { longitude, latitude });
 
       // Create location object in the format the API expects
       const locationData = {
         latitude,
         longitude
       };
-      console.log('Location data:', locationData);
 
       // Prepare submission data
       const submissionData = {
@@ -362,32 +244,31 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
         job_id: activeJob.job_id,
         property_id: activeJob.property_id,
         status: 'active',
-        barcode: barcode || null,
-        photo_url: photo || null,
+        is_georeferenced: true,
         location: locationData,
         data: {
           ...otherFields,
+          barcode: barcode || null,
+          photo_url: photo || null,
           is_interior: is_interior || false,
-          floor: floorValue
+          floor: floor === '' ? null : floor,
+          target_species: target_species || null,
         }
       };
 
-      console.log('Final submission data:', JSON.stringify(submissionData, null, 2));
-      console.log('Submitting equipment...');
-      
-      try {
-        const success = await onSubmit(submissionData);
-        console.log('Submit result:', success);
-        if (!success) {
-          throw new Error('Failed to submit equipment');
-        }
-      } catch (submitError) {
-        console.error('Error during submit:', submitError);
-        throw new Error(submitError instanceof Error ? submitError.message : 'Failed to submit equipment');
+      const success = await onSubmit(submissionData);
+      if (success) {
+        setShowSuccess(true);
+        setSelectedType('');
+        setFormData({});
+        setError(null);
+        setUseCustomFloor(false);
+      } else {
+        throw new Error('Failed to add equipment');
       }
     } catch (err) {
-      console.error('Failed to submit equipment:', err);
-      setError(err instanceof Error ? err.message : 'Failed to submit equipment');
+      console.error('Failed to add equipment:', err);
+      setError(err instanceof Error ? err.message : 'Failed to add equipment');
     } finally {
       setIsSubmitting(false);
     }
@@ -744,7 +625,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       {showSuccess ? (
         <>
           <DialogTitle>
-            {successTitle || 'Success'}
+            Success
             <IconButton
               onClick={handleClose}
               sx={{ position: 'absolute', right: 8, top: 8 }}
@@ -765,14 +646,14 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
                 sx={{ fontSize: 48, mb: 2 }} 
               />
               <Typography variant="h6" sx={{ mb: 3 }}>
-                {successMessage || 'Equipment Added Successfully!'}
+                Equipment Added Successfully!
               </Typography>
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <Button
                   variant="contained"
                   onClick={handleAddAnother}
                 >
-                  {successButtonText || 'Add Another'}
+                  Add Another
                 </Button>
                 <Button
                   variant="outlined"
@@ -787,7 +668,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       ) : (
         <>
           <DialogTitle>
-            {editMode ? 'Edit Equipment' : 'Add Equipment'}
+            Add Equipment
             <IconButton
               onClick={handleClose}
               sx={{ position: 'absolute', right: 8, top: 8 }}
@@ -857,7 +738,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
               disabled={!selectedType || isSubmitting || isLoading}
               startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
             >
-              {isSubmitting ? (editMode ? 'Saving...' : 'Adding Equipment...') : (editMode ? 'Save Changes' : 'Add Equipment')}
+              {isSubmitting ? 'Adding Equipment...' : 'Add Equipment'}
             </Button>
           </DialogActions>
         </>
