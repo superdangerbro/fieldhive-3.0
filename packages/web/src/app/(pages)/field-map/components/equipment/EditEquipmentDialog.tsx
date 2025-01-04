@@ -20,7 +20,8 @@ import {
   FormControlLabel,
   Switch,
   CircularProgress,
-  FormHelperText
+  FormHelperText,
+  Slider
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -98,29 +99,40 @@ export function EditEquipmentDialog({
   // Initialize form data when dialog opens
   useEffect(() => {
     if (open && equipment) {
+      console.log('Initializing form with equipment:', equipment);
       setSelectedType(equipment.type);
       
+      // Extract data from equipment
+      const equipmentData = equipment.data || {};
+      console.log('Equipment data:', equipmentData);
+
+      // Check both root level and data object for barcode
+      const barcode = equipment.barcode || equipmentData.barcode || null;
+      console.log('Found barcode:', barcode);
+      
       const { 
-        barcode, 
-        photo_url, 
-        photo,
-        is_interior, 
-        floor,
-        target_species,
+        photo_url = null,
+        photo = null,
+        is_interior = false,
+        floor = null,
+        target_species = null,
         ...otherData 
-      } = equipment.data || {};
+      } = equipmentData;
 
       // Convert is_interior to boolean if it's not already
       const isInterior = typeof is_interior === 'boolean' ? is_interior : Boolean(is_interior);
 
-      setFormData({
+      const formValues = {
         ...otherData,
-        barcode: barcode || null,
-        photo: photo_url || photo || null,
+        barcode,
+        photo: photo_url || photo,
         is_interior: isInterior,
-        floor: floor || null,
-        target_species: target_species || null,
-      });
+        floor: isInterior ? (floor || 'G') : null,
+        target_species,
+      };
+
+      console.log('Setting form data:', formValues);
+      setFormData(formValues);
 
       // Set custom floor mode if needed
       if (floor && !FLOOR_OPTIONS.includes(floor)) {
@@ -156,9 +168,10 @@ export function EditEquipmentDialog({
         status: equipment.status,
         is_georeferenced: true,
         location: equipment.location,
+        barcode, // Add barcode at root level
         data: {
           ...otherFields,
-          barcode: barcode || null,
+          barcode, // Keep barcode in data object too for backward compatibility
           photo_url: photo || null,
           is_interior: typeof is_interior === 'boolean' ? is_interior : false,
           floor: is_interior ? (floor === '' ? null : floor) : null,
@@ -263,17 +276,36 @@ export function EditEquipmentDialog({
                   fullWidth
                 />
               ) : (
-                <DarkSelect
-                  value={formData[field.name] || 'G'}
-                  onChange={(e) => handleFormChange(field.name, e.target.value)}
-                  fullWidth
-                >
-                  {FLOOR_OPTIONS.map((option) => (
-                    <MenuItem key={option} value={option}>
-                      {option}
-                    </MenuItem>
-                  ))}
-                </DarkSelect>
+                <Box sx={{ px: 2, py: 1 }}>
+                  <Typography id="floor-slider" gutterBottom>
+                    Floor: {formData[field.name] || 'G'}
+                  </Typography>
+                  <Slider
+                    value={FLOOR_OPTIONS.indexOf(formData[field.name] || 'G')}
+                    onChange={(_, value) => handleFormChange(field.name, FLOOR_OPTIONS[value as number])}
+                    min={0}
+                    max={FLOOR_OPTIONS.length - 1}
+                    marks={FLOOR_OPTIONS.map((label, index) => ({
+                      value: index,
+                      label,
+                    }))}
+                    sx={{
+                      color: 'primary.main',
+                      '& .MuiSlider-thumb': {
+                        backgroundColor: '#fff',
+                      },
+                      '& .MuiSlider-track': {
+                        border: 'none',
+                      },
+                      '& .MuiSlider-mark': {
+                        backgroundColor: '#bfbfbf',
+                      },
+                      '& .MuiSlider-markLabel': {
+                        color: '#fff',
+                      },
+                    }}
+                  />
+                </Box>
               )}
             </Box>
             <FormHelperText>{field.description}</FormHelperText>
@@ -318,6 +350,7 @@ export function EditEquipmentDialog({
               required={field.required}
               error={field.required && !formData[field.name]}
               helperText={field.description}
+              placeholder={`Enter ${field.label.toLowerCase()}`}
             />
           </FormControl>
         );
@@ -327,7 +360,20 @@ export function EditEquipmentDialog({
   // Get fields for selected type
   const getFieldsForType = (typeId: string) => {
     const type = equipmentTypes.find(t => t.value === typeId);
-    return type?.fields || [];
+    if (!type) return [];
+
+    // Add barcode field if type requires it
+    const fields = [...(type.fields || [])];
+    if (type.barcodeRequired) {
+      fields.unshift({
+        name: 'barcode',
+        label: 'Barcode',
+        type: 'text',
+        required: true,
+        description: 'Enter the equipment barcode'
+      });
+    }
+    return fields;
   };
 
   return (
