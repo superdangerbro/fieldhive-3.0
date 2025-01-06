@@ -67,6 +67,7 @@ interface EquipmentMarkerDialogProps {
   onUpdateType: (id: string, typeId: string) => Promise<void>;
   onEdit?: (equipment: Equipment) => void;
   onAddInspection?: (equipment: Equipment) => void;
+  onMove?: (equipment: Equipment) => void;
 }
 
 /**
@@ -85,7 +86,8 @@ export function EquipmentMarkerDialog({
   onDelete,
   onUpdateType,
   onEdit,
-  onAddInspection
+  onAddInspection,
+  onMove
 }: EquipmentMarkerDialogProps) {
   const { equipmentTypes, equipmentStatuses, updateEquipmentStatus } = useEquipment();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -183,6 +185,15 @@ export function EquipmentMarkerDialog({
               onClick={() => onEdit?.(equipment)}
             >
               Edit Equipment
+            </Button>
+            <Button
+              variant="outlined"
+              color="primary"
+              size="small"
+              startIcon={<EditIcon />}
+              onClick={() => onMove?.(equipment)}
+            >
+              Move Equipment
             </Button>
           </div>
           <div className="flex flex-col gap-6">

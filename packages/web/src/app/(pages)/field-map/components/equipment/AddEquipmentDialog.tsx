@@ -105,7 +105,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   onClose,
   onSubmit,
   onAddAnother,
-  showSuccess,
+  showSuccess: showSuccessProp,
   propertyName,
   propertyType,
   jobType,
@@ -128,9 +128,15 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showCaptureView, setShowCaptureView] = useState(false);
   const [useCustomFloor, setUseCustomFloor] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  console.log('Initial render - showSuccess:', showSuccess);
+  console.log('Initial render - showSuccess:', showSuccessProp);
+
+  // Sync showSuccess with prop
+  useEffect(() => {
+    setShowSuccess(showSuccessProp);
+  }, [showSuccessProp]);
 
   // Initialize form when dialog opens
   useEffect(() => {
@@ -139,6 +145,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       setFormData({});
       setError(null);
       setUseCustomFloor(false);
+      setShowSuccess(false);
     }
   }, [open]);
 

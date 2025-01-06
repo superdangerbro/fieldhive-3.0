@@ -215,6 +215,35 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
     }
   });
 
+  const moveEquipmentMutation = useMutation({
+    mutationFn: async ({ id, location }: { id: string; location: [number, number] }) => {
+      console.log('Moving equipment:', { id, location });
+      const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment/${id}/location`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          location: {
+            latitude: location[1],
+            longitude: location[0]
+          }
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to move equipment' }));
+        console.error('Move failed:', error);
+        throw new Error(error.message || 'Failed to move equipment');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      refetchEquipment(); // Force immediate refetch
+    },
+    onError: (error) => {
+      console.error('Move mutation error:', error);
+    }
+  });
+
   return {
     data: equipmentList,
     isLoading: isLoadingEquipment || isLoadingTypes || isLoadingStatuses,
@@ -223,6 +252,7 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
     updateEquipment: updateEquipmentMutation.mutateAsync,
     updateEquipmentStatus: updateEquipmentStatusMutation.mutateAsync,
     deleteEquipment: deleteEquipmentMutation.mutateAsync,
+    moveEquipment: moveEquipmentMutation.mutateAsync,
     isPlacingEquipment,
     startPlacingEquipment,
     cancelPlacingEquipment,

@@ -74,6 +74,8 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [placementLocation, setPlacementLocation] = useState<[number, number] | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isMovingEquipment, setIsMovingEquipment] = useState(false);
+  const [equipmentToMove, setEquipmentToMove] = useState<Equipment | null>(null);
 
   // Validate requirements before allowing equipment placement
   const canPlaceEquipment = activeProperty?.property_id && activeJob?.job_id && activeMode === 'edit';
@@ -202,6 +204,35 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
     }
   };
 
+  const handleMoveEquipment = useCallback((equipment: Equipment) => {
+    setEquipmentToMove(equipment);
+    setIsMovingEquipment(true);
+    setIsMarkerDialogOpen(false);
+  }, []);
+
+  const handleCancelMove = useCallback(() => {
+    setIsMovingEquipment(false);
+    setEquipmentToMove(null);
+  }, []);
+
+  const handleConfirmMove = useCallback(async (location: [number, number]) => {
+    if (!equipmentToMove?.equipment_id) return;
+    
+    try {
+      await updateEquipment({
+        equipment_id: equipmentToMove.equipment_id,
+        location: {
+          latitude: location[1],
+          longitude: location[0]
+        }
+      });
+      setIsMovingEquipment(false);
+      setEquipmentToMove(null);
+    } catch (error) {
+      console.error('Failed to move equipment:', error);
+    }
+  }, [equipmentToMove, updateEquipment]);
+
   if (!visible) return null;
 
   return (
@@ -298,7 +329,25 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
           onUpdateType={handleUpdateEquipmentType}
           onEdit={handleEditEquipment}
           onAddInspection={handleAddInspection}
+          onMove={handleMoveEquipment}
         />
+      )}
+
+      {/* Moving Equipment UI */}
+      {isMovingEquipment && (
+        <>
+          <Crosshairs />
+          <EquipmentPlacementControls
+            onCancel={handleCancelMove}
+            onConfirm={() => {
+              const center = mapRef?.current?.getCenter();
+              if (center) {
+                handleConfirmMove([center.lng, center.lat]);
+              }
+            }}
+            mode="move"
+          />
+        </>
       )}
 
       {/* Crosshairs for equipment placement */}
