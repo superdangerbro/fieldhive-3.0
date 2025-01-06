@@ -68,7 +68,7 @@ interface EditEquipmentDialogProps {
   onSubmit: (data: any) => Promise<boolean>;
 }
 
-const FLOOR_OPTIONS = (() => {
+const generateFloorOptions = () => {
   const options = [];
   // Lower floors (L5 to L1)
   for (let i = 5; i >= 1; i--) {
@@ -81,7 +81,9 @@ const FLOOR_OPTIONS = (() => {
     options.push(i.toString());
   }
   return options;
-})();
+};
+
+const FLOOR_OPTIONS = generateFloorOptions();
 
 export function EditEquipmentDialog({
   open,
@@ -98,48 +100,21 @@ export function EditEquipmentDialog({
 
   // Initialize form data when dialog opens
   useEffect(() => {
-    if (open && equipment) {
-      console.log('Initializing form with equipment:', equipment);
-      setSelectedType(equipment.type);
+    if (equipment) {
+      const floorValue = equipment.data?.floor;
+      const isCustomFloor = floorValue && !FLOOR_OPTIONS.includes(floorValue);
       
-      // Extract data from equipment
-      const equipmentData = equipment.data || {};
-      console.log('Equipment data:', equipmentData);
-
-      // Check both root level and data object for barcode
-      const barcode = equipment.barcode || equipmentData.barcode || null;
-      console.log('Found barcode:', barcode);
+      setFormData({
+        barcode: equipment.barcode || '',
+        photo: equipment.photo_url || '',
+        is_interior: equipment.data?.is_interior || false,
+        floor: floorValue || '',
+        target_species: equipment.data?.target_species || '',
+      });
       
-      const { 
-        photo_url = null,
-        photo = null,
-        is_interior = false,
-        floor = null,
-        target_species = null,
-        ...otherData 
-      } = equipmentData;
-
-      // Convert is_interior to boolean if it's not already
-      const isInterior = typeof is_interior === 'boolean' ? is_interior : Boolean(is_interior);
-
-      const formValues = {
-        ...otherData,
-        barcode,
-        photo: photo_url || photo,
-        is_interior: isInterior,
-        floor: isInterior ? (floor || 'G') : null,
-        target_species,
-      };
-
-      console.log('Setting form data:', formValues);
-      setFormData(formValues);
-
-      // Set custom floor mode if needed
-      if (floor && !FLOOR_OPTIONS.includes(floor)) {
-        setUseCustomFloor(true);
-      }
+      setUseCustomFloor(isCustomFloor);
     }
-  }, [open, equipment]);
+  }, [equipment]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,7 +132,7 @@ export function EditEquipmentDialog({
         throw new Error('Selected type configuration not found');
       }
 
-      const { barcode, photo, is_interior, floor, target_species, ...otherFields } = formData;
+      const { barcode, photo, is_interior, floor, ...otherFields } = formData;
 
       const submissionData = {
         equipment_id: equipment.equipment_id,
@@ -168,14 +143,12 @@ export function EditEquipmentDialog({
         status: equipment.status,
         is_georeferenced: true,
         location: equipment.location,
-        barcode, // Add barcode at root level
+        barcode: barcode || null,
+        photo_url: photo || null,
         data: {
           ...otherFields,
-          barcode, // Keep barcode in data object too for backward compatibility
-          photo_url: photo || null,
           is_interior: typeof is_interior === 'boolean' ? is_interior : false,
           floor: is_interior ? (floor === '' ? null : floor) : null,
-          target_species: target_species || null,
         }
       };
 
@@ -240,7 +213,7 @@ export function EditEquipmentDialog({
         );
 
       case 'slider':
-        // Only show floor field if is_interior is true
+        // Only show floor controls if is_interior is true
         if (field.name === 'floor' && !formData.is_interior) {
           return null;
         }
@@ -250,15 +223,16 @@ export function EditEquipmentDialog({
             <Box sx={{ width: '100%' }}>
               <Typography gutterBottom>{field.label}</Typography>
               
+              {/* Custom Floor Toggle */}
               <FormControlLabel
                 control={
                   <Switch
                     checked={useCustomFloor}
                     onChange={(e) => {
                       setUseCustomFloor(e.target.checked);
-                      // Reset to default floor when switching back to standard options
                       if (!e.target.checked) {
-                        handleFormChange('floor', 'G');
+                        // Reset to default floor when switching to slider
+                        handleFormChange(field.name, formData[field.name] || 'G');
                       }
                     }}
                     size="small"
@@ -276,36 +250,37 @@ export function EditEquipmentDialog({
                   fullWidth
                 />
               ) : (
-                <Box sx={{ px: 2, py: 1 }}>
-                  <Typography id="floor-slider" gutterBottom>
-                    Floor: {formData[field.name] || 'G'}
-                  </Typography>
-                  <Slider
-                    value={FLOOR_OPTIONS.indexOf(formData[field.name] || 'G')}
-                    onChange={(_, value) => handleFormChange(field.name, FLOOR_OPTIONS[value as number])}
-                    min={0}
-                    max={FLOOR_OPTIONS.length - 1}
-                    marks={FLOOR_OPTIONS.map((label, index) => ({
-                      value: index,
-                      label,
-                    }))}
-                    sx={{
-                      color: 'primary.main',
-                      '& .MuiSlider-thumb': {
-                        backgroundColor: '#fff',
-                      },
-                      '& .MuiSlider-track': {
-                        border: 'none',
-                      },
-                      '& .MuiSlider-mark': {
-                        backgroundColor: '#bfbfbf',
-                      },
-                      '& .MuiSlider-markLabel': {
-                        color: '#fff',
-                      },
-                    }}
-                  />
-                </Box>
+                <Slider
+                  value={FLOOR_OPTIONS.indexOf(formData[field.name] || 'G')}
+                  onChange={(_, index) => handleFormChange(field.name, FLOOR_OPTIONS[index as number])}
+                  min={0}
+                  max={FLOOR_OPTIONS.length - 1}
+                  step={1}
+                  marks={FLOOR_OPTIONS.map((label, index) => ({
+                    value: index,
+                    label
+                  }))}
+                  valueLabelDisplay="auto"
+                  valueLabelFormat={(index) => FLOOR_OPTIONS[index]}
+                  sx={{
+                    color: 'primary.main',
+                    '& .MuiSlider-thumb': {
+                      backgroundColor: '#fff',
+                    },
+                    '& .MuiSlider-track': {
+                      backgroundColor: 'primary.main',
+                    },
+                    '& .MuiSlider-rail': {
+                      backgroundColor: 'rgba(255, 255, 255, 0.23)',
+                    },
+                    '& .MuiSlider-mark': {
+                      backgroundColor: 'rgba(255, 255, 255, 0.23)',
+                    },
+                    '& .MuiSlider-markLabel': {
+                      color: 'rgba(255, 255, 255, 0.7)',
+                    }
+                  }}
+                />
               )}
             </Box>
             <FormHelperText>{field.description}</FormHelperText>
@@ -362,18 +337,41 @@ export function EditEquipmentDialog({
     const type = equipmentTypes.find(t => t.value === typeId);
     if (!type) return [];
 
-    // Add barcode field if type requires it
-    const fields = [...(type.fields || [])];
-    if (type.barcodeRequired) {
-      fields.unshift({
+    // Get base fields from type, excluding ones we'll handle specially
+    const typeFields = (type.fields || []).filter(field => 
+      !['is_interior', 'floor'].includes(field.name)
+    );
+
+    return [
+      // Add barcode field if type requires it
+      ...(type.barcodeRequired ? [{
         name: 'barcode',
         label: 'Barcode',
         type: 'text',
         required: true,
         description: 'Enter the equipment barcode'
-      });
-    }
-    return fields;
+      }] : []),
+      // Add our special fields
+      {
+        name: 'is_interior',
+        type: 'boolean',
+        label: 'Interior Equipment',
+        description: 'Whether this equipment is located inside a building'
+      },
+      {
+        name: 'floor',
+        type: 'slider',
+        label: 'Floor',
+        description: 'Floor number where the equipment is located',
+        conditions: [
+          {
+            field: 'is_interior',
+            value: true
+          }
+        ]
+      },
+      ...typeFields
+    ];
   };
 
   return (

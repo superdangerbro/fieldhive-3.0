@@ -56,6 +56,49 @@ interface AddEquipmentDialogProps {
   accounts?: string[];
 }
 
+const DarkTextField = styled(TextField)({
+  '& .MuiInputBase-input': {
+    color: 'white',
+  },
+  '& .MuiOutlinedInput-root': {
+    '& fieldset': {
+      borderColor: 'rgba(255, 255, 255, 0.23)',
+    },
+    '&:hover fieldset': {
+      borderColor: 'rgba(255, 255, 255, 0.4)',
+    },
+  },
+  '& .MuiInputLabel-root': {
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  '& .MuiIconButton-root': {
+    color: 'white',
+  }
+});
+
+const DarkSelect = styled(Select)({
+  '& .MuiSelect-select': {
+    color: 'white'
+  }
+});
+
+const switchStyles = {
+  '& .MuiSwitch-switchBase': {
+    color: '#fff',
+    '&.Mui-checked': {
+      color: '#6366f1',
+      '& + .MuiSwitch-track': {
+        backgroundColor: '#4f46e5',
+        opacity: 0.5
+      }
+    }
+  },
+  '& .MuiSwitch-track': {
+    backgroundColor: '#374151',
+    opacity: 0.3
+  }
+};
+
 export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   open,
   location,
@@ -173,23 +216,6 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
     });
   };
 
-  const switchStyles = {
-    '& .MuiSwitch-switchBase': {
-      color: '#fff',
-      '&.Mui-checked': {
-        color: '#6366f1',
-        '& + .MuiSwitch-track': {
-          backgroundColor: '#4f46e5',
-          opacity: 0.5
-        }
-      }
-    },
-    '& .MuiSwitch-track': {
-      backgroundColor: '#374151',
-      opacity: 0.3
-    }
-  };
-
   // Generate floor options
   const generateFloorOptions = () => {
     const options = [];
@@ -219,56 +245,49 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       setIsSubmitting(true);
       setError(null);
 
-      // Get all fields for the selected type
       const typeConfig = equipmentTypes.find(t => t.value === selectedType);
       if (!typeConfig) {
         throw new Error('Selected type configuration not found');
       }
 
-      // Extract special fields
-      const { barcode, photo, is_interior, floor, target_species, ...otherFields } = formData;
+      const { barcode, photo, is_interior, floor, ...otherFields } = formData;
 
       // Extract latitude and longitude
       const [longitude, latitude] = location;
 
-      // Create location object in the format the API expects
-      const locationData = {
-        latitude,
-        longitude
-      };
-
-      // Prepare submission data
       const submissionData = {
         name: typeConfig.label || typeConfig.value,
-        equipment_type_id: typeConfig.value,
+        equipment_type_id: selectedType,
         job_id: activeJob.job_id,
         property_id: activeJob.property_id,
         status: 'active',
         is_georeferenced: true,
-        location: locationData,
+        location: {
+          latitude,
+          longitude
+        },
+        barcode: barcode || null,
+        photo_url: photo || null,
         data: {
           ...otherFields,
-          barcode: barcode || null,
-          photo_url: photo || null,
-          is_interior: is_interior || false,
-          floor: floor === '' ? null : floor,
-          target_species: target_species || null,
+          is_interior: typeof is_interior === 'boolean' ? is_interior : false,
+          floor: is_interior ? (floor === '' ? null : floor) : null,
         }
       };
 
-      const success = await onSubmit(submissionData);
-      if (success) {
-        setShowSuccess(true);
+      console.log('Submitting equipment data:', submissionData);
+      if (await onSubmit(submissionData)) {
+        console.log('Equipment added successfully');
         setSelectedType('');
         setFormData({});
         setError(null);
         setUseCustomFloor(false);
-      } else {
-        throw new Error('Failed to add equipment');
+        setShowSuccess(true);
       }
     } catch (err) {
       console.error('Failed to add equipment:', err);
       setError(err instanceof Error ? err.message : 'Failed to add equipment');
+      setShowSuccess(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -599,6 +618,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
 
   const handleFormChange = (field: string, value: any) => {
     setFormData(prev => ({
+
       ...prev,
       [field]: value,
       // Reset floor when interior is turned off
@@ -624,6 +644,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
     >
       {showSuccess ? (
         <>
+
           <DialogTitle>
             Success
             <IconButton
@@ -634,16 +655,16 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
             </IconButton>
           </DialogTitle>
           <DialogContent>
-            <Box sx={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              py: 4 
+            <Box sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              py: 4
             }}>
-              <CheckCircleOutlineIcon 
-                color="success" 
-                sx={{ fontSize: 48, mb: 2 }} 
+              <CheckCircleOutlineIcon
+                color="success"
+                sx={{ fontSize: 48, mb: 2 }}
               />
               <Typography variant="h6" sx={{ mb: 3 }}>
                 Equipment Added Successfully!
@@ -665,8 +686,10 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
             </Box>
           </DialogContent>
         </>
+
       ) : (
         <>
+
           <DialogTitle>
             Add Equipment
             <IconButton
@@ -742,6 +765,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
             </Button>
           </DialogActions>
         </>
+
       )}
     </Dialog>
   );

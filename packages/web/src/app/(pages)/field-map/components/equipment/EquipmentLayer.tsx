@@ -70,10 +70,10 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   // Local state
   const [isAddEquipmentDialogOpen, setIsAddEquipmentDialogOpen] = useState(false);
   const [isEditEquipmentDialogOpen, setIsEditEquipmentDialogOpen] = useState(false);
+  const [isMarkerDialogOpen, setIsMarkerDialogOpen] = useState(false);
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [placementLocation, setPlacementLocation] = useState<[number, number] | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
-  const [isMarkerDialogOpen, setIsMarkerDialogOpen] = useState(false);
 
   // Validate requirements before allowing equipment placement
   const canPlaceEquipment = activeProperty?.property_id && activeJob?.job_id && activeMode === 'edit';
@@ -104,7 +104,6 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   useEffect(() => {
     if (!isAddEquipmentDialogOpen) {
       setPlacementLocation(null);
-      setShowSuccess(false);
     }
   }, [isAddEquipmentDialogOpen]);
 
@@ -122,7 +121,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   const handleAddEquipment = async (data: any) => {
     try {
       // Add the equipment
-      const success = await addEquipment.mutateAsync(data);
+      const success = await addEquipment(data);
       if (success) {
         setShowSuccess(true);
       }
