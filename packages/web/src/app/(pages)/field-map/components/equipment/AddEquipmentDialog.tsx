@@ -131,8 +131,6 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   const [showSuccess, setShowSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  console.log('Initial render - showSuccess:', showSuccessProp);
-
   // Sync showSuccess with prop
   useEffect(() => {
     setShowSuccess(showSuccessProp);
@@ -282,9 +280,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
         }
       };
 
-      console.log('Submitting equipment data:', submissionData);
       if (await onSubmit(submissionData)) {
-        console.log('Equipment added successfully');
         setSelectedType('');
         setFormData({});
         setError(null);
@@ -301,7 +297,6 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   };
 
   const handleAddAnother = () => {
-    console.log('Add Another clicked');
     // Reset form state
     setSelectedType('');
     setFormData({});
@@ -312,28 +307,14 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
   };
 
   const handleClose = () => {
-    console.log('Handle close called, isSubmitting:', isSubmitting);
     if (!isSubmitting) {
-      console.log('Closing dialog');
       onClose();
     }
   };
 
   const handleFinish = () => {
-    console.log('Finishing, closing dialog');
     handleClose();
   };
-
-  // Debug effect for dialog state
-  useEffect(() => {
-    console.log('Dialog state changed:', {
-      open,
-      showSuccess,
-      isSubmitting,
-      selectedType,
-      hasError: !!error
-    });
-  }, [open, showSuccess, isSubmitting, selectedType, error]);
 
   const handleStartCapture = async () => {
     try {
@@ -351,7 +332,7 @@ export const AddEquipmentDialog: React.FC<AddEquipmentDialogProps> = ({
       setFormData(prev => ({ ...prev, photo: photoData }));
       setShowCaptureView(false);
     } catch (err) {
-    console.error('Failed to take photo:', err);
+      console.error('Failed to take photo:', err);
       setError(err instanceof Error ? err.message : 'Failed to take photo');
     }
   };

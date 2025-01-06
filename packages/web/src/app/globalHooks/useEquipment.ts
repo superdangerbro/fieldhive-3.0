@@ -29,7 +29,6 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
   } = useQuery({
     queryKey: ['equipment', bounds],
     queryFn: async () => {
-      console.log('Fetching equipment with bounds:', bounds);
       const url = new URL(`${ENV_CONFIG.api.baseUrl}/equipment`);
       url.searchParams.set('status', 'active'); // Only show active equipment
       if (bounds) {
@@ -40,7 +39,6 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
         throw new Error('Failed to fetch equipment');
       }
       const data = await response.json();
-      console.log('Received equipment data:', data);
       return data.equipment || []; // Ensure we return an array
     },
     enabled: true, // Always fetch equipment
@@ -118,7 +116,6 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
   // Equipment mutations
   const addEquipmentMutation = useMutation({
     mutationFn: async (data: any) => {
-      console.log('Adding equipment:', data);
       try {
         const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment`, {
           method: 'POST',
@@ -129,18 +126,15 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
         const dataResponse = await response.json();
         
         if (!response.ok) {
-          console.error('Server error:', dataResponse);
           throw new Error(dataResponse.message || `Failed to add equipment: ${response.status}`);
         }
 
         return dataResponse;
       } catch (error) {
-        console.error('Error adding equipment:', error);
         throw error;
       }
     },
     onSuccess: () => {
-      console.log('Successfully added equipment, invalidating queries');
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
       refetchEquipment(); // Force immediate refetch
       setIsAddEquipmentDialogOpen(false);
@@ -152,7 +146,6 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
   // Update equipment mutation
   const updateEquipmentMutation = useMutation({
     mutationFn: async (data: any) => {
-      console.log('Updating equipment:', data);
       const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment/${data.equipment_id}`, {
         method: 'PUT',
         headers: {
@@ -163,7 +156,6 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Failed to update equipment:', errorData);
         throw new Error(errorData.message || 'Failed to update equipment');
       }
 
@@ -193,19 +185,16 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
 
   const deleteEquipmentMutation = useMutation({
     mutationFn: async (id: string) => {
-      console.log('Deleting equipment with ID:', id);
       const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment/${id}`, {
         method: 'DELETE'
       });
       if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Failed to delete equipment' }));
-        console.error('Delete failed:', error);
         throw new Error(error.message || 'Failed to delete equipment');
       }
       return id;
     },
     onSuccess: (id) => {
-      console.log('Successfully deleted equipment:', id);
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
       refetchEquipment(); // Force immediate refetch
       closeMarkerDialog();
@@ -217,7 +206,6 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
 
   const moveEquipmentMutation = useMutation({
     mutationFn: async ({ id, location }: { id: string; location: [number, number] }) => {
-      console.log('Moving equipment:', { id, location });
       const response = await fetch(`${ENV_CONFIG.api.baseUrl}/equipment/${id}/location`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -230,7 +218,6 @@ export function useEquipment(options: UseEquipmentOptions = {}) {
       });
       if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Failed to move equipment' }));
-        console.error('Move failed:', error);
         throw new Error(error.message || 'Failed to move equipment');
       }
       return response.json();

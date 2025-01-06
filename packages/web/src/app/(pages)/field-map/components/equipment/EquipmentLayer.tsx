@@ -64,7 +64,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   } = useEquipment({ bounds });
 
   useEffect(() => {
-    console.log('Equipment data:', equipment);
+    // Removed console.log statement
   }, [equipment]);
 
   // Local state
@@ -90,12 +90,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   // Expose the start placement handler to parent components
   useImperativeHandle(ref, () => ({
     handleStartPlacement: () => {
-      console.log('Starting equipment placement with:', {
-        canPlaceEquipment,
-        activeProperty,
-        activeJob,
-        activeMode
-      });
+      // Removed console.log statement
       if (canPlaceEquipment) {
         setIsAddingFromContext(true);
       }
@@ -129,13 +124,13 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
       }
       return success;
     } catch (error) {
-      console.error('Failed to add equipment:', error);
+      // Removed console.error statement
       return false;
     }
   };
 
   const handleAddAnother = () => {
-    console.log('Starting new equipment placement');
+    // Removed console.log statement
     setShowSuccess(false);
     setIsAddEquipmentDialogOpen(false);
     // Start the placement process again
@@ -143,7 +138,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   };
 
   const handleCloseDialog = () => {
-    console.log('Closing dialog');
+    // Removed console.log statement
     setIsAddEquipmentDialogOpen(false);
     setIsAddingFromContext(false);
     setShowSuccess(false);
@@ -169,20 +164,20 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
 
   const handleUpdateEquipment = async (data: any) => {
     try {
-      console.log('Updating equipment with data:', data);
+      // Removed console.log statement
       await updateEquipment(data);
       setIsEditEquipmentDialogOpen(false);
       setSelectedEquipment(null);
       return true;
     } catch (error) {
-      console.error('Failed to update equipment:', error);
+      // Removed console.error statement
       return false;
     }
   };
 
   const handleAddInspection = useCallback((equipment: Equipment) => {
     // TODO: Implement add inspection functionality
-    console.log('Add inspection for equipment:', equipment);
+    // Removed console.log statement
   }, []);
 
   const handleDeleteEquipment = async (id: string) => {
@@ -191,7 +186,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
       setIsMarkerDialogOpen(false);
       setSelectedEquipment(null);
     } catch (error) {
-      console.error('Failed to deactivate equipment:', error);
+      // Removed console.error statement
       alert('Failed to deactivate equipment. Please try again.');
     }
   };
@@ -200,7 +195,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
     try {
       await updateEquipment({ id, data: { equipment_type_id: typeId } });
     } catch (error) {
-      console.error('Failed to update equipment type:', error);
+      // Removed console.error statement
     }
   };
 
@@ -229,7 +224,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
       setIsMovingEquipment(false);
       setEquipmentToMove(null);
     } catch (error) {
-      console.error('Failed to move equipment:', error);
+      // Removed console.error statement
     }
   }, [equipmentToMove, updateEquipment]);
 
@@ -247,7 +242,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
 
         // Skip if coordinates are invalid
         if (!longitude || !latitude || isNaN(longitude) || isNaN(latitude)) {
-          console.warn('Invalid coordinates for equipment:', eq.equipment_id, eq.location);
+          // Removed console.warn statement
           return null;
         }
 
@@ -358,7 +353,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
             onConfirm={() => {
               const center = mapRef.current?.getCenter();
               if (!center) {
-                console.warn('Map center not available');
+                // Removed console.warn statement
                 return;
               }
               
@@ -366,11 +361,11 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
               const lat = center.lat;
               
               if (!lng || !lat || isNaN(lng) || isNaN(lat)) {
-                console.warn('Invalid map center coordinates:', lng, lat);
+                // Removed console.warn statement
                 return;
               }
 
-              console.log('Setting placement location:', [lng, lat]);
+              // Removed console.log statement
               setPlacementLocation([lng, lat]);
               setIsAddEquipmentDialogOpen(true);
             }}
