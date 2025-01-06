@@ -9,6 +9,7 @@ import { Crosshairs } from './Crosshairs';
 import { AddEquipmentDialog } from './AddEquipmentDialog';
 import { EditEquipmentDialog } from './EditEquipmentDialog';
 import { EquipmentMarkerDialog } from './EquipmentMarkerDialog';
+import { AddInspectionDialog } from './AddInspectionDialog';
 import { EquipmentPlacementControls } from './EquipmentPlacementControls';
 import { useEquipment } from '../../../../../app/globalHooks/useEquipment';
 import { useMapContext } from '../../../../../app/globalHooks/useMapContext';
@@ -60,7 +61,8 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
     error,
     isPlacingEquipment,
     cancelPlacingEquipment,
-    startPlacingEquipment
+    startPlacingEquipment,
+    refetch
   } = useEquipment({ bounds });
 
   useEffect(() => {
@@ -71,6 +73,7 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   const [isAddEquipmentDialogOpen, setIsAddEquipmentDialogOpen] = useState(false);
   const [isEditEquipmentDialogOpen, setIsEditEquipmentDialogOpen] = useState(false);
   const [isMarkerDialogOpen, setIsMarkerDialogOpen] = useState(false);
+  const [isAddInspectionDialogOpen, setIsAddInspectionDialogOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [placementLocation, setPlacementLocation] = useState<[number, number] | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -178,6 +181,9 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
   const handleAddInspection = useCallback((equipment: Equipment) => {
     // TODO: Implement add inspection functionality
     // Removed console.log statement
+    setSelectedEquipment(equipment);
+    setIsAddInspectionDialogOpen(true);
+    setIsMarkerDialogOpen(false);
   }, []);
 
   const handleDeleteEquipment = async (id: string) => {
@@ -325,6 +331,22 @@ export const EquipmentLayer = forwardRef<EquipmentLayerHandle, EquipmentLayerPro
           onEdit={handleEditEquipment}
           onAddInspection={handleAddInspection}
           onMove={handleMoveEquipment}
+        />
+      )}
+
+      {/* Add Inspection Dialog */}
+      {selectedEquipment && (
+        <AddInspectionDialog
+          open={isAddInspectionDialogOpen}
+          equipment={selectedEquipment}
+          onClose={() => {
+            setIsAddInspectionDialogOpen(false);
+            setSelectedEquipment(null);
+          }}
+          onSuccess={() => {
+            // Refetch equipment data
+            refetch();
+          }}
         />
       )}
 

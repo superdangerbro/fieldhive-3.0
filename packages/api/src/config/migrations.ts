@@ -2,13 +2,7 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 import { DataSource } from 'typeorm';
 import { logger } from '../utils/logger';
-import { Property } from '../domains/properties/entities/Property';
-import { Address } from '../domains/addresses/entities/Address';
-import { Job } from '../domains/jobs/entities/Job';
-import { Account } from '../domains/accounts/entities/Account';
-import { PropertiesAccounts } from '../jointables/PropertiesAccounts';
-import { Setting } from '../domains/settings/entities/Setting';
-import { UsersAccounts } from '../jointables/UsersAccounts';
+import { env } from './database';
 
 // Load environment variables
 const envPath = resolve(__dirname, '../../.env');
@@ -16,25 +10,26 @@ config({ path: envPath });
 
 // Log connection details (without sensitive info)
 logger.info('Database connection details:', {
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  username: process.env.DB_USER
+  host: env.DB_HOST,
+  port: env.DB_PORT,
+  database: env.DB_NAME,
+  username: env.DB_USER
 });
 
 // This configuration is specifically for running migrations
 export const MigrationDataSource = new DataSource({
   type: 'postgres',
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT),
-  username: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  host: env.DB_HOST,
+  port: env.DB_PORT,
+  username: env.DB_USER,
+  password: env.DB_PASSWORD,
+  database: env.DB_NAME,
   // Disable synchronization for migrations
   synchronize: false,
   logging: true,
-  entities: [Property, Address, Job, Account, PropertiesAccounts, Setting, UsersAccounts],
-  migrations: [resolve(__dirname, '../migrations/*{.ts,.js}')],
+  // Use glob patterns for entities and migrations
+  entities: ['src/domains/*/entities/*.ts'],
+  migrations: ['src/migrations/*.ts'],
   ssl: {
     rejectUnauthorized: false
   }

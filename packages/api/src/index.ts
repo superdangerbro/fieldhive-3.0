@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import express from 'express';
 import cors from 'cors';
 import { AppDataSource } from './config/database';
-import router from './mainRouter';
+import { router } from './mainRouter';
 import { errorHandler, requestLogger } from './middleware/errorHandler';
 import { createWebSocketServer } from './websocket';
 

@@ -28,6 +28,9 @@ export const ENV_CONFIG = {
   }
 } as const;
 
+// Export API URL for direct use
+export const API_URL = ENV_CONFIG.api.baseUrl;
+
 // Type-safe environment validation
 const requiredEnvVars = [
   'NEXT_PUBLIC_API_URL',
@@ -56,15 +59,10 @@ export function validateEnvironment() {
 
 // Helper function to ensure API URL is available
 export function getApiUrl() {
-  if (!process.env.NEXT_PUBLIC_API_URL) {
-    throw new Error(
-      'API URL not configured. Please set NEXT_PUBLIC_API_URL in your environment variables.'
-    );
-  }
-  return process.env.NEXT_PUBLIC_API_URL;
+  return ENV_CONFIG.api.baseUrl;
 }
 
 // Helper to check if environment is properly configured
 export function isEnvironmentConfigured() {
-  return Boolean(process.env.NEXT_PUBLIC_API_URL);
+  return validateEnvironment();
 }

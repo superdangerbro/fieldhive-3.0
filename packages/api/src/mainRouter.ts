@@ -8,6 +8,7 @@ import { inspectionsRouter } from './domains/inspections';
 import { fieldsRouter } from './domains/fields';
 import { sensorsRouter } from './domains/sensors';
 import { healthRouter } from './domains/health';
+import { authRouter } from './domains/auth';
 import settingsRouter from './domains/settings/mainRouter';
 import { logger } from './utils/logger';
 
@@ -36,6 +37,7 @@ if (fieldsRouter) router.use('/fields', fieldsRouter);
 if (sensorsRouter) router.use('/sensors', sensorsRouter);
 if (healthRouter) router.use('/health', healthRouter);
 if (settingsRouter) router.use('/settings', settingsRouter);
+if (authRouter) router.use('/auth', authRouter);
 
 // Catch-all route for debugging
 router.use('*', (req, res) => {
@@ -49,4 +51,4 @@ router.use('*', (req, res) => {
     });
 });
 
-export default router;
+export { router };

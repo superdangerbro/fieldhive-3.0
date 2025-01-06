@@ -1,3 +1,7 @@
+import { Point } from 'geojson';
+import { Job } from './job';
+import { Property } from './property';
+
 export interface Equipment {
     equipment_id: string;
     name: string;
@@ -8,14 +12,31 @@ export interface Equipment {
     data?: Record<string, any>;
     created_at?: Date;
     updated_at?: Date;
-    location: {
-        coordinates: [number, number];
-    };
+    location: Point;
+    job?: Job;
+    property?: Property;
+    inspections?: EquipmentInspection[];
+}
+
+export interface EquipmentInspection {
+    inspection_id: string;
+    equipment_id: string;
+    inspector_id: string;
+    property_id?: string;
+    job_id?: string;
+    barcode?: string;
+    notes?: string;
+    image_url?: string;
+    data?: Record<string, any>;
+    location?: Point;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface EquipmentType {
     name: string;
     label: string;
+    description?: string;
     fields: Field[];
     barcodeRequired?: boolean;
     photoRequired?: boolean;
@@ -34,9 +55,7 @@ export interface CreateEquipmentDto {
     property_id: string;
     job_id: string;
     data?: Record<string, any>;
-    location: {
-        coordinates: [number, number];
-    };
+    location: Point;
 }
 
 export interface UpdateEquipmentDto {

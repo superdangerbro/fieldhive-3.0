@@ -1,2 +1,4 @@
-export { default as inspectionsRouter } from './route';
-export * from './entities/Inspection';
+export { inspectionsRouter } from './routes';
+export { InspectionJob } from './entities/InspectionJob';
+export { InspectionJobEquipment } from './entities/InspectionJobEquipment';
+export { EquipmentInspection } from './entities/EquipmentInspection';
