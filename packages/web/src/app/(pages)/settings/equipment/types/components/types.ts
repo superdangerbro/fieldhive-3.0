@@ -1,6 +1,6 @@
 import type { EquipmentType } from '@/app/globalTypes/equipment';
 
-export type FieldType = 'text' | 'number' | 'select' | 'multiselect' | 'checkbox' | 'textarea' | 'boolean' | 'slider';
+export type FieldType = 'text' | 'number' | 'select' | 'multiselect' | 'checkbox' | 'textarea' | 'boolean' | 'slider' | 'capture-flow';
 
 export interface NumberConfig {
     min?: number;
@@ -23,6 +23,13 @@ export interface SliderConfig {
     marks?: { value: number; label: string; }[];
 }
 
+export interface CaptureFlowConfig {
+    requireBarcode: boolean;
+    requirePhoto: boolean;
+    barcodeFormats?: string[]; // Supported barcode formats
+    photoInstructions?: string; // Optional instructions for taking the photo
+}
+
 export interface Condition {
     field: string;        // Field name this condition depends on
     value: string | boolean;  // Value that triggers the condition
@@ -32,11 +39,15 @@ export interface Condition {
 export interface FormField {
     name: string;
     label: string;
-    type: FieldType;
-    required?: boolean;
-    conditions?: Condition[];
-    config?: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig;
+    type: string;
     description?: string;
+    config?: {
+        requireBarcode?: boolean;
+        requirePhoto?: boolean;
+        photoInstructions?: string;
+        options?: string[];
+        [key: string]: any;
+    };
 }
 
 export interface InspectionSection {
@@ -46,33 +57,34 @@ export interface InspectionSection {
     conditions?: Condition[]; // Section-level conditions
 }
 
-// Extend the global EquipmentType interface
 export interface EquipmentTypeConfig extends EquipmentType {
     fields: FormField[];  // Equipment fields
-    barcodeRequired: boolean; // Whether this equipment type requires a barcode
-    photoRequired: boolean; // Whether this equipment type requires a photo
     inspectionConfig?: {
         sections: InspectionSection[];
     };
 }
 
-export interface NewFieldState extends Omit<FormField, 'name'> {
+export interface NewFieldState {
     name: string;
 }
 
 // Type guards
-export function isSelectConfig(config: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig | undefined): config is SelectConfig {
-    return config !== undefined && 'options' in config && !(config as MultiSelectConfig).multiple !== undefined;
+export function isSelectConfig(config: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig | CaptureFlowConfig | undefined): config is SelectConfig {
+    return config !== undefined && 'options' in config && !('min' in config);
 }
 
-export function isMultiSelectConfig(config: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig | undefined): config is MultiSelectConfig {
-    return config !== undefined && 'options' in config && !(config as MultiSelectConfig).multiple === undefined;
+export function isMultiSelectConfig(config: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig | CaptureFlowConfig | undefined): config is MultiSelectConfig {
+    return config !== undefined && 'options' in config && !('min' in config);
 }
 
-export function isNumberConfig(config: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig | undefined): config is NumberConfig {
+export function isNumberConfig(config: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig | CaptureFlowConfig | undefined): config is NumberConfig {
     return config !== undefined && ('min' in config || 'max' in config || 'step' in config);
 }
 
-export function isSliderConfig(config: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig | undefined): config is SliderConfig {
-    return config !== undefined && 'min' in config && 'max' in config;
+export function isSliderConfig(config: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig | CaptureFlowConfig | undefined): config is SliderConfig {
+    return config !== undefined && 'marks' in config;
+}
+
+export function isCaptureFlowConfig(config: NumberConfig | SelectConfig | MultiSelectConfig | SliderConfig | CaptureFlowConfig | undefined): config is CaptureFlowConfig {
+    return config !== undefined && 'requireBarcode' in config && 'requirePhoto' in config;
 }

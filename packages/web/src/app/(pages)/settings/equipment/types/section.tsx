@@ -14,6 +14,7 @@ import {
     Collapse,
     Dialog,
     DialogContent,
+    DialogTitle,
     FormControlLabel,
     Switch,
     Divider
@@ -30,7 +31,7 @@ import { useEquipmentTypes, useUpdateEquipmentTypes } from '../hooks/useEquipmen
 import { useCrudDialogs } from '@/app/globalHooks/useCrudDialogs';
 import { CrudFormDialog, CrudDeleteDialog } from '@/app/globalComponents/crud/CrudDialogs';
 import type { EquipmentTypeConfig, FormField } from './components/types';
-import { AddFieldForm } from './components/AddFieldForm';
+import { SelectFieldDialog } from '@/app/components/fields/SelectFieldDialog';
 import { FieldList } from './components/FieldList';
 import { InspectionFormBuilder } from './components/InspectionFormBuilder';
 
@@ -43,119 +44,140 @@ export function EquipmentTypeSection() {
     const [addingFieldsTo, setAddingFieldsTo] = React.useState<string | null>(null);
     const [editingField, setEditingField] = React.useState<{ typeValue: string; field: FormField } | null>(null);
     const [configuringInspection, setConfiguringInspection] = React.useState<string | null>(null);
+    const [saveError, setSaveError] = React.useState<string | null>(null);
     const formRef = React.useRef<HTMLFormElement>(null);
 
     const handleSave = async (data: EquipmentTypeConfig) => {
         console.log('Saving type:', { mode: dialogState.mode, data });
+        setSaveError(null);
+        
         try {
-            // If we're updating an existing type (not in dialog mode)
-            if (!dialogState.isOpen) {
-                const updatedTypes = types.map(type => 
-                    type.value === data.value ? data : type
-                );
-                await updateMutation.mutateAsync(updatedTypes);
-                return;
-            }
-
-            // If we're in dialog mode (creating or editing)
-            const updatedTypes = dialogState.mode === 'create'
-                ? [...types, data]
-                : types.map(type => 
-                    type.value === dialogState.data?.value ? data : type
-                );
+            await updateMutation.mutateAsync(data);
             
-            await updateMutation.mutateAsync(updatedTypes);
-            closeDialog();
-        } catch (error) {
-            console.error('Failed to save type:', error);
-        }
-    };
-
-    const handleDelete = async (typeToDelete: EquipmentTypeConfig) => {
-        console.log('Deleting type:', typeToDelete);
-        try {
-            const updatedTypes = types.filter((type: EquipmentTypeConfig) => type.value !== typeToDelete.value);
-            await updateMutation.mutateAsync(updatedTypes);
-            closeDialog();
-        } catch (error) {
-            console.error('Failed to delete type:', error);
+            // Close dialog and reset state
+            if (dialogState.mode !== 'none') {
+                closeDialog();
+            }
+            setAddingFieldsTo(null);
+            setEditingField(null);
+            setConfiguringInspection(null);
+            
+            return true;
+        } catch (err) {
+            console.error('Error saving type:', err);
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+            setSaveError(errorMessage);
+            return false;
         }
     };
 
     const handleAddField = async (typeValue: string, field: FormField) => {
-        console.log('Adding field:', { typeValue, field });
-        try {
-            const updatedTypes = types.map(type => {
-                if (type.value === typeValue) {
-                    return {
-                        ...type,
-                        fields: [...type.fields, field]
-                    };
-                }
-                return type;
-            });
+        console.log('Adding field:', { typeValue, field, types });
+        
+        if (!Array.isArray(types)) {
+            console.error('Types is not an array:', types);
+            setSaveError('Failed to add field: Types data is invalid');
+            return;
+        }
 
-            await updateMutation.mutateAsync(updatedTypes);
+        const type = types.find(t => t.value === typeValue);
+        if (!type) {
+            console.error('Type not found:', typeValue);
+            setSaveError('Failed to add field: Equipment type not found');
+            return;
+        }
+
+        console.log('Found type:', type);
+
+        const updatedType = {
+            ...type,
+            fields: Array.isArray(type.fields) ? [...type.fields, field] : [field]
+        };
+
+        console.log('Updated type:', updatedType);
+        const success = await handleSave(updatedType);
+        if (success) {
             setAddingFieldsTo(null);
-        } catch (error) {
-            console.error('Failed to add field:', error);
         }
     };
 
     const handleEditField = async (typeValue: string, oldField: FormField, newField: FormField) => {
-        console.log('Editing field:', { typeValue, oldField, newField });
-        try {
-            const updatedTypes = types.map(type => {
-                if (type.value === typeValue) {
-                    return {
-                        ...type,
-                        fields: type.fields.map(field => 
-                            field.name === oldField.name ? newField : field
-                        )
-                    };
-                }
-                return type;
-            });
+        console.log('Editing field:', { typeValue, oldField, newField, types });
+        
+        if (!Array.isArray(types)) {
+            console.error('Types is not an array:', types);
+            setSaveError('Failed to edit field: Types data is invalid');
+            return;
+        }
 
-            await updateMutation.mutateAsync(updatedTypes);
+        const type = types.find(t => t.value === typeValue);
+        if (!type) {
+            console.error('Type not found:', typeValue);
+            setSaveError('Failed to edit field: Equipment type not found');
+            return;
+        }
+
+        console.log('Found type:', type);
+
+        const updatedType = {
+            ...type,
+            fields: Array.isArray(type.fields) ? 
+                type.fields.map(f => f.name === oldField.name ? newField : f) :
+                [newField]
+        };
+
+        console.log('Updated type:', updatedType);
+        const success = await handleSave(updatedType);
+        if (success) {
             setEditingField(null);
-        } catch (error) {
-            console.error('Failed to edit field:', error);
         }
     };
 
     const handleDeleteField = async (typeValue: string, fieldName: string) => {
-        console.log('Deleting field:', { typeValue, fieldName });
-        try {
-            const updatedTypes = types.map(type => {
-                if (type.value === typeValue) {
-                    return {
-                        ...type,
-                        fields: type.fields.filter(field => field.name !== fieldName)
-                    };
-                }
-                return type;
-            });
-
-            await updateMutation.mutateAsync(updatedTypes);
-        } catch (error) {
-            console.error('Failed to delete field:', error);
+        console.log('Deleting field:', { typeValue, fieldName, types });
+        
+        if (!Array.isArray(types)) {
+            console.error('Types is not an array:', types);
+            setSaveError('Failed to delete field: Types data is invalid');
+            return;
         }
+
+        const type = types.find(t => t.value === typeValue);
+        if (!type) {
+            console.error('Type not found:', typeValue);
+            setSaveError('Failed to delete field: Equipment type not found');
+            return;
+        }
+
+        console.log('Found type:', type);
+
+        const updatedType = {
+            ...type,
+            fields: Array.isArray(type.fields) ? 
+                type.fields.filter(f => f.name !== fieldName) :
+                []
+        };
+
+        console.log('Updated type:', updatedType);
+        await handleSave(updatedType);
     };
 
-    if (isLoading || updateMutation.isPending) {
+    if (isLoading) {
         return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                 <CircularProgress />
             </Box>
         );
     }
 
-    if (fetchError || updateMutation.error) {
-        const error = fetchError || updateMutation.error;
+    if (fetchError || updateMutation.error || saveError) {
+        const errorMessage = saveError || 
+            (updateMutation.error instanceof Error ? updateMutation.error.message : 'An error occurred') ||
+            (fetchError instanceof Error ? fetchError.message : 'An error occurred');
+            
         return (
             <Box sx={{ p: 2, color: 'error.main' }}>
-                <Typography>{error instanceof Error ? error.message : 'An error occurred'}</Typography>
+                <Typography>{errorMessage}</Typography>
             </Box>
         );
     }
@@ -239,15 +261,16 @@ export function EquipmentTypeSection() {
                                     </Box>
                                 </Box>
 
-                                <Box sx={{ mt: 3, pl: 2 }}>
+                                <Divider sx={{ my: 2 }} />
+
+                                <Box sx={{ pl: 2 }}>
                                     <Typography variant="caption" color="text.secondary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
                                         Fields
                                     </Typography>
-                                    
                                     <Box sx={{ mt: 1 }}>
                                         <Button
-                                            startIcon={<AddIcon />}
                                             onClick={() => setAddingFieldsTo(type.value)}
+                                            startIcon={<AddIcon />}
                                             variant="outlined"
                                             size="small"
                                         >
@@ -289,13 +312,22 @@ export function EquipmentTypeSection() {
                                     >
                                         Configure Inspection Form
                                     </Button>
+                                    <Button
+                                        size="small"
+                                        onClick={() => openEditDialog(type)}
+                                        startIcon={<EditIcon />}
+                                    >
+                                        Edit Type
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        onClick={() => openDeleteDialog(type)}
+                                        startIcon={<DeleteIcon />}
+                                        color="error"
+                                    >
+                                        Delete Type
+                                    </Button>
                                 </Box>
-                                <IconButton onClick={() => openEditDialog(type)}>
-                                    <EditIcon />
-                                </IconButton>
-                                <IconButton onClick={() => openDeleteDialog(type)}>
-                                    <DeleteIcon />
-                                </IconButton>
                             </Box>
                         </Collapse>
                     </ListItem>
@@ -354,24 +386,15 @@ export function EquipmentTypeSection() {
                 </CrudFormDialog>
             )}
 
-            <Dialog 
-                open={!!addingFieldsTo} 
+            {/* Field Selection Dialog */}
+            <SelectFieldDialog
+                open={!!addingFieldsTo}
                 onClose={() => setAddingFieldsTo(null)}
-                maxWidth="sm"
-                fullWidth
-            >
-                <DialogContent>
-                    {addingFieldsTo && (
-                        <AddFieldForm
-                            mode="add"
-                            onAdd={(field) => handleAddField(addingFieldsTo, field)}
-                            onCancel={() => setAddingFieldsTo(null)}
-                            existingFields={(types.find(t => t.value === addingFieldsTo)?.fields || []).map(f => f.name)}
-                        />
-                    )}
-                </DialogContent>
-            </Dialog>
+                onSelect={(field) => handleAddField(addingFieldsTo!, field)}
+                existingFieldNames={(types.find(t => t.value === addingFieldsTo)?.fields || []).map(f => f.name)}
+            />
 
+            {/* Field Editing Dialog */}
             <Dialog 
                 open={!!editingField} 
                 onClose={() => setEditingField(null)}
@@ -380,12 +403,11 @@ export function EquipmentTypeSection() {
             >
                 <DialogContent>
                     {editingField && (
-                        <AddFieldForm
-                            mode="edit"
-                            initialField={editingField.field}
-                            onAdd={(field) => handleEditField(editingField.typeValue, editingField.field, field)}
-                            onCancel={() => setEditingField(null)}
-                            existingFields={(types.find(t => t.value === editingField.typeValue)?.fields || [])
+                        <SelectFieldDialog
+                            open={true}
+                            onClose={() => setEditingField(null)}
+                            onSelect={(field) => handleEditField(editingField.typeValue, editingField.field, field)}
+                            existingFieldNames={(types.find(t => t.value === editingField.typeValue)?.fields || [])
                                 .filter(f => f.name !== editingField.field.name)
                                 .map(f => f.name)}
                         />
@@ -393,35 +415,46 @@ export function EquipmentTypeSection() {
                 </DialogContent>
             </Dialog>
 
-            <Dialog 
-                open={!!configuringInspection} 
-                onClose={() => setConfiguringInspection(null)}
-                maxWidth="md"
-                fullWidth
-            >
-                <DialogContent>
-                    {configuringInspection && (
-                        <InspectionFormBuilder
-                            equipmentType={types.find(t => t.value === configuringInspection)!}
-                            onSave={async (updatedType) => {
-                                const updatedTypes = types.map(type => 
-                                    type.value === configuringInspection ? updatedType : type
-                                );
-                                await updateMutation.mutateAsync(updatedTypes);
-                                setConfiguringInspection(null);
-                            }}
-                        />
-                    )}
-                </DialogContent>
-            </Dialog>
+            {configuringInspection && (
+                <Dialog
+                    open={true}
+                    onClose={() => setConfiguringInspection(null)}
+                    maxWidth="lg"
+                    fullWidth
+                >
+                    <DialogTitle>Configure Inspection Form</DialogTitle>
+                    <DialogContent>
+                        {types.find(t => t.value === configuringInspection) && (
+                            <InspectionFormBuilder
+                                equipmentType={types.find(t => t.value === configuringInspection)!}
+                                onSave={async (updatedType) => {
+                                    const success = await handleSave(updatedType);
+                                    if (success) {
+                                        setConfiguringInspection(null);
+                                    }
+                                }}
+                            />
+                        )}
+                    </DialogContent>
+                </Dialog>
+            )}
 
-            <CrudDeleteDialog
-                open={dialogState.isOpen && dialogState.mode === 'delete'}
-                onClose={closeDialog}
-                onConfirm={() => dialogState.data && handleDelete(dialogState.data)}
-                title="Delete Equipment Type"
-                message={`Are you sure you want to delete the equipment type "${dialogState.data?.label}"? This action cannot be undone.`}
-            />
+            {dialogState.mode === 'delete' && dialogState.data && (
+                <CrudDeleteDialog
+                    open={true}
+                    onClose={closeDialog}
+                    onConfirm={async () => {
+                        if (!dialogState.data) return;
+                        await handleSave({
+                            ...dialogState.data,
+                            deleted: true
+                        });
+                        closeDialog();
+                    }}
+                    title="Delete Equipment Type"
+                    message={`Are you sure you want to delete the "${dialogState.data.label}" equipment type? This action cannot be undone.`}
+                />
+            )}
         </Box>
     );
 }

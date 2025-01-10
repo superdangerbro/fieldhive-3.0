@@ -1,6 +1,7 @@
 import { Point } from 'geojson';
 import { Job } from './job';
 import { Property } from './property';
+import { type FormField } from '../(pages)/settings/equipment/types/components/types';
 
 export interface Equipment {
     equipment_id: string;
@@ -16,6 +17,7 @@ export interface Equipment {
     job?: Job;
     property?: Property;
     inspections?: EquipmentInspection[];
+    fields: Record<string, any>;
 }
 
 export interface EquipmentInspection {
@@ -34,12 +36,17 @@ export interface EquipmentInspection {
 }
 
 export interface EquipmentType {
+    id: string;
     name: string;
     label: string;
     description?: string;
-    fields: Field[];
+    fields: EquipmentTypeField[];
     barcodeRequired?: boolean;
     photoRequired?: boolean;
+}
+
+export interface EquipmentTypeField extends Pick<FormField, 'name'> {
+    required: boolean;
 }
 
 export interface EquipmentStatus {

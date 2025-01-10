@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Button,
@@ -17,12 +17,20 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import type { InspectionSection, FormField, EquipmentTypeConfig } from './types';
-import { AddFieldForm } from './AddFieldForm';
+import { SelectFieldDialog } from '@/app/components/fields/SelectFieldDialog';
 
 interface InspectionFormBuilderProps {
     equipmentType: EquipmentTypeConfig;
     onSave: (updatedType: EquipmentTypeConfig) => Promise<void>;
 }
+
+const droppableProps = {
+    isDropDisabled: false,
+    isCombineEnabled: false,
+    ignoreContainerClipping: false,
+    renderClone: null,
+    mode: 'standard' as const
+};
 
 export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormBuilderProps) {
     const [inspectionConfig, setInspectionConfig] = useState(
@@ -31,6 +39,13 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
         }
     );
     const [addingSectionIndex, setAddingSectionIndex] = useState<number | null>(null);
+
+    // Update inspectionConfig when equipmentType changes
+    useEffect(() => {
+        setInspectionConfig(equipmentType.inspectionConfig || {
+            sections: []
+        });
+    }, [equipmentType]);
 
     const handleAddSection = () => {
         setInspectionConfig(prev => ({
@@ -120,10 +135,11 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
     };
 
     const handleSave = async () => {
-        await onSave({
+        const updatedType = {
             ...equipmentType,
             inspectionConfig
-        });
+        };
+        await onSave(updatedType);
     };
 
     return (
@@ -138,7 +154,7 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
             </Box>
 
             <DragDropContext onDragEnd={handleDragEnd}>
-                <Droppable droppableId="sections" type="SECTION">
+                <Droppable droppableId="sections" type="SECTION" {...droppableProps}>
                     {(provided) => (
                         <Box 
                             ref={provided.innerRef} 
@@ -175,14 +191,14 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
                                                 </IconButton>
                                             </Box>
 
-                                            <Droppable droppableId={String(sectionIndex)} type="FIELD">
+                                            <Droppable droppableId={String(sectionIndex)} type="FIELD" {...droppableProps}>
                                                 {(provided) => (
                                                     <Box 
-                                                        ref={provided.innerRef} 
+                                                        ref={provided.innerRef}
                                                         {...provided.droppableProps}
                                                         sx={{ 
                                                             minHeight: 50,
-                                                            backgroundColor: 'background.default',
+                                                            backgroundColor: 'action.hover',
                                                             borderRadius: 1,
                                                             p: 1
                                                         }}
@@ -225,17 +241,18 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
                                                             </Draggable>
                                                         ))}
                                                         {provided.placeholder}
+                                                        <Button
+                                                            variant="text"
+                                                            startIcon={<AddIcon />}
+                                                            onClick={() => setAddingSectionIndex(sectionIndex)}
+                                                            size="small"
+                                                            sx={{ mt: 1 }}
+                                                        >
+                                                            Add Field
+                                                        </Button>
                                                     </Box>
                                                 )}
                                             </Droppable>
-
-                                            <Button
-                                                startIcon={<AddIcon />}
-                                                onClick={() => setAddingSectionIndex(sectionIndex)}
-                                                sx={{ mt: 1 }}
-                                            >
-                                                Add Field
-                                            </Button>
                                         </Paper>
                                     )}
                                 </Draggable>
@@ -264,25 +281,17 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
                 </Button>
             </Box>
 
-            {/* Add Field Dialog */}
-            <Dialog
+            {/* Field Selection Dialog */}
+            <SelectFieldDialog
                 open={addingSectionIndex !== null}
                 onClose={() => setAddingSectionIndex(null)}
-                maxWidth="sm"
-                fullWidth
-            >
-                <DialogTitle>Add Field to Section</DialogTitle>
-                <DialogContent>
-                    <AddFieldForm
-                        onSubmit={(field) => {
-                            if (addingSectionIndex !== null) {
-                                handleAddField(addingSectionIndex, field);
-                            }
-                        }}
-                        onCancel={() => setAddingSectionIndex(null)}
-                    />
-                </DialogContent>
-            </Dialog>
+                onSelect={(field) => {
+                    if (addingSectionIndex !== null) {
+                        handleAddField(addingSectionIndex, field);
+                    }
+                }}
+                existingFieldNames={inspectionConfig.sections.flatMap(s => s.fields.map(f => f.name))}
+            />
         </Box>
     );
 }

@@ -89,6 +89,19 @@ const transformApiField = (apiField: ApiFieldConfig): FormField => {
 const transformToApiField = (field: FormField): ApiFieldConfig => {
     console.log('Transforming frontend field:', field);
     
+    // Map frontend types to API types
+    const typeMap: Record<string, string> = {
+        'text': 'text',
+        'number': 'number',
+        'select': 'select',
+        'multiselect': 'select',
+        'checkbox': 'checkbox',
+        'textarea': 'textarea',
+        'boolean': 'checkbox',
+        'slider': 'number',
+        'capture-flow': 'text' // Map capture-flow to text type
+    };
+
     // Validate the field before transforming
     const errors = validateFieldConfig(field);
     if (errors.length > 0) {
@@ -97,7 +110,7 @@ const transformToApiField = (field: FormField): ApiFieldConfig => {
 
     const apiField: ApiFieldConfig = {
         name: field.name,
-        type: field.type,
+        type: typeMap[field.type] || 'text', // Default to text if type not found
         required: field.required || false,
         description: field.description
     };
@@ -111,6 +124,17 @@ const transformToApiField = (field: FormField): ApiFieldConfig => {
         if (field.config.min !== undefined) apiField.min = field.config.min;
         if (field.config.max !== undefined) apiField.max = field.config.max;
         if (field.config.step !== undefined) apiField.step = field.config.step;
+    }
+
+    if (field.type === 'slider' && field.config) {
+        if (field.config.min !== undefined) apiField.min = field.config.min;
+        if (field.config.max !== undefined) apiField.max = field.config.max;
+        if (field.config.step !== undefined) apiField.step = field.config.step;
+    }
+
+    // Handle capture-flow specific config
+    if (field.type === 'capture-flow' && field.config) {
+        apiField.description = field.config.photoInstructions || field.description;
     }
 
     console.log('Transformed to API field:', apiField);
@@ -196,40 +220,46 @@ export const useEquipmentTypes = () => {
 export const useUpdateEquipmentTypes = () => {
     const queryClient = useQueryClient();
 
-    return useMutation<EquipmentTypeConfig[], Error, EquipmentTypeConfig[]>({
-        mutationFn: async (types) => {
-            console.log('Updating equipment types with:', types);
-            const apiTypes = types.map(transformToApiType);
-            console.log('Transformed for API:', apiTypes);
+    return useMutation<EquipmentTypeConfig, Error, EquipmentTypeConfig>({
+        mutationFn: async (type) => {
+            console.log('Updating equipment type with:', type);
+            try {
+                const apiType = transformToApiType(type);
+                console.log('Transformed for API:', apiType);
 
-            const response = await fetch(buildUrl(ENDPOINTS.types), {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(apiTypes),
-                signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
-            });
+                const response = await fetch(buildUrl(ENDPOINTS.types), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify([apiType]), // Send as array for API compatibility
+                    signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
+                });
 
-            if (!response.ok) {
-                await handleApiError(response);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('API error response:', errorData);
+                    
+                    // Check if we have validation errors
+                    if (errorData.errors && Array.isArray(errorData.errors)) {
+                        const validationErrors = errorData.errors
+                            .map((err: { type: string; errors: string[] }) => err.errors)
+                            .flat()
+                            .join(', ');
+                        throw new Error(validationErrors);
+                    }
+                    
+                    throw new Error(errorData.message || 'Failed to update equipment type');
+                }
+
+                const data = await response.json();
+                return transformApiType(data[0]); // Get first item since we only sent one
+            } catch (err) {
+                console.error('Error updating equipment type:', err);
+                throw err;
             }
-
-            const data = await response.json();
-            console.log('API update response:', data);
-
-            // Validate API response
-            const errors = validateApiResponse(data);
-            if (errors.length > 0) {
-                console.error('API update response validation errors:', errors);
-                throw new Error('Invalid API response: ' + errors.join(', '));
-            }
-
-            const transformed = data.map(transformApiType);
-            console.log('Transformed update response:', transformed);
-            return transformed;
         },
-        onSuccess: (data) => {
-            console.log('Update successful, setting query data:', data);
-            queryClient.setQueryData(['equipmentTypes'], data);
+        onSuccess: () => {
+            // Invalidate and refetch equipment types
+            queryClient.invalidateQueries({ queryKey: ['equipmentTypes'] });
         },
     });
 };

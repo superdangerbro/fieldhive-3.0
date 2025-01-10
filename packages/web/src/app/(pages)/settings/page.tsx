@@ -7,6 +7,9 @@ import { JobsTab } from './jobs/JobsTab';
 import { AccountsTab } from './accounts/AccountsTab';
 import { PropertiesTab } from './properties/PropertiesTab';
 import { useSearchParams, useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+
+const FieldsTab = dynamic(() => import('./fields/page'), { ssr: false });
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -32,7 +35,7 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-const TAB_NAMES = ['equipment', 'jobs', 'accounts', 'properties'] as const;
+const TAB_NAMES = ['equipment', 'jobs', 'accounts', 'properties', 'fields'] as const;
 type TabName = typeof TAB_NAMES[number];
 
 function getTabIndex(tab: string | null): number {
@@ -98,6 +101,7 @@ export default function SettingsPage() {
             <Tab label="Jobs" />
             <Tab label="Accounts" />
             <Tab label="Properties" />
+            <Tab label="Form Fields" />
           </Tabs>
         </Box>
       </Paper>
@@ -114,6 +118,9 @@ export default function SettingsPage() {
         </TabPanel>
         <TabPanel value={value} index={3}>
           <PropertiesTab />
+        </TabPanel>
+        <TabPanel value={value} index={4}>
+          <FieldsTab />
         </TabPanel>
       </Box>
     </Box>
