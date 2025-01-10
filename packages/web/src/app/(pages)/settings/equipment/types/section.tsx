@@ -17,7 +17,8 @@ import {
     DialogTitle,
     FormControlLabel,
     Switch,
-    Divider
+    Divider,
+    ListItemText
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -43,7 +44,6 @@ export function EquipmentTypeSection() {
     const [expandedType, setExpandedType] = React.useState<string | null>(null);
     const [addingFieldsTo, setAddingFieldsTo] = React.useState<string | null>(null);
     const [editingField, setEditingField] = React.useState<{ typeValue: string; field: FormField } | null>(null);
-    const [configuringInspection, setConfiguringInspection] = React.useState<string | null>(null);
     const [saveError, setSaveError] = React.useState<string | null>(null);
     const formRef = React.useRef<HTMLFormElement>(null);
 
@@ -52,7 +52,11 @@ export function EquipmentTypeSection() {
         setSaveError(null);
         
         try {
-            await updateMutation.mutateAsync(data);
+            await updateMutation.mutateAsync({
+                ...data,
+                fields: Array.isArray(data.fields) ? data.fields : [],
+                inspectionConfig: data.inspectionConfig || { sections: [] }
+            });
             
             // Close dialog and reset state
             if (dialogState.mode !== 'none') {
@@ -60,7 +64,6 @@ export function EquipmentTypeSection() {
             }
             setAddingFieldsTo(null);
             setEditingField(null);
-            setConfiguringInspection(null);
             
             return true;
         } catch (err) {
@@ -223,7 +226,7 @@ export function EquipmentTypeSection() {
                         </ListItemButton>
                         <Collapse in={expandedType === type.value}>
                             <Box sx={{ p: 2 }}>
-                                <Box sx={{ pl: 2 }}>
+                                <Box sx={{ pl: 2, mb: 3 }}>
                                     <Typography variant="caption" color="text.secondary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
                                         General Settings
                                     </Typography>
@@ -263,55 +266,75 @@ export function EquipmentTypeSection() {
 
                                 <Divider sx={{ my: 2 }} />
 
-                                <Box sx={{ pl: 2 }}>
+                                <Box sx={{ pl: 2, mb: 3 }}>
                                     <Typography variant="caption" color="text.secondary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
                                         Fields
                                     </Typography>
                                     <Box sx={{ mt: 1 }}>
                                         <Button
-                                            onClick={() => setAddingFieldsTo(type.value)}
-                                            startIcon={<AddIcon />}
                                             variant="outlined"
                                             size="small"
+                                            onClick={() => setAddingFieldsTo(type.value)}
+                                            startIcon={<AddIcon />}
                                         >
                                             Add Field
                                         </Button>
                                     </Box>
+                                    {type.fields && type.fields.length > 0 ? (
+                                        <List dense>
+                                            {type.fields.map((field, index) => (
+                                                <ListItem
+                                                    key={field.name}
+                                                    secondaryAction={
+                                                        <Box sx={{ display: 'flex', gap: 1 }}>
+                                                            <IconButton
+                                                                edge="end"
+                                                                aria-label="edit"
+                                                                onClick={() => handleEditField(type.value, field)}
+                                                                size="small"
+                                                            >
+                                                                <EditIcon fontSize="small" />
+                                                            </IconButton>
+                                                            <IconButton
+                                                                edge="end"
+                                                                aria-label="delete"
+                                                                onClick={() => handleDeleteField(type.value, field.name)}
+                                                                size="small"
+                                                            >
+                                                                <DeleteIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Box>
+                                                    }
+                                                >
+                                                    <ListItemText
+                                                        primary={field.label}
+                                                        secondary={`Type: ${field.type}`}
+                                                    />
+                                                </ListItem>
+                                            ))}
+                                        </List>
+                                    ) : (
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                            No fields added yet
+                                        </Typography>
+                                    )}
                                 </Box>
 
-                                <Box sx={{ py: 1 }}>
-                                    <FieldList
-                                        fields={type.fields}
-                                        onDeleteField={(name) => handleDeleteField(type.value, name)}
-                                        onEditField={(field) => setEditingField({ typeValue: type.value, field })}
-                                        onAddCondition={(fieldName, condition) => {
-                                            const field = type.fields.find(f => f.name === fieldName);
-                                            if (field) {
-                                                handleEditField(type.value, field, {
-                                                    ...field,
-                                                    conditions: [...(field.conditions || []), condition]
-                                                });
-                                            }
-                                        }}
-                                        onDeleteCondition={(fieldName, conditionIndex) => {
-                                            const field = type.fields.find(f => f.name === fieldName);
-                                            if (field && field.conditions) {
-                                                handleEditField(type.value, field, {
-                                                    ...field,
-                                                    conditions: field.conditions.filter((_, i) => i !== conditionIndex)
-                                                });
-                                            }
-                                        }}
+                                <Divider sx={{ my: 2 }} />
+
+                                <Box sx={{ pl: 2 }}>
+                                    <Typography variant="caption" color="text.secondary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
+                                        Inspection Form
+                                    </Typography>
+                                    <InspectionFormBuilder
+                                        equipmentType={type}
+                                        onSave={handleSave}
                                     />
                                 </Box>
+
+                                <Divider sx={{ my: 2 }} />
+
                                 <Box sx={{ display: 'flex', gap: 1 }}>
-                                    <Button
-                                        size="small"
-                                        onClick={() => setConfiguringInspection(type.value)}
-                                        startIcon={<SettingsIcon />}
-                                    >
-                                        Configure Inspection Form
-                                    </Button>
                                     <Button
                                         size="small"
                                         onClick={() => openEditDialog(type)}
@@ -414,30 +437,6 @@ export function EquipmentTypeSection() {
                     )}
                 </DialogContent>
             </Dialog>
-
-            {configuringInspection && (
-                <Dialog
-                    open={true}
-                    onClose={() => setConfiguringInspection(null)}
-                    maxWidth="lg"
-                    fullWidth
-                >
-                    <DialogTitle>Configure Inspection Form</DialogTitle>
-                    <DialogContent>
-                        {types.find(t => t.value === configuringInspection) && (
-                            <InspectionFormBuilder
-                                equipmentType={types.find(t => t.value === configuringInspection)!}
-                                onSave={async (updatedType) => {
-                                    const success = await handleSave(updatedType);
-                                    if (success) {
-                                        setConfiguringInspection(null);
-                                    }
-                                }}
-                            />
-                        )}
-                    </DialogContent>
-                </Dialog>
-            )}
 
             {dialogState.mode === 'delete' && dialogState.data && (
                 <CrudDeleteDialog

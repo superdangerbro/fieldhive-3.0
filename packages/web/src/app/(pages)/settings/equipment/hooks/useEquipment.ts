@@ -28,6 +28,7 @@ interface ApiEquipmentType {
     fields: ApiFieldConfig[];
     barcodeRequired?: boolean;
     photoRequired?: boolean;
+    inspectionConfig?: any;
 }
 
 // Helper function to build full API URL
@@ -144,12 +145,13 @@ const transformToApiField = (field: FormField): ApiFieldConfig => {
 // Transform API type to frontend type
 const transformApiType = (apiType: ApiEquipmentType): EquipmentTypeConfig => {
     console.log('Transforming API type:', apiType);
-    const transformed = {
+    const transformed: EquipmentTypeConfig = {
         value: apiType.name.toLowerCase(),
         label: apiType.name,
         fields: apiType.fields.map(transformApiField),
         barcodeRequired: apiType.barcodeRequired,
-        photoRequired: apiType.photoRequired
+        photoRequired: apiType.photoRequired,
+        inspectionConfig: apiType.inspectionConfig
     };
 
     // Validate the transformed type
@@ -176,7 +178,8 @@ const transformToApiType = (type: EquipmentTypeConfig): ApiEquipmentType => {
         name: type.label || type.value,
         fields: type.fields.map(transformToApiField),
         barcodeRequired: type.barcodeRequired,
-        photoRequired: type.photoRequired
+        photoRequired: type.photoRequired,
+        inspectionConfig: type.inspectionConfig
     };
 
     console.log('Transformed to API type:', transformed);

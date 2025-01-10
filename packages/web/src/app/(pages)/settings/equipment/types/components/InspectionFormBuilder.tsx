@@ -58,6 +58,7 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
                 }
             ]
         }));
+        handleSave();
     };
 
     const handleDeleteSection = (index: number) => {
@@ -65,61 +66,70 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
             ...prev,
             sections: prev.sections.filter((_, i) => i !== index)
         }));
+        handleSave();
     };
 
     const handleSectionTitleChange = (index: number, title: string) => {
         setInspectionConfig(prev => ({
             ...prev,
-            sections: prev.sections.map((section, i) => 
-                i === index ? { ...section, title } : section
+            sections: prev.sections.map((section, i) =>
+                i === index
+                    ? { ...section, title }
+                    : section
             )
         }));
+        handleSave();
     };
 
     const handleAddField = (sectionIndex: number, field: FormField) => {
         setInspectionConfig(prev => ({
             ...prev,
-            sections: prev.sections.map((section, i) => 
-                i === sectionIndex 
-                    ? { ...section, fields: [...section.fields, field] }
+            sections: prev.sections.map((section, i) =>
+                i === sectionIndex
+                    ? {
+                        ...section,
+                        fields: [...section.fields, field]
+                    }
                     : section
             )
         }));
-        setAddingSectionIndex(null);
+        handleSave();
     };
 
     const handleDeleteField = (sectionIndex: number, fieldIndex: number) => {
         setInspectionConfig(prev => ({
             ...prev,
-            sections: prev.sections.map((section, i) => 
-                i === sectionIndex 
-                    ? { 
-                        ...section, 
-                        fields: section.fields.filter((_, fi) => fi !== fieldIndex)
+            sections: prev.sections.map((section, i) =>
+                i === sectionIndex
+                    ? {
+                        ...section,
+                        fields: section.fields.filter((_, j) => j !== fieldIndex)
                     }
                     : section
             )
         }));
+        handleSave();
     };
 
     const handleDragEnd = (result: any) => {
         if (!result.destination) return;
 
         const { source, destination, type } = result;
-        
+
         if (type === 'SECTION') {
             const sections = Array.from(inspectionConfig.sections);
             const [removed] = sections.splice(source.index, 1);
             sections.splice(destination.index, 0, removed);
             setInspectionConfig(prev => ({ ...prev, sections }));
+            handleSave();
         } else if (type === 'FIELD') {
             const sections = Array.from(inspectionConfig.sections);
             const sourceSection = sections[parseInt(source.droppableId)];
             const destSection = sections[parseInt(destination.droppableId)];
-            
+
             const sourceFields = Array.from(sourceSection.fields);
             const [removed] = sourceFields.splice(source.index, 1);
-            
+
             if (source.droppableId === destination.droppableId) {
                 sourceFields.splice(destination.index, 0, removed);
                 sections[parseInt(source.droppableId)] = { ...sourceSection, fields: sourceFields };
@@ -129,155 +139,95 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
                 sections[parseInt(source.droppableId)] = { ...sourceSection, fields: sourceFields };
                 sections[parseInt(destination.droppableId)] = { ...destSection, fields: destFields };
             }
-            
+
             setInspectionConfig(prev => ({ ...prev, sections }));
+            handleSave();
         }
     };
 
     const handleSave = async () => {
         const updatedType = {
             ...equipmentType,
-            inspectionConfig
+            inspectionConfig: {
+                ...inspectionConfig,
+                sections: inspectionConfig.sections.map(section => ({
+                    ...section,
+                    fields: section.fields.map(field => ({
+                        name: field.name,
+                        label: field.label,
+                        type: field.type,
+                        required: field.required
+                    }))
+                }))
+            }
         };
+        console.log('Saving updated type:', updatedType);
         await onSave(updatedType);
     };
 
     return (
-        <Box sx={{ width: '100%' }}>
-            <Box sx={{ mb: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                    Inspection Form Configuration
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                    Configure the inspection form for {equipmentType.label} equipment
-                </Typography>
-            </Box>
-
-            <DragDropContext onDragEnd={handleDragEnd}>
-                <Droppable droppableId="sections" type="SECTION" {...droppableProps}>
-                    {(provided) => (
-                        <Box 
-                            ref={provided.innerRef} 
-                            {...provided.droppableProps}
-                            sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+        <Box>
+            {inspectionConfig.sections.map((section, sectionIndex) => (
+                <Paper key={sectionIndex} sx={{ p: 2, mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                        <DragIndicatorIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                        <TextField
+                            value={section.title}
+                            onChange={(e) => handleSectionTitleChange(sectionIndex, e.target.value)}
+                            variant="standard"
+                            fullWidth
+                            placeholder="Section Title"
+                            sx={{ mr: 1 }}
+                        />
+                        <IconButton
+                            size="small"
+                            onClick={() => handleDeleteSection(sectionIndex)}
+                            color="error"
                         >
-                            {inspectionConfig.sections.map((section, sectionIndex) => (
-                                <Draggable
-                                    key={`section-${sectionIndex}`}
-                                    draggableId={`section-${sectionIndex}`}
-                                    index={sectionIndex}
+                            <DeleteIcon />
+                        </IconButton>
+                    </Box>
+
+                    <Box sx={{ pl: 4 }}>
+                        {section.fields.map((field, fieldIndex) => (
+                            <Box key={fieldIndex} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                <Typography>{field.label}</Typography>
+                                <IconButton
+                                    size="small"
+                                    onClick={() => handleDeleteField(sectionIndex, fieldIndex)}
+                                    sx={{ ml: 1 }}
                                 >
-                                    {(provided) => (
-                                        <Paper
-                                            ref={provided.innerRef}
-                                            {...provided.draggableProps}
-                                            sx={{ p: 2 }}
-                                        >
-                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                                <Box {...provided.dragHandleProps}>
-                                                    <DragIndicatorIcon />
-                                                </Box>
-                                                <TextField
-                                                    value={section.title}
-                                                    onChange={(e) => handleSectionTitleChange(sectionIndex, e.target.value)}
-                                                    variant="standard"
-                                                    sx={{ ml: 1, flex: 1 }}
-                                                />
-                                                <IconButton 
-                                                    onClick={() => handleDeleteSection(sectionIndex)}
-                                                    size="small"
-                                                >
-                                                    <DeleteIcon />
-                                                </IconButton>
-                                            </Box>
+                                    <DeleteIcon fontSize="small" />
+                                </IconButton>
+                            </Box>
+                        ))}
+                        <Button
+                            size="small"
+                            onClick={() => setAddingSectionIndex(sectionIndex)}
+                            startIcon={<AddIcon />}
+                            sx={{ mt: 1 }}
+                        >
+                            Add Field
+                        </Button>
+                    </Box>
+                </Paper>
+            ))}
 
-                                            <Droppable droppableId={String(sectionIndex)} type="FIELD" {...droppableProps}>
-                                                {(provided) => (
-                                                    <Box 
-                                                        ref={provided.innerRef}
-                                                        {...provided.droppableProps}
-                                                        sx={{ 
-                                                            minHeight: 50,
-                                                            backgroundColor: 'action.hover',
-                                                            borderRadius: 1,
-                                                            p: 1
-                                                        }}
-                                                    >
-                                                        {section.fields.map((field, fieldIndex) => (
-                                                            <Draggable
-                                                                key={`field-${sectionIndex}-${fieldIndex}`}
-                                                                draggableId={`field-${sectionIndex}-${fieldIndex}`}
-                                                                index={fieldIndex}
-                                                            >
-                                                                {(provided) => (
-                                                                    <Box
-                                                                        ref={provided.innerRef}
-                                                                        {...provided.draggableProps}
-                                                                        {...provided.dragHandleProps}
-                                                                        sx={{
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            p: 1,
-                                                                            mb: 1,
-                                                                            backgroundColor: 'background.paper',
-                                                                            borderRadius: 1,
-                                                                            boxShadow: 1
-                                                                        }}
-                                                                    >
-                                                                        <DragIndicatorIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                                                                        <Typography>{field.label}</Typography>
-                                                                        <Box sx={{ flex: 1 }} />
-                                                                        <Typography variant="caption" color="text.secondary" sx={{ mr: 2 }}>
-                                                                            {field.type}
-                                                                        </Typography>
-                                                                        <IconButton
-                                                                            onClick={() => handleDeleteField(sectionIndex, fieldIndex)}
-                                                                            size="small"
-                                                                        >
-                                                                            <DeleteIcon />
-                                                                        </IconButton>
-                                                                    </Box>
-                                                                )}
-                                                            </Draggable>
-                                                        ))}
-                                                        {provided.placeholder}
-                                                        <Button
-                                                            variant="text"
-                                                            startIcon={<AddIcon />}
-                                                            onClick={() => setAddingSectionIndex(sectionIndex)}
-                                                            size="small"
-                                                            sx={{ mt: 1 }}
-                                                        >
-                                                            Add Field
-                                                        </Button>
-                                                    </Box>
-                                                )}
-                                            </Droppable>
-                                        </Paper>
-                                    )}
-                                </Draggable>
-                            ))}
-                            {provided.placeholder}
-                        </Box>
-                    )}
-                </Droppable>
-            </DragDropContext>
-
-            <Button
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={handleAddSection}
-                sx={{ mt: 2 }}
-            >
-                Add Section
-            </Button>
-
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+            <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                <Button
+                    variant="outlined"
+                    onClick={handleAddSection}
+                    startIcon={<AddIcon />}
+                    size="small"
+                >
+                    Add Section
+                </Button>
                 <Button
                     variant="contained"
                     onClick={handleSave}
+                    size="small"
                 >
-                    Save Inspection Form
+                    Save Changes
                 </Button>
             </Box>
 
@@ -288,6 +238,7 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
                 onSelect={(field) => {
                     if (addingSectionIndex !== null) {
                         handleAddField(addingSectionIndex, field);
+                        setAddingSectionIndex(null);
                     }
                 }}
                 existingFieldNames={inspectionConfig.sections.flatMap(s => s.fields.map(f => f.name))}

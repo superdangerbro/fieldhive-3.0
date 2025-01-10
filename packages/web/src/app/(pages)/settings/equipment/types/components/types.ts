@@ -52,20 +52,20 @@ export interface FormField {
 
 export interface InspectionSection {
     title: string;
-    description?: string;
     fields: FormField[];
-    conditions?: Condition[]; // Section-level conditions
+    description?: string;
+    conditions?: Condition[];
 }
 
-export interface EquipmentTypeConfig extends EquipmentType {
-    fields: FormField[];  // Equipment fields
+export interface EquipmentTypeConfig {
+    value: string;
+    label: string;
+    fields: FormField[];
+    barcodeRequired?: boolean;
+    photoRequired?: boolean;
     inspectionConfig?: {
         sections: InspectionSection[];
     };
-}
-
-export interface NewFieldState {
-    name: string;
 }
 
 // Type guards
