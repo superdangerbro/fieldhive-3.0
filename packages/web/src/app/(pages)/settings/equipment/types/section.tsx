@@ -280,44 +280,33 @@ export function EquipmentTypeSection() {
                                             Add Field
                                         </Button>
                                     </Box>
-                                    {type.fields && type.fields.length > 0 ? (
-                                        <List dense>
-                                            {type.fields.map((field, index) => (
-                                                <ListItem
-                                                    key={field.name}
-                                                    secondaryAction={
-                                                        <Box sx={{ display: 'flex', gap: 1 }}>
-                                                            <IconButton
-                                                                edge="end"
-                                                                aria-label="edit"
-                                                                onClick={() => handleEditField(type.value, field)}
-                                                                size="small"
-                                                            >
-                                                                <EditIcon fontSize="small" />
-                                                            </IconButton>
-                                                            <IconButton
-                                                                edge="end"
-                                                                aria-label="delete"
-                                                                onClick={() => handleDeleteField(type.value, field.name)}
-                                                                size="small"
-                                                            >
-                                                                <DeleteIcon fontSize="small" />
-                                                            </IconButton>
-                                                        </Box>
-                                                    }
-                                                >
-                                                    <ListItemText
-                                                        primary={field.label}
-                                                        secondary={`Type: ${field.type}`}
-                                                    />
-                                                </ListItem>
-                                            ))}
-                                        </List>
-                                    ) : (
-                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                            No fields added yet
-                                        </Typography>
-                                    )}
+                                    <Box sx={{ mt: 2 }}>
+                                        <FieldList
+                                            fields={type.fields || []}
+                                            onDeleteField={(fieldName) => handleDeleteField(type.value, fieldName)}
+                                            onEditField={(field) => setEditingField({ typeValue: type.value, field })}
+                                            onAddCondition={(fieldName, condition) => {
+                                                const field = type.fields?.find(f => f.name === fieldName);
+                                                if (field) {
+                                                    const updatedField = {
+                                                        ...field,
+                                                        conditions: [...(field.conditions || []), condition]
+                                                    };
+                                                    handleEditField(type.value, field, updatedField);
+                                                }
+                                            }}
+                                            onDeleteCondition={(fieldName, conditionIndex) => {
+                                                const field = type.fields?.find(f => f.name === fieldName);
+                                                if (field && field.conditions) {
+                                                    const updatedField = {
+                                                        ...field,
+                                                        conditions: field.conditions.filter((_, i) => i !== conditionIndex)
+                                                    };
+                                                    handleEditField(type.value, field, updatedField);
+                                                }
+                                            }}
+                                        />
+                                    </Box>
                                 </Box>
 
                                 <Divider sx={{ my: 2 }} />
@@ -418,25 +407,14 @@ export function EquipmentTypeSection() {
             />
 
             {/* Field Editing Dialog */}
-            <Dialog 
-                open={!!editingField} 
-                onClose={() => setEditingField(null)}
-                maxWidth="sm"
-                fullWidth
-            >
-                <DialogContent>
-                    {editingField && (
-                        <SelectFieldDialog
-                            open={true}
-                            onClose={() => setEditingField(null)}
-                            onSelect={(field) => handleEditField(editingField.typeValue, editingField.field, field)}
-                            existingFieldNames={(types.find(t => t.value === editingField.typeValue)?.fields || [])
-                                .filter(f => f.name !== editingField.field.name)
-                                .map(f => f.name)}
-                        />
-                    )}
-                </DialogContent>
-            </Dialog>
+            {editingField && (
+                <SelectFieldDialog
+                    open={true}
+                    onClose={() => setEditingField(null)}
+                    onSave={(newField) => handleEditField(editingField.typeValue, editingField.field, newField)}
+                    initialValues={editingField.field}
+                />
+            )}
 
             {dialogState.mode === 'delete' && dialogState.data && (
                 <CrudDeleteDialog

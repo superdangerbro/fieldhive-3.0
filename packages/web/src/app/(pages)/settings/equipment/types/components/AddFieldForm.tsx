@@ -36,6 +36,7 @@ export function AddFieldForm({ onAdd, onCancel, existingFields, initialValues }:
             label: '',
             type: 'text',
             description: '',
+            showWhen: [],
             config: {}
         };
     });

@@ -2,19 +2,17 @@
 
 import React, { useState } from 'react';
 import {
-    List,
-    ListItem,
-    ListItemText,
-    IconButton,
     Box,
-    Chip,
+    Paper,
     Typography,
+    Button,
+    IconButton,
     Collapse,
-    Button
+    Chip
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import AddIcon from '@mui/icons-material/Add';
+import RuleIcon from '@mui/icons-material/Rule';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import type { FormField, Condition } from './types';
@@ -38,16 +36,16 @@ export function FieldList({
 }: FieldListProps) {
     const [expandedField, setExpandedField] = useState<string | null>(null);
     const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
-    const [selectedField, setSelectedField] = useState<string | null>(null);
+    const [selectedField, setSelectedField] = useState<FormField | null>(null);
 
-    const handleAddRule = (fieldName: string) => {
-        setSelectedField(fieldName);
+    const handleAddRule = (field: FormField) => {
+        setSelectedField(field);
         setRuleDialogOpen(true);
     };
 
     const handleSaveRule = (condition: Condition) => {
         if (selectedField) {
-            onAddCondition(selectedField, condition);
+            onAddCondition(selectedField.name, condition);
         }
         setRuleDialogOpen(false);
         setSelectedField(null);
@@ -56,11 +54,11 @@ export function FieldList({
     const getFieldTypeLabel = (field: FormField) => {
         switch (field.type) {
             case 'text':
-                return 'Text Field';
+                return 'Text';
             case 'number':
-                return 'Number Field';
+                return 'Number';
             case 'select':
-                return `Dropdown (${isSelectConfig(field.config) ? field.config.options.length : 0} options)`;
+                return 'Select';
             case 'checkbox':
                 return 'Checkbox';
             case 'textarea':
@@ -71,159 +69,195 @@ export function FieldList({
     };
 
     const renderFieldConfig = (field: FormField) => {
-        if (isNumberConfig(field.config)) {
+        if (field.type === 'select' && isSelectConfig(field.config)) {
             return (
-                <Box sx={{ mt: 1 }}>
-                    {field.config.min !== undefined && <Typography>Min: {field.config.min}</Typography>}
-                    {field.config.max !== undefined && <Typography>Max: {field.config.max}</Typography>}
-                    {field.config.step !== undefined && <Typography>Step: {field.config.step}</Typography>}
-                </Box>
-            );
-        }
-
-        if (isSelectConfig(field.config)) {
-            return (
-                <Box sx={{ mt: 1 }}>
-                    <Typography variant="caption">Options:</Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                        {field.config.options.map((option: string) => (
-                            <Chip key={option} label={option} size="small" />
+                <Box>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                        Options:
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {field.config.options.map((option, index) => (
+                            <Chip 
+                                key={index} 
+                                label={option} 
+                                size="small" 
+                                variant="outlined"
+                            />
                         ))}
                     </Box>
                 </Box>
             );
         }
-
         return null;
     };
 
-    const renderConditions = (field: FormField) => {
-        if (!field.conditions?.length) return null;
-
-        return (
-            <Box sx={{ mt: 1 }}>
-                <Typography variant="caption" sx={{ fontWeight: 'bold' }}>Conditions:</Typography>
-                {field.conditions.map((condition, index) => {
-                    const dependentField = fields.find(f => f.name === condition.field);
-                    return (
-                        <Box 
-                            key={index} 
-                            sx={{ 
-                                display: 'flex', 
-                                alignItems: 'center',
-                                mt: 0.5,
-                                backgroundColor: 'rgba(0, 0, 0, 0.03)',
-                                borderRadius: 1,
-                                p: 1
-                            }}
-                        >
-                            <Typography variant="body2">
-                                When {dependentField?.label || condition.field} is {String(condition.value)}
-                                {condition.makeRequired && ' (Required)'}
-                            </Typography>
-                            <IconButton 
-                                size="small" 
-                                onClick={() => onDeleteCondition(field.name, index)}
-                                sx={{ ml: 'auto' }}
-                            >
-                                <DeleteIcon fontSize="small" />
-                            </IconButton>
-                        </Box>
-                    );
-                })}
-            </Box>
-        );
-    };
-
     return (
-        <>
-            <List>
-                {fields.map((field) => (
-                    <ListItem
-                        key={field.name}
-                        sx={{
-                            flexDirection: 'column',
-                            alignItems: 'stretch',
-                            bgcolor: 'background.paper',
-                            mb: 1,
-                            borderRadius: 1,
-                            border: '1px solid',
-                            borderColor: 'divider'
-                        }}
-                    >
-                        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                            <IconButton
-                                onClick={() => setExpandedField(expandedField === field.name ? null : field.name)}
-                                size="small"
-                            >
-                                {expandedField === field.name ? (
-                                    <KeyboardArrowDownIcon />
-                                ) : (
-                                    <KeyboardArrowRightIcon />
-                                )}
-                            </IconButton>
-                            
-                            <Box sx={{ flex: 1 }}>
-                                <Typography variant="body1">{field.label}</Typography>
-                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
+        <Box>
+            {fields.map((field) => (
+                <Box
+                    key={field.name}
+                    sx={{
+                        bgcolor: 'background.paper',
+                        mb: 1,
+                        borderRadius: 1,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        p: 1
+                    }}
+                >
+                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                        <IconButton
+                            onClick={() => setExpandedField(expandedField === field.name ? null : field.name)}
+                            size="small"
+                        >
+                            {expandedField === field.name ? (
+                                <KeyboardArrowDownIcon />
+                            ) : (
+                                <KeyboardArrowRightIcon />
+                            )}
+                        </IconButton>
+                        
+                        <Box sx={{ flex: 1 }}>
+                            <Typography variant="body1">{field.label}</Typography>
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
+                                <Chip 
+                                    label={getFieldTypeLabel(field)} 
+                                    size="small" 
+                                    variant="outlined"
+                                />
+                                {field.required && (
                                     <Chip 
-                                        label={getFieldTypeLabel(field)} 
+                                        label="Required" 
                                         size="small" 
+                                        color="primary" 
                                         variant="outlined"
                                     />
-                                    {field.required && (
-                                        <Chip 
-                                            label="Required" 
-                                            size="small" 
-                                            color="primary" 
-                                            variant="outlined"
-                                        />
-                                    )}
-                                </Box>
-                            </Box>
-
-                            <Box sx={{ ml: 'auto', display: 'flex' }}>
-                                <Button
-                                    startIcon={<AddIcon />}
-                                    onClick={() => handleAddRule(field.name)}
-                                    size="small"
-                                >
-                                    Add Rule
-                                </Button>
-                                <IconButton onClick={() => onEditField(field)}>
-                                    <EditIcon />
-                                </IconButton>
-                                <IconButton onClick={() => onDeleteField(field.name)}>
-                                    <DeleteIcon />
-                                </IconButton>
+                                )}
+                                {field.conditions?.length > 0 && (
+                                    <Chip 
+                                        label={`${field.conditions.length} Rules`}
+                                        size="small"
+                                        color="info"
+                                        variant="outlined"
+                                    />
+                                )}
                             </Box>
                         </Box>
 
-                        <Collapse in={expandedField === field.name} sx={{ width: '100%', pl: 6 }}>
-                            <Box sx={{ py: 1 }}>
-                                {field.description && (
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                        {field.description}
-                                    </Typography>
-                                )}
-                                {renderFieldConfig(field)}
-                                {renderConditions(field)}
-                            </Box>
-                        </Collapse>
-                    </ListItem>
-                ))}
-            </List>
+                        <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
+                            <Button
+                                startIcon={<RuleIcon />}
+                                onClick={() => handleAddRule(field)}
+                                size="small"
+                                variant="outlined"
+                                sx={{ 
+                                    color: 'text.primary',
+                                    borderColor: 'divider',
+                                    '&:hover': {
+                                        borderColor: 'primary.main'
+                                    }
+                                }}
+                            >
+                                Rules
+                            </Button>
+                            <IconButton 
+                                onClick={() => onEditField(field)}
+                                size="small"
+                            >
+                                <EditIcon />
+                            </IconButton>
+                            <IconButton 
+                                onClick={() => onDeleteField(field.name)}
+                                size="small"
+                                color="error"
+                            >
+                                <DeleteIcon />
+                            </IconButton>
+                        </Box>
+                    </Box>
 
-            <RuleDialog
-                open={ruleDialogOpen}
-                onClose={() => {
-                    setRuleDialogOpen(false);
-                    setSelectedField(null);
-                }}
-                onSave={handleSaveRule}
-                availableFields={fields}
-                currentFieldName={selectedField || ''}
-            />
-        </>
+                    <Collapse in={expandedField === field.name}>
+                        <Box sx={{ px: 2, pb: 2 }}>
+                            {field.description && (
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                    {field.description}
+                                </Typography>
+                            )}
+                            
+                            {renderFieldConfig(field)}
+                            
+                            {field.conditions && field.conditions.length > 0 && (
+                                <Box sx={{ mt: 2 }}>
+                                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                        Rules:
+                                    </Typography>
+                                    {field.conditions.map((condition, index) => (
+                                        <Box 
+                                            key={index}
+                                            sx={{ 
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1,
+                                                mb: 1,
+                                                p: 1,
+                                                bgcolor: 'action.hover',
+                                                borderRadius: 1
+                                            }}
+                                        >
+                                            <Typography variant="body2">
+                                                When field{' '}
+                                                <strong>{condition.field}</strong>{' '}
+                                                {condition.operator}{' '}
+                                                <strong>{condition.value}</strong>
+                                                {condition.makeRequired && (
+                                                    <Typography 
+                                                        component="span" 
+                                                        variant="caption" 
+                                                        color="warning.main"
+                                                        sx={{ ml: 1 }}
+                                                    >
+                                                        (Make Required)
+                                                    </Typography>
+                                                )}
+                                            </Typography>
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => onDeleteCondition(field.name, index)}
+                                                sx={{ 
+                                                    ml: 'auto',
+                                                    opacity: 0.5,
+                                                    '&:hover': { 
+                                                        opacity: 1,
+                                                        color: 'error.main'
+                                                    }
+                                                }}
+                                            >
+                                                <DeleteIcon fontSize="small" />
+                                            </IconButton>
+                                        </Box>
+                                    ))}
+                                </Box>
+                            )}
+                        </Box>
+                    </Collapse>
+                </Box>
+            ))}
+
+            {selectedField && ruleDialogOpen && (
+                <RuleDialog
+                    open={ruleDialogOpen}
+                    onClose={() => {
+                        setRuleDialogOpen(false);
+                        setSelectedField(null);
+                    }}
+                    onSave={handleSaveRule}
+                    availableFields={{
+                        equipment: fields,
+                        inspection: []
+                    }}
+                    currentFieldName={selectedField.name}
+                />
+            )}
+        </Box>
     );
 }

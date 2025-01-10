@@ -31,16 +31,20 @@ export interface CaptureFlowConfig {
 }
 
 export interface Condition {
-    field: string;        // Field name this condition depends on
-    value: string | boolean;  // Value that triggers the condition
-    makeRequired?: boolean;  // Whether this field becomes required when condition is met
+    operator: 'equals' | 'notEquals' | 'contains' | 'greaterThan' | 'lessThan' | 'greaterThanOrEqual' | 'lessThanOrEqual' | 'startsWith' | 'endsWith';
+    value: string;
+    targetFields: string[];
+    action: 'show' | 'hide' | 'require' | 'notRequired' | 'enable' | 'disable';
 }
 
 export interface FormField {
     name: string;
     label: string;
     type: string;
+    required?: boolean;
     description?: string;
+    conditions?: Condition[];  // Field-level conditions
+    showWhen?: Condition[];   // Conditions that control field visibility
     config?: {
         requireBarcode?: boolean;
         requirePhoto?: boolean;
@@ -54,7 +58,8 @@ export interface InspectionSection {
     title: string;
     fields: FormField[];
     description?: string;
-    conditions?: Condition[];
+    conditions?: Condition[];  // Section-level conditions
+    showWhen?: Condition[];   // Conditions that control section visibility
 }
 
 export interface EquipmentTypeConfig {

@@ -8,16 +8,15 @@ import {
     Paper,
     IconButton,
     TextField,
-    Dialog,
-    DialogTitle,
-    DialogContent,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import RuleIcon from '@mui/icons-material/Rule';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
-import type { InspectionSection, FormField, EquipmentTypeConfig } from './types';
+import type { InspectionSection, FormField, EquipmentTypeConfig, Condition } from './types';
 import { SelectFieldDialog } from '@/app/components/fields/SelectFieldDialog';
+import { FieldList } from './FieldList';
 
 interface InspectionFormBuilderProps {
     equipmentType: EquipmentTypeConfig;
@@ -39,6 +38,7 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
         }
     );
     const [addingSectionIndex, setAddingSectionIndex] = useState<number | null>(null);
+    const [addingConditionIndex, setAddingConditionIndex] = useState<number | null>(null);
 
     // Update inspectionConfig when equipmentType changes
     useEffect(() => {
@@ -111,6 +111,28 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
         handleSave();
     };
 
+    const handleAddCondition = (sectionIndex: number) => {
+        setAddingConditionIndex(sectionIndex);
+    };
+
+    const handleSaveCondition = (sectionIndex: number, condition: Condition) => {
+        const updatedConfig = { ...inspectionConfig };
+        if (!updatedConfig.sections[sectionIndex].showWhen) {
+            updatedConfig.sections[sectionIndex].showWhen = [];
+        }
+        updatedConfig.sections[sectionIndex].showWhen.push(condition);
+        setInspectionConfig(updatedConfig);
+        handleSave();
+    };
+
+    const handleDeleteCondition = (sectionIndex: number, conditionIndex: number) => {
+        const updatedConfig = { ...inspectionConfig };
+        updatedConfig.sections[sectionIndex].showWhen = 
+            updatedConfig.sections[sectionIndex].showWhen?.filter((_, i) => i !== conditionIndex) || [];
+        setInspectionConfig(updatedConfig);
+        handleSave();
+    };
+
     const handleDragEnd = (result: any) => {
         if (!result.destination) return;
 
@@ -167,69 +189,136 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
 
     return (
         <Box>
-            {inspectionConfig.sections.map((section, sectionIndex) => (
-                <Paper key={sectionIndex} sx={{ p: 2, mb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                        <DragIndicatorIcon sx={{ color: 'text.secondary', mr: 1 }} />
-                        <TextField
-                            value={section.title}
-                            onChange={(e) => handleSectionTitleChange(sectionIndex, e.target.value)}
-                            variant="standard"
-                            fullWidth
-                            placeholder="Section Title"
-                            sx={{ mr: 1 }}
-                        />
-                        <IconButton
-                            size="small"
-                            onClick={() => handleDeleteSection(sectionIndex)}
-                            color="error"
-                        >
-                            <DeleteIcon />
-                        </IconButton>
-                    </Box>
-
-                    <Box sx={{ pl: 4 }}>
-                        {section.fields.map((field, fieldIndex) => (
-                            <Box key={fieldIndex} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                <Typography>{field.label}</Typography>
+            {inspectionConfig.sections.length === 0 ? (
+                <Box sx={{ 
+                    p: 2, 
+                    textAlign: 'center',
+                    border: '2px dashed',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    mb: 2
+                }}>
+                    <Typography color="text.secondary" gutterBottom>
+                        No sections added yet
+                    </Typography>
+                    <Button
+                        variant="outlined"
+                        onClick={handleAddSection}
+                        startIcon={<AddIcon />}
+                        size="small"
+                    >
+                        Add First Section
+                    </Button>
+                </Box>
+            ) : (
+                <>
+                    {inspectionConfig.sections.map((section, sectionIndex) => (
+                        <Paper key={sectionIndex} sx={{ p: 2, mb: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                <DragIndicatorIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                                <TextField
+                                    value={section.title}
+                                    onChange={(e) => handleSectionTitleChange(sectionIndex, e.target.value)}
+                                    variant="standard"
+                                    fullWidth
+                                    placeholder="Section Title"
+                                    sx={{ mr: 1 }}
+                                />
                                 <IconButton
                                     size="small"
-                                    onClick={() => handleDeleteField(sectionIndex, fieldIndex)}
-                                    sx={{ ml: 1 }}
+                                    onClick={() => handleDeleteSection(sectionIndex)}
+                                    color="error"
                                 >
-                                    <DeleteIcon fontSize="small" />
+                                    <DeleteIcon />
                                 </IconButton>
                             </Box>
-                        ))}
-                        <Button
-                            size="small"
-                            onClick={() => setAddingSectionIndex(sectionIndex)}
-                            startIcon={<AddIcon />}
-                            sx={{ mt: 1 }}
-                        >
-                            Add Field
-                        </Button>
-                    </Box>
-                </Paper>
-            ))}
 
-            <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
-                <Button
-                    variant="outlined"
-                    onClick={handleAddSection}
-                    startIcon={<AddIcon />}
-                    size="small"
-                >
-                    Add Section
-                </Button>
-                <Button
-                    variant="contained"
-                    onClick={handleSave}
-                    size="small"
-                >
-                    Save Changes
-                </Button>
-            </Box>
+                            <Box sx={{ pl: 4 }}>
+                                {section.fields.length === 0 ? (
+                                    <Box sx={{ 
+                                        p: 2, 
+                                        textAlign: 'center',
+                                        border: '1px dashed',
+                                        borderColor: 'divider',
+                                        borderRadius: 1
+                                    }}>
+                                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                                            No fields added to this section
+                                        </Typography>
+                                        <Button
+                                            size="small"
+                                            onClick={() => setAddingSectionIndex(sectionIndex)}
+                                            startIcon={<AddIcon />}
+                                        >
+                                            Add Field
+                                        </Button>
+                                    </Box>
+                                ) : (
+                                    <>
+                                        <FieldList
+                                            fields={section.fields}
+                                            onDeleteField={(fieldName) => {
+                                                const fieldIndex = section.fields.findIndex(f => f.name === fieldName);
+                                                if (fieldIndex !== -1) {
+                                                    handleDeleteField(sectionIndex, fieldIndex);
+                                                }
+                                            }}
+                                            onEditField={(field) => {
+                                                const fieldIndex = section.fields.findIndex(f => f.name === field.name);
+                                                if (fieldIndex !== -1) {
+                                                    // Handle edit field here
+                                                    console.log('Edit field:', field);
+                                                }
+                                            }}
+                                            onAddCondition={(fieldName, condition) => {
+                                                const fieldIndex = section.fields.findIndex(f => f.name === fieldName);
+                                                if (fieldIndex !== -1) {
+                                                    const updatedConfig = { ...inspectionConfig };
+                                                    const field = updatedConfig.sections[sectionIndex].fields[fieldIndex];
+                                                    if (!field.conditions) {
+                                                        field.conditions = [];
+                                                    }
+                                                    field.conditions.push(condition);
+                                                    setInspectionConfig(updatedConfig);
+                                                    handleSave();
+                                                }
+                                            }}
+                                            onDeleteCondition={(fieldName, conditionIndex) => {
+                                                const fieldIndex = section.fields.findIndex(f => f.name === fieldName);
+                                                if (fieldIndex !== -1) {
+                                                    const updatedConfig = { ...inspectionConfig };
+                                                    const field = updatedConfig.sections[sectionIndex].fields[fieldIndex];
+                                                    if (field.conditions) {
+                                                        field.conditions = field.conditions.filter((_, i) => i !== conditionIndex);
+                                                        setInspectionConfig(updatedConfig);
+                                                        handleSave();
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                        <Button
+                                            size="small"
+                                            onClick={() => setAddingSectionIndex(sectionIndex)}
+                                            startIcon={<AddIcon />}
+                                            sx={{ mt: 1 }}
+                                        >
+                                            Add Field
+                                        </Button>
+                                    </>
+                                )}
+                            </Box>
+                        </Paper>
+                    ))}
+                    <Button
+                        variant="outlined"
+                        onClick={handleAddSection}
+                        startIcon={<AddIcon />}
+                        size="small"
+                    >
+                        Add Section
+                    </Button>
+                </>
+            )}
 
             {/* Field Selection Dialog */}
             <SelectFieldDialog
