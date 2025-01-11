@@ -38,6 +38,7 @@ export interface Condition {
 }
 
 export interface FormField {
+    id: string;       // Unique identifier for the field
     name: string;
     label: string;
     type: string;
@@ -45,19 +46,25 @@ export interface FormField {
     description?: string;
     conditions?: Condition[];  // Field-level conditions
     showWhen?: Condition[];   // Conditions that control field visibility
+    order?: number;           // Field order within its section
     config?: {
         requireBarcode?: boolean;
         requirePhoto?: boolean;
         photoInstructions?: string;
+        min?: number;
+        max?: number;
+        step?: number;
         options?: string[];
-        [key: string]: any;
+        marks?: { value: number; label: string; }[];
     };
 }
 
-export interface InspectionSection {
+export interface Section {
+    id: string;
     title: string;
-    fields: FormField[];
     description?: string;
+    order: number;
+    fields: FormField[];
     conditions?: Condition[];  // Section-level conditions
     showWhen?: Condition[];   // Conditions that control section visibility
 }
@@ -65,11 +72,11 @@ export interface InspectionSection {
 export interface EquipmentTypeConfig {
     value: string;
     label: string;
-    fields: FormField[];
+    sections: Section[];      // Use sections instead of flat fields array
     barcodeRequired?: boolean;
     photoRequired?: boolean;
     inspectionConfig?: {
-        sections: InspectionSection[];
+        sections: Section[];
     };
 }
 

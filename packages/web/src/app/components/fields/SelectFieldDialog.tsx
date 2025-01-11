@@ -74,12 +74,14 @@ export function SelectFieldDialog({ open, onClose, onSelect, existingFieldNames 
     console.log('Fields by Section:', fieldsBySection);
 
     const handleSelect = (baseField: BaseField) => {
-        // Create a form field from the base field
+        // Create a form field from the base field with a unique ID
         const formField: FormField = {
+            id: crypto.randomUUID(),  // Add unique ID
             name: baseField.name,
             label: baseField.description || baseField.name,
             type: baseField.type,
-            description: baseField.description
+            description: baseField.description,
+            order: 0  // Add default order
         };
         onSelect(formField);
         onClose();

@@ -32,12 +32,14 @@ export function AddFieldForm({ onAdd, onCancel, existingFields, initialValues }:
             return { ...initialValues };
         }
         return {
+            id: `field-${Math.random().toString(36).substr(2, 9)}`,
             name: '',
             label: '',
             type: 'text',
             description: '',
             showWhen: [],
-            config: {}
+            config: {},
+            order: 0
         };
     });
 
@@ -63,10 +65,12 @@ export function AddFieldForm({ onAdd, onCancel, existingFields, initialValues }:
 
         console.log('Submitting field:', { ...field, name: normalizedName }); // Debug log
         
-        // Add field
+        // Add field with ID and order
         onAdd({
             ...field,
-            name: normalizedName
+            id: field.id || `field-${Math.random().toString(36).substr(2, 9)}`,
+            name: normalizedName,
+            order: existingFields.length
         });
     };
 

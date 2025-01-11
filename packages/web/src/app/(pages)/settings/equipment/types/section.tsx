@@ -13,8 +13,9 @@ import {
     TextField,
     Collapse,
     Dialog,
-    DialogContent,
     DialogTitle,
+    DialogContent,
+    DialogActions,
     FormControlLabel,
     Switch,
     Divider,
@@ -31,406 +32,676 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useEquipmentTypes, useUpdateEquipmentTypes } from '../hooks/useEquipment';
 import { useCrudDialogs } from '@/app/globalHooks/useCrudDialogs';
 import { CrudFormDialog, CrudDeleteDialog } from '@/app/globalComponents/crud/CrudDialogs';
-import type { EquipmentTypeConfig, FormField } from './components/types';
+import type { EquipmentTypeConfig, FormField, Section } from './components/types';
 import { SelectFieldDialog } from '@/app/components/fields/SelectFieldDialog';
 import { FieldList } from './components/FieldList';
 import { InspectionFormBuilder } from './components/InspectionFormBuilder';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 export function EquipmentTypeSection() {
-    console.log('EquipmentTypeSection render');
     const { data: types = [], isLoading, error: fetchError } = useEquipmentTypes();
     const updateMutation = useUpdateEquipmentTypes();
     const { dialogState, openCreateDialog, openEditDialog, openDeleteDialog, closeDialog } = useCrudDialogs();
     const [expandedType, setExpandedType] = React.useState<string | null>(null);
-    const [addingFieldsTo, setAddingFieldsTo] = React.useState<string | null>(null);
-    const [editingField, setEditingField] = React.useState<{ typeValue: string; field: FormField } | null>(null);
+    const [expandedSection, setExpandedSection] = React.useState<string | null>(null);
+    const [addingFieldsTo, setAddingFieldsTo] = React.useState<{ typeValue: string; sectionId: string } | null>(null);
+    const [editingField, setEditingField] = React.useState<{ typeValue: string; sectionId: string; field: FormField } | null>(null);
+    const [editingSectionTitle, setEditingSectionTitle] = React.useState<{
+        typeValue: string;
+        sectionId: string;
+        currentTitle: string;
+        isInspection: boolean;
+    } | null>(null);
     const [saveError, setSaveError] = React.useState<string | null>(null);
-    const formRef = React.useRef<HTMLFormElement>(null);
 
-    const handleSave = async (data: EquipmentTypeConfig) => {
-        console.log('Saving type:', { mode: dialogState.mode, data });
-        setSaveError(null);
+    React.useEffect(() => {
+        console.log('Current types:', types);
+    }, [types]);
+
+    const handleAddSection = (typeValue: string) => {
+        console.log('handleAddSection called with typeValue:', typeValue);
         
+        // Find the type
+        const type = types.find(t => t.value === typeValue);
+        if (!type) {
+            console.error('Type not found');
+            return;
+        }
+        console.log('Found type:', type);
+
+        // Create new section
+        const newSection: Section = {
+            id: crypto.randomUUID(),
+            title: 'New Section',
+            description: '',
+            order: type.sections?.length || 0,
+            fields: [],
+            conditions: [],
+            showWhen: []
+        };
+        console.log('Created new section:', newSection);
+
+        // Create updated type with new section
+        const updatedType: EquipmentTypeConfig = {
+            ...type,
+            value: type.value,
+            label: type.label,
+            sections: [...(type.sections || []), newSection],
+            barcodeRequired: type.barcodeRequired,
+            photoRequired: type.photoRequired,
+            inspectionConfig: type.inspectionConfig
+        };
+        console.log('Updated type:', updatedType);
+
         try {
-            await updateMutation.mutateAsync({
-                ...data,
-                fields: Array.isArray(data.fields) ? data.fields : [],
-                inspectionConfig: data.inspectionConfig || { sections: [] }
-            });
-            
-            // Close dialog and reset state
-            if (dialogState.mode !== 'none') {
-                closeDialog();
+            // Find and update the type in the array
+            const updatedTypes = types.map(t => 
+                t.value === typeValue ? updatedType : t
+            );
+            console.log('Updating with types:', updatedTypes);
+
+            updateMutation.mutate(updatedTypes);
+        } catch (error) {
+            console.error('Error in handleAddSection:', error);
+        }
+    };
+
+    const handleAddInspectionSection = (type: EquipmentTypeConfig) => {
+        const newSection = {
+            id: crypto.randomUUID(), // Generate unique ID
+            title: 'New Inspection Section',
+            order: type.inspectionConfig?.sections?.length || 0,
+            fields: [],
+            conditions: [],
+            showWhen: []
+        };
+
+        const updatedType = {
+            ...type,
+            inspectionConfig: {
+                ...type.inspectionConfig,
+                sections: [...(type.inspectionConfig?.sections || []), newSection]
             }
-            setAddingFieldsTo(null);
-            setEditingField(null);
+        };
+
+        updateMutation.mutate([updatedType]);
+    };
+
+    const handleEditSection = (typeValue: string, sectionId: string, updates: Partial<Section>) => {
+        const type = types.find(t => t.value === typeValue);
+        if (!type) return;
+
+        const updatedType = {
+            ...type,
+            sections: type.sections.map(section => 
+                section.id === sectionId ? { ...section, ...updates } : section
+            )
+        };
+
+        updateMutation.mutate([updatedType]);
+    };
+
+    const handleDeleteSection = (typeValue: string, sectionId: string) => {
+        const type = types.find(t => t.value === typeValue);
+        if (!type) return;
+
+        const updatedType = {
+            ...type,
+            sections: type.sections.filter(section => section.id !== sectionId)
+        };
+
+        updateMutation.mutate([updatedType]);
+    };
+
+    const handleMoveSection = (typeValue: string, sectionId: string, direction: 'up' | 'down') => {
+        const type = types.find(t => t.value === typeValue);
+        if (!type) return;
+
+        const sections = [...type.sections];
+        const currentIndex = sections.findIndex(s => s.id === sectionId);
+        if (currentIndex === -1) return;
+
+        const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+        if (newIndex < 0 || newIndex >= sections.length) return;
+
+        // Swap sections
+        [sections[currentIndex], sections[newIndex]] = [sections[newIndex], sections[currentIndex]];
+        
+        // Update order values
+        sections.forEach((section, index) => {
+            section.order = index;
+        });
+
+        const updatedType = {
+            ...type,
+            sections: sections
+        };
+
+        updateMutation.mutate([updatedType]);
+    };
+
+    const handleAddField = (typeValue: string, sectionId: string, field: FormField) => {
+        const type = types.find(t => t.value === typeValue);
+        if (!type) return;
+
+        // Ensure field has an ID
+        const fieldWithId = {
+            ...field,
+            id: field.id || crypto.randomUUID()
+        };
+
+        const updatedType = {
+            ...type,
+            sections: type.sections.map(section => {
+                if (section.id === sectionId) {
+                    return {
+                        ...section,
+                        fields: [...section.fields, fieldWithId]
+                    };
+                }
+                return section;
+            })
+        };
+
+        updateMutation.mutate([updatedType]);
+        setAddingFieldsTo(null);
+    };
+
+    const handleEditField = (typeValue: string, sectionId: string, fieldName: string, updates: Partial<FormField>) => {
+        const type = types.find(t => t.value === typeValue);
+        if (!type) return;
+
+        const updatedType = {
+            ...type,
+            sections: type.sections.map(section => {
+                if (section.id === sectionId) {
+                    return {
+                        ...section,
+                        fields: section.fields.map(field => 
+                            field.name === fieldName ? { ...field, ...updates } : field
+                        )
+                    };
+                }
+                return section;
+            })
+        };
+
+        updateMutation.mutate([updatedType]);
+        setEditingField(null);
+    };
+
+    const handleDeleteField = (typeValue: string, sectionId: string, fieldName: string) => {
+        const type = types.find(t => t.value === typeValue);
+        if (!type) return;
+
+        const updatedType: EquipmentTypeConfig = {
+            ...type,
+            sections: type.sections.map(section => {
+                if (section.id === sectionId) {
+                    return {
+                        ...section,
+                        fields: section.fields.filter(field => field.name !== fieldName)
+                    };
+                }
+                return section;
+            })
+        };
+
+        updateMutation.mutate([updatedType]);
+    };
+
+    const handleReorderFields = (typeValue: string, sectionId: string, sourceIndex: number, targetIndex: number) => {
+        const type = types.find(t => t.value === typeValue);
+        if (!type) return;
+
+        const section = type.sections.find(s => s.id === sectionId);
+        if (!section) return;
+
+        // Ensure all fields have IDs
+        const fieldsWithIds = section.fields.map(field => ({
+            ...field,
+            id: field.id || `field-${field.name}-${Math.random().toString(36).substr(2, 9)}`
+        }));
+
+        const [movedField] = fieldsWithIds.splice(sourceIndex, 1);
+        fieldsWithIds.splice(targetIndex, 0, movedField);
+
+        // Update order values
+        fieldsWithIds.forEach((field, index) => {
+            field.order = index;
+        });
+
+        const updatedType = {
+            ...type,
+            sections: type.sections.map(s => {
+                if (s.id === sectionId) {
+                    return {
+                        ...s,
+                        fields: fieldsWithIds
+                    };
+                }
+                return s;
+            })
+        };
+
+        updateMutation.mutate([updatedType]);
+    };
+
+    const handleDeleteInspectionSection = (typeValue: string, sectionIndex: number) => {
+        const typeIndex = types.findIndex(t => t.value === typeValue);
+        if (typeIndex === -1) return;
+
+        const type = types[typeIndex];
+        if (!type.inspectionConfig) return;
+
+        const updatedType = {
+            ...type,
+            inspectionConfig: {
+                ...type.inspectionConfig,
+                sections: type.inspectionConfig.sections.filter((_, i) => i !== sectionIndex)
+            }
+        };
+        updateMutation.mutate([updatedType]);
+    };
+
+    const handleEditSectionTitle = (typeValue: string, sectionId: string, newTitle: string, isInspection: boolean = false) => {
+        const type = types.find(t => t.value === typeValue);
+        if (!type) return;
+
+        const updatedType = { ...type };
+        
+        if (isInspection) {
+            if (!updatedType.inspectionConfig?.sections) return;
             
-            return true;
-        } catch (err) {
-            console.error('Error saving type:', err);
-            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-            setSaveError(errorMessage);
-            return false;
-        }
-    };
-
-    const handleAddField = async (typeValue: string, field: FormField) => {
-        console.log('Adding field:', { typeValue, field, types });
-        
-        if (!Array.isArray(types)) {
-            console.error('Types is not an array:', types);
-            setSaveError('Failed to add field: Types data is invalid');
-            return;
+            updatedType.inspectionConfig = {
+                ...updatedType.inspectionConfig,
+                sections: updatedType.inspectionConfig.sections.map(section =>
+                    section.id === sectionId ? { ...section, title: newTitle } : section
+                )
+            };
+        } else {
+            updatedType.sections = updatedType.sections.map(section =>
+                section.id === sectionId ? { ...section, title: newTitle } : section
+            );
         }
 
-        const type = types.find(t => t.value === typeValue);
-        if (!type) {
-            console.error('Type not found:', typeValue);
-            setSaveError('Failed to add field: Equipment type not found');
-            return;
-        }
-
-        console.log('Found type:', type);
-
-        const updatedType = {
-            ...type,
-            fields: Array.isArray(type.fields) ? [...type.fields, field] : [field]
-        };
-
-        console.log('Updated type:', updatedType);
-        const success = await handleSave(updatedType);
-        if (success) {
-            setAddingFieldsTo(null);
-        }
-    };
-
-    const handleEditField = async (typeValue: string, oldField: FormField, newField: FormField) => {
-        console.log('Editing field:', { typeValue, oldField, newField, types });
-        
-        if (!Array.isArray(types)) {
-            console.error('Types is not an array:', types);
-            setSaveError('Failed to edit field: Types data is invalid');
-            return;
-        }
-
-        const type = types.find(t => t.value === typeValue);
-        if (!type) {
-            console.error('Type not found:', typeValue);
-            setSaveError('Failed to edit field: Equipment type not found');
-            return;
-        }
-
-        console.log('Found type:', type);
-
-        const updatedType = {
-            ...type,
-            fields: Array.isArray(type.fields) ? 
-                type.fields.map(f => f.name === oldField.name ? newField : f) :
-                [newField]
-        };
-
-        console.log('Updated type:', updatedType);
-        const success = await handleSave(updatedType);
-        if (success) {
-            setEditingField(null);
-        }
-    };
-
-    const handleDeleteField = async (typeValue: string, fieldName: string) => {
-        console.log('Deleting field:', { typeValue, fieldName, types });
-        
-        if (!Array.isArray(types)) {
-            console.error('Types is not an array:', types);
-            setSaveError('Failed to delete field: Types data is invalid');
-            return;
-        }
-
-        const type = types.find(t => t.value === typeValue);
-        if (!type) {
-            console.error('Type not found:', typeValue);
-            setSaveError('Failed to delete field: Equipment type not found');
-            return;
-        }
-
-        console.log('Found type:', type);
-
-        const updatedType = {
-            ...type,
-            fields: Array.isArray(type.fields) ? 
-                type.fields.filter(f => f.name !== fieldName) :
-                []
-        };
-
-        console.log('Updated type:', updatedType);
-        await handleSave(updatedType);
-    };
-
-    if (isLoading) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                <CircularProgress />
-            </Box>
+        const updatedTypes = types.map(t =>
+            t.value === typeValue ? updatedType : t
         );
-    }
 
-    if (fetchError || updateMutation.error || saveError) {
-        const errorMessage = saveError || 
-            (updateMutation.error instanceof Error ? updateMutation.error.message : 'An error occurred') ||
-            (fetchError instanceof Error ? fetchError.message : 'An error occurred');
-            
-        return (
-            <Box sx={{ p: 2, color: 'error.main' }}>
-                <Typography>{errorMessage}</Typography>
-            </Box>
-        );
-    }
+        updateMutation.mutate(updatedTypes);
+        setEditingSectionTitle(null);
+    };
 
-    const isFormDialog = dialogState.isOpen && dialogState.mode !== 'delete';
+    const handleReorderSections = (typeValue: string, result: any) => {
+        if (!result.destination) return;
+        if (result.source.index === result.destination.index) return;
+
+        const type = types.find(t => t.value === typeValue);
+        if (!type) return;
+
+        const sections = Array.from(type.sections || []);
+        const [movedSection] = sections.splice(result.source.index, 1);
+        sections.splice(result.destination.index, 0, movedSection);
+
+        // Update order values
+        sections.forEach((section, index) => {
+            section.order = index;
+        });
+
+        const updatedType = {
+            ...type,
+            sections
+        };
+
+        updateMutation.mutate([updatedType]);
+    };
+
+    const handleReorderInspectionSections = (typeValue: string, result: any) => {
+        if (!result.destination) return;
+        if (result.source.index === result.destination.index) return;
+
+        const type = types.find(t => t.value === typeValue);
+        if (!type || !type.inspectionConfig) return;
+
+        const sections = Array.from(type.inspectionConfig.sections || []);
+        const [movedSection] = sections.splice(result.source.index, 1);
+        sections.splice(result.destination.index, 0, movedSection);
+
+        const updatedType = {
+            ...type,
+            inspectionConfig: {
+                ...type.inspectionConfig,
+                sections
+            }
+        };
+
+        updateMutation.mutate([updatedType]);
+    };
+
+    const handleDeleteInspectionField = (typeValue: string, sectionId: string, fieldName: string) => {
+        const type = types.find(t => t.value === typeValue);
+        if (!type) return;
+
+        const updatedType: EquipmentTypeConfig = {
+            ...type,
+            inspectionConfig: {
+                ...type.inspectionConfig,
+                sections: type.inspectionConfig.sections.map(section => {
+                    if (section.id === sectionId) {
+                        return {
+                            ...section,
+                            fields: section.fields.filter(field => field.name !== fieldName)
+                        };
+                    }
+                    return section;
+                })
+            }
+        };
+
+        updateMutation.mutate([updatedType]);
+    };
 
     return (
         <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h6">
-                    Equipment Types
-                </Typography>
-                <Button 
-                    variant="contained"
-                    onClick={openCreateDialog}
-                >
-                    Add Equipment Type
-                </Button>
-            </Box>
-
-            <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
-                Configure the available equipment types and their fields
-            </Typography>
-
-            <List>
-                {types.map((type: EquipmentTypeConfig) => (
-                    <ListItem
-                        key={type.value}
-                        disablePadding
-                        sx={{
-                            display: 'block',
-                            backgroundColor: 'background.paper',
-                            mb: 2,
-                            borderRadius: 1,
-                            boxShadow: 1
-                        }}
-                    >
-                        <ListItemButton onClick={() => setExpandedType(expandedType === type.value ? null : type.value)} sx={{ p: 2 }}>
-                            <Typography variant="h5" sx={{ flex: 1, fontWeight: 600, fontSize: '1.5rem' }}>
-                                {type.label}
-                            </Typography>
-                            {expandedType === type.value ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                        </ListItemButton>
-                        <Collapse in={expandedType === type.value}>
-                            <Box sx={{ p: 2 }}>
-                                <Box sx={{ pl: 2, mb: 3 }}>
-                                    <Typography variant="caption" color="text.secondary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
-                                        General Settings
-                                    </Typography>
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
-                                        <FormControlLabel
-                                            control={
-                                                <Switch
-                                                    checked={type.barcodeRequired}
-                                                    onChange={async (e) => {
-                                                        const updatedType = {
-                                                            ...type,
-                                                            barcodeRequired: e.target.checked
-                                                        };
-                                                        await handleSave(updatedType);
-                                                    }}
-                                                />
-                                            }
-                                            label="Require Barcode"
-                                        />
-                                        <FormControlLabel
-                                            control={
-                                                <Switch
-                                                    checked={type.photoRequired}
-                                                    onChange={async (e) => {
-                                                        const updatedType = {
-                                                            ...type,
-                                                            photoRequired: e.target.checked
-                                                        };
-                                                        await handleSave(updatedType);
-                                                    }}
-                                                />
-                                            }
-                                            label="Require Photo"
-                                        />
-                                    </Box>
-                                </Box>
-
-                                <Divider sx={{ my: 2 }} />
-
-                                <Box sx={{ pl: 2, mb: 3 }}>
-                                    <Typography variant="caption" color="text.secondary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
-                                        Fields
-                                    </Typography>
-                                    <Box sx={{ mt: 1 }}>
-                                        <Button
-                                            variant="outlined"
-                                            size="small"
-                                            onClick={() => setAddingFieldsTo(type.value)}
-                                            startIcon={<AddIcon />}
-                                        >
-                                            Add Field
-                                        </Button>
-                                    </Box>
-                                    <Box sx={{ mt: 2 }}>
-                                        <FieldList
-                                            fields={type.fields || []}
-                                            onDeleteField={(fieldName) => handleDeleteField(type.value, fieldName)}
-                                            onEditField={(field) => setEditingField({ typeValue: type.value, field })}
-                                            onAddCondition={(fieldName, condition) => {
-                                                const field = type.fields?.find(f => f.name === fieldName);
-                                                if (field) {
-                                                    const updatedField = {
-                                                        ...field,
-                                                        conditions: [...(field.conditions || []), condition]
-                                                    };
-                                                    handleEditField(type.value, field, updatedField);
-                                                }
-                                            }}
-                                            onDeleteCondition={(fieldName, conditionIndex) => {
-                                                const field = type.fields?.find(f => f.name === fieldName);
-                                                if (field && field.conditions) {
-                                                    const updatedField = {
-                                                        ...field,
-                                                        conditions: field.conditions.filter((_, i) => i !== conditionIndex)
-                                                    };
-                                                    handleEditField(type.value, field, updatedField);
-                                                }
-                                            }}
-                                        />
-                                    </Box>
-                                </Box>
-
-                                <Divider sx={{ my: 2 }} />
-
-                                <Box sx={{ pl: 2 }}>
-                                    <Typography variant="caption" color="text.secondary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
-                                        Inspection Form
-                                    </Typography>
-                                    <InspectionFormBuilder
-                                        equipmentType={type}
-                                        onSave={handleSave}
+            {isLoading ? (
+                <CircularProgress />
+            ) : fetchError ? (
+                <Typography color="error">{fetchError.message}</Typography>
+            ) : (
+                <>
+                    <List>
+                        {types.map((type) => (
+                            <ListItem
+                                key={type.value}
+                                disablePadding
+                                sx={{ flexDirection: 'column', alignItems: 'stretch' }}
+                            >
+                                <ListItemButton
+                                    onClick={() => setExpandedType(expandedType === type.value ? null : type.value)}
+                                    sx={{
+                                        '& .MuiTypography-root': {
+                                            fontSize: '1.5rem',
+                                            fontWeight: 600
+                                        }
+                                    }}
+                                >
+                                    <ListItemText 
+                                        primary={type.label}
+                                        primaryTypographyProps={{
+                                            variant: 'h4',
+                                            sx: { mb: 0 }
+                                        }}
                                     />
-                                </Box>
+                                    {expandedType === type.value ? (
+                                        <KeyboardArrowDownIcon sx={{ fontSize: '2rem' }} />
+                                    ) : (
+                                        <KeyboardArrowRightIcon sx={{ fontSize: '2rem' }} />
+                                    )}
+                                </ListItemButton>
 
-                                <Divider sx={{ my: 2 }} />
+                                <Collapse in={expandedType === type.value}>
+                                    <Box sx={{ pl: 2, pr: 2, pb: 2 }}>
+                                        {/* Equipment Form Section */}
+                                        <Box sx={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center',
+                                            p: 1,
+                                            bgcolor: 'background.paper',
+                                            borderRadius: 1,
+                                            mb: 2
+                                        }}>
+                                            <Typography 
+                                                variant="h6"
+                                                sx={{ flex: 1, mb: 0 }}
+                                            >
+                                                Equipment Form
+                                            </Typography>
+                                            <Button
+                                                variant="contained"
+                                                startIcon={<AddIcon />}
+                                                onClick={() => handleAddSection(type.value)}
+                                                size="small"
+                                            >
+                                                Add Section
+                                            </Button>
+                                        </Box>
+                                        <DragDropContext onDragEnd={(result) => handleReorderSections(type.value, result)}>
+                                            <Droppable droppableId={`equipment-sections-${type.value}`} isDropDisabled={false} isCombineEnabled={false} ignoreContainerClipping={false}>
+                                                {(provided) => (
+                                                    <Box {...provided.droppableProps} ref={provided.innerRef}>
+                                                        {type.sections?.map((section, index) => (
+                                                            <Draggable key={section.id} draggableId={section.id} index={index} isDragDisabled={false}>
+                                                                {(provided) => (
+                                                                    <Box
+                                                                        ref={provided.innerRef}
+                                                                        {...provided.draggableProps}
+                                                                        {...provided.dragHandleProps}
+                                                                        sx={{
+                                                                            mb: 2,
+                                                                            p: 2,
+                                                                            bgcolor: 'background.paper',
+                                                                            borderRadius: 1,
+                                                                            border: '1px solid',
+                                                                            borderColor: 'divider'
+                                                                        }}
+                                                                    >
+                                                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                                                            <Typography variant="h6" sx={{ flex: 1 }}>
+                                                                                {section.title}
+                                                                            </Typography>
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                onClick={() => setEditingSectionTitle({
+                                                                                    typeValue: type.value,
+                                                                                    sectionId: section.id,
+                                                                                    currentTitle: section.title,
+                                                                                    isInspection: false
+                                                                                })}
+                                                                                sx={{ mr: 1 }}
+                                                                            >
+                                                                                <EditIcon />
+                                                                            </IconButton>
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                onClick={() => handleDeleteSection(type.value, section.id)}
+                                                                                color="error"
+                                                                            >
+                                                                                <DeleteIcon />
+                                                                            </IconButton>
+                                                                        </Box>
+                                                                        <Box sx={{ pl: 2 }}>
+                                                                            <Button
+                                                                                startIcon={<AddIcon />}
+                                                                                onClick={() => setAddingFieldsTo({ typeValue: type.value, sectionId: section.id })}
+                                                                                size="small"
+                                                                            >
+                                                                                Add Field
+                                                                            </Button>
+                                                                            {section.fields && (
+                                                                                <FieldList
+                                                                                    fields={section.fields}
+                                                                                    onAddField={(field) => handleAddField(type.value, section.id, field)}
+                                                                                    onEditField={(field) => handleEditField(type.value, section.id, field.name, field)}
+                                                                                    onDeleteField={(name) => handleDeleteField(type.value, section.id, name)}
+                                                                                    onReorderFields={(result) => handleReorderFields(type.value, section.id, result.source.index, result.destination.index)}
+                                                                                    onAddCondition={(fieldName, condition) => handleAddCondition(type.value, section.id, fieldName, condition)}
+                                                                                    onDeleteCondition={(fieldName, conditionIndex) => handleDeleteCondition(type.value, section.id, fieldName, conditionIndex)}
+                                                                                />
+                                                                            )}
+                                                                        </Box>
+                                                                    </Box>
+                                                                )}
+                                                            </Draggable>
+                                                        ))}
+                                                        {provided.placeholder}
+                                                    </Box>
+                                                )}
+                                            </Droppable>
+                                        </DragDropContext>
 
-                                <Box sx={{ display: 'flex', gap: 1 }}>
-                                    <Button
-                                        size="small"
-                                        onClick={() => openEditDialog(type)}
-                                        startIcon={<EditIcon />}
-                                    >
-                                        Edit Type
-                                    </Button>
-                                    <Button
-                                        size="small"
-                                        onClick={() => openDeleteDialog(type)}
-                                        startIcon={<DeleteIcon />}
-                                        color="error"
-                                    >
-                                        Delete Type
-                                    </Button>
-                                </Box>
-                            </Box>
-                        </Collapse>
-                    </ListItem>
-                ))}
-            </List>
+                                        {/* Inspection Form Section */}
+                                        <Box sx={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center',
+                                            p: 1,
+                                            bgcolor: 'background.paper',
+                                            borderRadius: 1,
+                                            mb: 2
+                                        }}>
+                                            <Typography 
+                                                variant="h6"
+                                                sx={{ flex: 1, mb: 0 }}
+                                            >
+                                                Inspection Form
+                                            </Typography>
+                                            <Button
+                                                variant="contained"
+                                                startIcon={<AddIcon />}
+                                                onClick={() => handleAddInspectionSection(type)}
+                                                size="small"
+                                            >
+                                                Add Section
+                                            </Button>
+                                        </Box>
+                                        <DragDropContext onDragEnd={(result) => handleReorderInspectionSections(type.value, result)}>
+                                            <Droppable droppableId={`inspection-sections-${type.value}`} isDropDisabled={false} isCombineEnabled={false} ignoreContainerClipping={false}>
+                                                {(provided) => (
+                                                    <Box {...provided.droppableProps} ref={provided.innerRef}>
+                                                        {type.inspectionConfig?.sections?.map((section, index) => (
+                                                            <Draggable key={section.id} draggableId={section.id} index={index} isDragDisabled={false}>
+                                                                {(provided) => (
+                                                                    <Box
+                                                                        ref={provided.innerRef}
+                                                                        {...provided.draggableProps}
+                                                                        {...provided.dragHandleProps}
+                                                                        sx={{
+                                                                            mb: 2,
+                                                                            p: 2,
+                                                                            bgcolor: 'background.paper',
+                                                                            borderRadius: 1,
+                                                                            border: '1px solid',
+                                                                            borderColor: 'divider'
+                                                                        }}
+                                                                    >
+                                                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                                                            <Typography variant="h6" sx={{ flex: 1 }}>
+                                                                                {section.title}
+                                                                            </Typography>
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                onClick={() => setEditingSectionTitle({
+                                                                                    typeValue: type.value,
+                                                                                    sectionId: section.id,
+                                                                                    currentTitle: section.title,
+                                                                                    isInspection: true
+                                                                                })}
+                                                                                sx={{ mr: 1 }}
+                                                                            >
+                                                                                <EditIcon />
+                                                                            </IconButton>
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                onClick={() => handleDeleteInspectionSection(type.value, index)}
+                                                                                color="error"
+                                                                            >
+                                                                                <DeleteIcon />
+                                                                            </IconButton>
+                                                                        </Box>
+                                                                        <Box sx={{ pl: 2 }}>
+                                                                            <Button
+                                                                                startIcon={<AddIcon />}
+                                                                                onClick={() => setAddingFieldsTo({ typeValue: type.value, sectionId: section.id })}
+                                                                                size="small"
+                                                                            >
+                                                                                Add Field
+                                                                            </Button>
+                                                                            {section.fields && (
+                                                                                <FieldList
+                                                                                    fields={section.fields}
+                                                                                    onAddField={(field) => handleAddField(type.value, section.id, field)}
+                                                                                    onEditField={(field) => handleEditField(type.value, section.id, field.name, field)}
+                                                                                    onDeleteField={(name) => handleDeleteField(type.value, section.id, name)}
+                                                                                    onReorderFields={(result) => handleReorderFields(type.value, section.id, result.source.index, result.destination.index)}
+                                                                                    onAddCondition={(fieldName, condition) => handleAddCondition(type.value, section.id, fieldName, condition)}
+                                                                                    onDeleteCondition={(fieldName, conditionIndex) => handleDeleteCondition(type.value, section.id, fieldName, conditionIndex)}
+                                                                                />
+                                                                            )}
+                                                                        </Box>
+                                                                    </Box>
+                                                                )}
+                                                            </Draggable>
+                                                        ))}
+                                                        {provided.placeholder}
+                                                    </Box>
+                                                )}
+                                            </Droppable>
+                                        </DragDropContext>
+                                    </Box>
+                                </Collapse>
+                            </ListItem>
+                        ))}
+                    </List>
 
-            {isFormDialog && (
-                <CrudFormDialog
-                    open={true}
-                    onClose={closeDialog}
-                    title={dialogState.mode === 'create' ? 'Add Equipment Type' : 'Edit Equipment Type'}
-                    actions={
-                        <>
-                            <Button onClick={closeDialog}>
-                                Cancel
-                            </Button>
+                    {editingField && (
+                        <SelectFieldDialog
+                            open={true}
+                            onClose={() => setEditingField(null)}
+                            onSave={(field) => {
+                                if (editingField) {
+                                    handleEditField(
+                                        editingField.typeValue,
+                                        editingField.sectionId,
+                                        editingField.field.name,
+                                        field
+                                    );
+                                }
+                            }}
+                            initialValues={editingField.field}
+                        />
+                    )}
+                    {/* Edit Section Title Dialog */}
+                    <Dialog 
+                        open={editingSectionTitle !== null} 
+                        onClose={() => setEditingSectionTitle(null)}
+                        maxWidth="sm"
+                        fullWidth
+                    >
+                        <DialogTitle>Edit Section Title</DialogTitle>
+                        <DialogContent>
+                            <TextField
+                                autoFocus
+                                margin="dense"
+                                label="Section Title"
+                                type="text"
+                                fullWidth
+                                value={editingSectionTitle?.currentTitle || ''}
+                                onChange={(e) => setEditingSectionTitle(prev => prev ? {
+                                    ...prev,
+                                    currentTitle: e.target.value
+                                } : null)}
+                            />
+                        </DialogContent>
+                        <DialogActions>
+                            <Button onClick={() => setEditingSectionTitle(null)}>Cancel</Button>
                             <Button 
-                                onClick={() => formRef.current?.requestSubmit()}
+                                onClick={() => {
+                                    if (editingSectionTitle) {
+                                        handleEditSectionTitle(
+                                            editingSectionTitle.typeValue,
+                                            editingSectionTitle.sectionId,
+                                            editingSectionTitle.currentTitle,
+                                            editingSectionTitle.isInspection
+                                        );
+                                    }
+                                }}
                                 variant="contained"
                             >
-                                {dialogState.mode === 'create' ? 'Add Type' : 'Save Changes'}
+                                Save
                             </Button>
-                        </>
-                    }
-                >
-                    <form ref={formRef} onSubmit={(e) => {
-                        e.preventDefault();
-                        const formData = new FormData(e.currentTarget);
-                        const name = formData.get('name') as string;
-                        
-                        if (!name.trim()) return;
-
-                        if (dialogState.mode === 'create' && 
-                            types.some(t => t.value === name.trim().toLowerCase())) {
-                            alert('An equipment type with this name already exists');
-                            return;
-                        }
-
-                        handleSave({
-                            value: name.toLowerCase(),
-                            label: name,
-                            fields: dialogState.data?.fields || [],
-                            barcodeRequired: false,
-                            photoRequired: false
-                        });
-                    }}>
-                        <TextField
-                            name="name"
-                            label="Type Name"
-                            defaultValue={dialogState.data?.label || ''}
-                            fullWidth
-                            autoFocus
-                            required
-                        />
-                    </form>
-                </CrudFormDialog>
-            )}
-
-            {/* Field Selection Dialog */}
-            <SelectFieldDialog
-                open={!!addingFieldsTo}
-                onClose={() => setAddingFieldsTo(null)}
-                onSelect={(field) => handleAddField(addingFieldsTo!, field)}
-                existingFieldNames={(types.find(t => t.value === addingFieldsTo)?.fields || []).map(f => f.name)}
-            />
-
-            {/* Field Editing Dialog */}
-            {editingField && (
-                <SelectFieldDialog
-                    open={true}
-                    onClose={() => setEditingField(null)}
-                    onSave={(newField) => handleEditField(editingField.typeValue, editingField.field, newField)}
-                    initialValues={editingField.field}
-                />
-            )}
-
-            {dialogState.mode === 'delete' && dialogState.data && (
-                <CrudDeleteDialog
-                    open={true}
-                    onClose={closeDialog}
-                    onConfirm={async () => {
-                        if (!dialogState.data) return;
-                        await handleSave({
-                            ...dialogState.data,
-                            deleted: true
-                        });
-                        closeDialog();
-                    }}
-                    title="Delete Equipment Type"
-                    message={`Are you sure you want to delete the "${dialogState.data.label}" equipment type? This action cannot be undone.`}
-                />
+                        </DialogActions>
+                    </Dialog>
+                </>
             )}
         </Box>
     );

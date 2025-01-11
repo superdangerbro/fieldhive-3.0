@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { EquipmentTypeConfig, FormField } from '../types/components/types';
+import type { EquipmentTypeConfig, FormField, Section } from '../types/components/types';
 import type { EquipmentStatus } from '@/app/globalTypes/equipment';
 import { ENV_CONFIG } from '@/config/environment';
 import { validateApiResponse, validateEquipmentType, validateFieldConfig } from '../types/utils/validation';
@@ -26,6 +26,7 @@ interface ApiFieldConfig {
 interface ApiEquipmentType {
     name: string;
     fields: ApiFieldConfig[];
+    sections?: Section[];
     barcodeRequired?: boolean;
     photoRequired?: boolean;
     inspectionConfig?: any;
@@ -145,20 +146,15 @@ const transformToApiField = (field: FormField): ApiFieldConfig => {
 // Transform API type to frontend type
 const transformApiType = (apiType: ApiEquipmentType): EquipmentTypeConfig => {
     console.log('Transforming API type:', apiType);
+    
     const transformed: EquipmentTypeConfig = {
-        value: apiType.name.toLowerCase(),
+        value: apiType.name,
         label: apiType.name,
-        fields: apiType.fields.map(transformApiField),
+        sections: apiType.sections || [],
         barcodeRequired: apiType.barcodeRequired,
         photoRequired: apiType.photoRequired,
         inspectionConfig: apiType.inspectionConfig
     };
-
-    // Validate the transformed type
-    const errors = validateEquipmentType(transformed);
-    if (errors.length > 0) {
-        console.warn('Equipment type validation errors:', errors);
-    }
 
     console.log('Transformed to:', transformed);
     return transformed;
@@ -168,15 +164,10 @@ const transformApiType = (apiType: ApiEquipmentType): EquipmentTypeConfig => {
 const transformToApiType = (type: EquipmentTypeConfig): ApiEquipmentType => {
     console.log('Transforming frontend type:', type);
     
-    // Validate the type before transforming
-    const errors = validateEquipmentType(type);
-    if (errors.length > 0) {
-        console.warn('Equipment type validation errors:', errors);
-    }
-
-    const transformed = {
-        name: type.label || type.value,
-        fields: type.fields.map(transformToApiField),
+    const transformed: ApiEquipmentType = {
+        name: type.value,
+        fields: [],
+        sections: type.sections,
         barcodeRequired: type.barcodeRequired,
         photoRequired: type.photoRequired,
         inspectionConfig: type.inspectionConfig
@@ -223,17 +214,20 @@ export const useEquipmentTypes = () => {
 export const useUpdateEquipmentTypes = () => {
     const queryClient = useQueryClient();
 
-    return useMutation<EquipmentTypeConfig, Error, EquipmentTypeConfig>({
-        mutationFn: async (type) => {
-            console.log('Updating equipment type with:', type);
+    return useMutation<EquipmentTypeConfig[], Error, EquipmentTypeConfig[]>({
+        mutationFn: async (types) => {
+            console.log('Updating equipment types with:', types);
             try {
-                const apiType = transformToApiType(type);
-                console.log('Transformed for API:', apiType);
+                const apiTypes = types.map(type => {
+                    console.log('Transforming type:', type);
+                    return transformToApiType(type);
+                });
+                console.log('Transformed for API:', apiTypes);
 
                 const response = await fetch(buildUrl(ENDPOINTS.types), {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify([apiType]), // Send as array for API compatibility
+                    body: JSON.stringify(apiTypes),
                     signal: AbortSignal.timeout(ENV_CONFIG.api.timeout),
                 });
 
@@ -254,16 +248,15 @@ export const useUpdateEquipmentTypes = () => {
                 }
 
                 const data = await response.json();
-                return transformApiType(data[0]); // Get first item since we only sent one
+                return data.map(transformApiType);
             } catch (err) {
-                console.error('Error updating equipment type:', err);
+                console.error('Error updating equipment types:', err);
                 throw err;
             }
         },
         onSuccess: () => {
-            // Invalidate and refetch equipment types
             queryClient.invalidateQueries({ queryKey: ['equipmentTypes'] });
-        },
+        }
     });
 };
 

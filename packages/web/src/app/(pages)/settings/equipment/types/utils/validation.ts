@@ -60,7 +60,16 @@ export function validateFieldConfig(field: FormField): string[] {
     return errors;
 }
 
-export function validateEquipmentType(type: { value: string; label: string; fields: FormField[] }): string[] {
+export function validateEquipmentType(type: { 
+    value: string; 
+    label: string; 
+    sections: Array<{ 
+        id: string; 
+        title: string; 
+        order: number; 
+        fields: FormField[] 
+    }> 
+}): string[] {
     const errors: string[] = [];
 
     // Validate required properties
@@ -70,34 +79,53 @@ export function validateEquipmentType(type: { value: string; label: string; fiel
     if (!type.label) {
         errors.push('Type label is required');
     }
-    if (!Array.isArray(type.fields)) {
-        errors.push('Fields must be an array');
+    if (!Array.isArray(type.sections)) {
+        errors.push('Sections must be an array');
         return errors;
     }
 
-    // Validate field names are unique
-    const fieldNames = new Set<string>();
-    type.fields.forEach(field => {
-        if (fieldNames.has(field.name)) {
-            errors.push(`Duplicate field name: ${field.name}`);
+    // Validate sections
+    type.sections.forEach((section, sectionIndex) => {
+        if (!section.id) {
+            errors.push(`Section ${sectionIndex + 1}: ID is required`);
         }
-        fieldNames.add(field.name);
-    });
-
-    // Validate each field
-    type.fields.forEach((field, index) => {
-        const fieldErrors = validateFieldConfig(field);
-        if (fieldErrors.length > 0) {
-            errors.push(`Field "${field.name || index}": ${fieldErrors.join(', ')}`);
+        if (!section.title) {
+            errors.push(`Section ${sectionIndex + 1}: Title is required`);
         }
-    });
+        if (!Array.isArray(section.fields)) {
+            errors.push(`Section "${section.title || sectionIndex}": Fields must be an array`);
+            return;
+        }
 
-    // Validate condition references
-    type.fields.forEach(field => {
-        field.conditions?.forEach((condition, index) => {
-            if (!type.fields.some(f => f.name === condition.field)) {
-                errors.push(`Field "${field.name}" condition ${index + 1}: References non-existent field "${condition.field}"`);
+        // Validate field names are unique across all sections
+        const fieldNames = new Set<string>();
+        type.sections.forEach(s => {
+            s.fields.forEach(field => {
+                if (fieldNames.has(field.name)) {
+                    errors.push(`Duplicate field name across sections: ${field.name}`);
+                }
+                fieldNames.add(field.name);
+            });
+        });
+
+        // Validate each field in the section
+        section.fields.forEach((field, fieldIndex) => {
+            const fieldErrors = validateFieldConfig(field);
+            if (fieldErrors.length > 0) {
+                errors.push(`Section "${section.title}", Field "${field.name || fieldIndex}": ${fieldErrors.join(', ')}`);
             }
+        });
+
+        // Validate condition references across all sections
+        section.fields.forEach(field => {
+            field.conditions?.forEach((condition, conditionIndex) => {
+                const fieldExists = type.sections.some(s => 
+                    s.fields.some(f => f.name === condition.field)
+                );
+                if (!fieldExists) {
+                    errors.push(`Section "${section.title}", Field "${field.name}" condition ${conditionIndex + 1}: References non-existent field "${condition.field}"`);
+                }
+            });
         });
     });
 
