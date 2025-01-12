@@ -25,16 +25,18 @@ class FieldRegistry {
     private baseFields: Map<string, BaseField> = new Map();
 
     private constructor() {
-        // Load from localStorage if available
-        const savedFields = localStorage.getItem('baseFields');
-        if (savedFields) {
-            try {
-                const fields = JSON.parse(savedFields);
-                Object.values(fields).forEach((field: any) => {
-                    this.baseFields.set(field.name, field as BaseField);
-                });
-            } catch (e) {
-                console.error('Error loading fields from localStorage:', e);
+        // Only try to load from localStorage in the browser
+        if (typeof window !== 'undefined') {
+            const savedFields = localStorage.getItem('baseFields');
+            if (savedFields) {
+                try {
+                    const fields = JSON.parse(savedFields);
+                    Object.values(fields).forEach((field: any) => {
+                        this.baseFields.set(field.name, field as BaseField);
+                    });
+                } catch (e) {
+                    console.error('Error loading fields from localStorage:', e);
+                }
             }
         }
     }
@@ -82,8 +84,11 @@ class FieldRegistry {
     }
 
     private saveToStorage(): void {
-        const fieldsObj = Object.fromEntries(this.baseFields);
-        localStorage.setItem('baseFields', JSON.stringify(fieldsObj));
+        // Only save to localStorage in the browser
+        if (typeof window !== 'undefined') {
+            const fieldsObj = Object.fromEntries(this.baseFields);
+            localStorage.setItem('baseFields', JSON.stringify(fieldsObj));
+        }
     }
 }
 

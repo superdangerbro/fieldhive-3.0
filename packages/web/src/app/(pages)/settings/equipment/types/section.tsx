@@ -35,6 +35,7 @@ import type { EquipmentTypeConfig, FormField } from './components/types';
 import { SelectFieldDialog } from '@/app/components/fields/SelectFieldDialog';
 import { FieldList } from './components/FieldList';
 import { InspectionFormBuilder } from './components/InspectionFormBuilder';
+import { AddFieldForm } from './components/AddFieldForm';
 
 export function EquipmentTypeSection() {
     console.log('EquipmentTypeSection render');
@@ -92,9 +93,24 @@ export function EquipmentTypeSection() {
 
         console.log('Found type:', type);
 
+        // Create a new field object with the correct structure
+        const newField = {
+            name: field.name,
+            label: field.label,
+            type: field.type,
+            description: field.description,
+            required: field.required,
+            showWhen: field.showWhen || [],
+            config: field.type === 'capture-flow' ? {
+                requireBarcode: true,
+                requirePhoto: true,
+                photoInstructions: 'Take a clear photo of the equipment'
+            } : field.config || {}
+        };
+
         const updatedType = {
             ...type,
-            fields: Array.isArray(type.fields) ? [...type.fields, field] : [field]
+            fields: Array.isArray(type.fields) ? [...type.fields, newField] : [newField]
         };
 
         console.log('Updated type:', updatedType);
@@ -122,11 +138,26 @@ export function EquipmentTypeSection() {
 
         console.log('Found type:', type);
 
+        // Create a new field object with the correct structure
+        const updatedField = {
+            name: newField.name,
+            label: newField.label,
+            type: newField.type,
+            description: newField.description,
+            required: newField.required,
+            showWhen: newField.showWhen || [],
+            config: newField.type === 'capture-flow' ? {
+                requireBarcode: true,
+                requirePhoto: true,
+                photoInstructions: 'Take a clear photo of the equipment'
+            } : newField.config || {}
+        };
+
         const updatedType = {
             ...type,
             fields: Array.isArray(type.fields) ? 
-                type.fields.map(f => f.name === oldField.name ? newField : f) :
-                [newField]
+                type.fields.map(f => f.name === oldField.name ? updatedField : f) :
+                [updatedField]
         };
 
         console.log('Updated type:', updatedType);
@@ -226,46 +257,6 @@ export function EquipmentTypeSection() {
                         </ListItemButton>
                         <Collapse in={expandedType === type.value}>
                             <Box sx={{ p: 2 }}>
-                                <Box sx={{ pl: 2, mb: 3 }}>
-                                    <Typography variant="caption" color="text.secondary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
-                                        General Settings
-                                    </Typography>
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
-                                        <FormControlLabel
-                                            control={
-                                                <Switch
-                                                    checked={type.barcodeRequired}
-                                                    onChange={async (e) => {
-                                                        const updatedType = {
-                                                            ...type,
-                                                            barcodeRequired: e.target.checked
-                                                        };
-                                                        await handleSave(updatedType);
-                                                    }}
-                                                />
-                                            }
-                                            label="Require Barcode"
-                                        />
-                                        <FormControlLabel
-                                            control={
-                                                <Switch
-                                                    checked={type.photoRequired}
-                                                    onChange={async (e) => {
-                                                        const updatedType = {
-                                                            ...type,
-                                                            photoRequired: e.target.checked
-                                                        };
-                                                        await handleSave(updatedType);
-                                                    }}
-                                                />
-                                            }
-                                            label="Require Photo"
-                                        />
-                                    </Box>
-                                </Box>
-
-                                <Divider sx={{ my: 2 }} />
-
                                 <Box sx={{ pl: 2, mb: 3 }}>
                                     <Typography variant="caption" color="text.secondary" gutterBottom sx={{ textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
                                         Fields
@@ -408,12 +399,24 @@ export function EquipmentTypeSection() {
 
             {/* Field Editing Dialog */}
             {editingField && (
-                <SelectFieldDialog
+                <Dialog
                     open={true}
                     onClose={() => setEditingField(null)}
-                    onSave={(newField) => handleEditField(editingField.typeValue, editingField.field, newField)}
-                    initialValues={editingField.field}
-                />
+                    maxWidth="sm"
+                    fullWidth
+                >
+                    <DialogTitle>Edit Field</DialogTitle>
+                    <DialogContent>
+                        <AddFieldForm
+                            onAdd={(newField) => handleEditField(editingField.typeValue, editingField.field, newField)}
+                            onCancel={() => setEditingField(null)}
+                            existingFields={(types.find(t => t.value === editingField.typeValue)?.fields || [])
+                                .filter(f => f.name !== editingField.field.name)
+                                .map(f => f.name)}
+                            initialValues={editingField.field}
+                        />
+                    </DialogContent>
+                </Dialog>
             )}
 
             {dialogState.mode === 'delete' && dialogState.data && (

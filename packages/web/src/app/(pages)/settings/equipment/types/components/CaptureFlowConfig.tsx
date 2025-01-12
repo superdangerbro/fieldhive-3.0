@@ -32,6 +32,7 @@ export function CaptureFlowConfig({ config, onChange }: CaptureFlowConfigProps) 
                         <Checkbox
                             checked={config.requireBarcode}
                             onChange={(e) => handleChange('requireBarcode', e.target.checked)}
+                            disabled // Always require barcode for equipment capture
                         />
                     }
                     label="Require Barcode"
@@ -41,26 +42,21 @@ export function CaptureFlowConfig({ config, onChange }: CaptureFlowConfigProps) 
                         <Checkbox
                             checked={config.requirePhoto}
                             onChange={(e) => handleChange('requirePhoto', e.target.checked)}
+                            disabled // Always require photo for equipment capture
                         />
                     }
                     label="Require Photo"
                 />
-            </FormGroup>
-
-            <Box sx={{ mt: 2 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                    Photo Instructions
-                </Typography>
                 <TextField
+                    label="Photo Instructions"
+                    value={config.photoInstructions || ''}
+                    onChange={(e) => handleChange('photoInstructions', e.target.value)}
                     fullWidth
                     multiline
                     rows={2}
-                    value={config.photoInstructions || ''}
-                    onChange={(e) => handleChange('photoInstructions', e.target.value)}
-                    placeholder="Enter instructions for taking the photo (optional)"
-                    size="small"
+                    sx={{ mt: 2 }}
                 />
-            </Box>
+            </FormGroup>
         </Box>
     );
 }

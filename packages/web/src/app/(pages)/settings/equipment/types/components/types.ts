@@ -46,9 +46,6 @@ export interface FormField {
     conditions?: Condition[];  // Field-level conditions
     showWhen?: Condition[];   // Conditions that control field visibility
     config?: {
-        requireBarcode?: boolean;
-        requirePhoto?: boolean;
-        photoInstructions?: string;
         options?: string[];
         [key: string]: any;
     };
@@ -66,8 +63,6 @@ export interface EquipmentTypeConfig {
     value: string;
     label: string;
     fields: FormField[];
-    barcodeRequired?: boolean;
-    photoRequired?: boolean;
     inspectionConfig?: {
         sections: InspectionSection[];
     };

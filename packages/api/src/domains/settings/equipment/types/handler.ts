@@ -3,13 +3,20 @@ import { AppDataSource } from '../../../../config/database';
 import { Setting } from '../../entities/Setting';
 
 // Field types
-type FieldType = 'text' | 'number' | 'select' | 'checkbox' | 'textarea';
+type FieldType = 'text' | 'number' | 'select' | 'checkbox' | 'textarea' | 'capture-flow';
 
 interface BaseField {
     name: string;
     type: FieldType;
     required?: boolean;
     description?: string;
+    config?: {
+        requireBarcode?: boolean;
+        requirePhoto?: boolean;
+        photoInstructions?: string;
+        options?: string[];
+        [key: string]: any;
+    };
 }
 
 interface NumberField extends BaseField {
@@ -32,7 +39,16 @@ interface CheckboxField extends BaseField {
     type: 'checkbox';
 }
 
-type Field = NumberField | SelectField | TextField | CheckboxField;
+interface CaptureFlowField extends BaseField {
+    type: 'capture-flow';
+    config: {
+        requireBarcode: boolean;
+        requirePhoto: boolean;
+        photoInstructions: string;
+    };
+}
+
+type Field = NumberField | SelectField | TextField | CheckboxField | CaptureFlowField;
 
 interface EquipmentType {
     name: string;
@@ -53,7 +69,7 @@ function validateField(field: Record<string, any>): string[] {
     }
 
     // Validate field type
-    const validTypes: FieldType[] = ['text', 'number', 'select', 'checkbox', 'textarea'];
+    const validTypes: FieldType[] = ['text', 'number', 'select', 'checkbox', 'textarea', 'capture-flow'];
     if (!validTypes.includes(field.type)) {
         errors.push(`Invalid field type: ${field.type}. Must be one of: ${validTypes.join(', ')}`);
         return errors; // Return early since type-specific validation won't work
@@ -81,6 +97,24 @@ function validateField(field: Record<string, any>): string[] {
                     errors.push(`Option ${index + 1} must be a string`);
                 }
             });
+        }
+    }
+
+    if (field.type === 'capture-flow') {
+        if (!field.config) {
+            errors.push('Equipment capture field must have a config');
+            return errors;
+        }
+        
+        // Validate config structure
+        if (typeof field.config.requireBarcode !== 'boolean') {
+            errors.push('Equipment capture field must specify requireBarcode as boolean');
+        }
+        if (typeof field.config.requirePhoto !== 'boolean') {
+            errors.push('Equipment capture field must specify requirePhoto as boolean');
+        }
+        if (typeof field.config.photoInstructions !== 'string') {
+            errors.push('Equipment capture field must specify photoInstructions as string');
         }
     }
 

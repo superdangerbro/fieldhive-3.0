@@ -21,6 +21,9 @@ interface ApiFieldConfig {
     min?: number;
     max?: number;
     step?: number;
+    requireBarcode?: boolean;
+    requirePhoto?: boolean;
+    photoInstructions?: string;
 }
 
 interface ApiEquipmentType {
@@ -52,7 +55,9 @@ const transformApiField = (apiField: ApiFieldConfig): FormField => {
         label: apiField.name,
         type: apiField.type as any,
         required: apiField.required || false,
-        description: apiField.description
+        description: apiField.description,
+        showWhen: [],
+        config: {}
     };
 
     // Add config for select fields
@@ -76,10 +81,13 @@ const transformApiField = (apiField: ApiFieldConfig): FormField => {
         }
     }
 
-    // Validate the transformed field
-    const errors = validateFieldConfig(field);
-    if (errors.length > 0) {
-        console.warn('Field validation errors:', errors);
+    // Add config for capture-flow fields
+    if (apiField.type === 'capture-flow') {
+        field.config = {
+            requireBarcode: apiField.config?.requireBarcode ?? true,
+            requirePhoto: apiField.config?.requirePhoto ?? true,
+            photoInstructions: apiField.config?.photoInstructions ?? 'Take a clear photo of the equipment'
+        };
     }
 
     console.log('Transformed to field:', field);
@@ -99,43 +107,35 @@ const transformToApiField = (field: FormField): ApiFieldConfig => {
         'checkbox': 'checkbox',
         'textarea': 'textarea',
         'boolean': 'checkbox',
-        'slider': 'number',
-        'capture-flow': 'text' // Map capture-flow to text type
+        'capture-flow': 'capture-flow'
     };
-
-    // Validate the field before transforming
-    const errors = validateFieldConfig(field);
-    if (errors.length > 0) {
-        console.warn('Field validation errors:', errors);
-    }
 
     const apiField: ApiFieldConfig = {
         name: field.name,
-        type: typeMap[field.type] || 'text', // Default to text if type not found
-        required: field.required || false,
+        type: typeMap[field.type] || field.type,
+        required: field.required,
         description: field.description
     };
 
-    // Add type-specific configurations
-    if (field.type === 'select' && field.config && 'options' in field.config) {
+    // Copy options for select fields
+    if (field.type === 'select' && field.config?.options) {
         apiField.options = field.config.options;
     }
 
-    if (field.type === 'number' && field.config && !('options' in field.config)) {
-        if (field.config.min !== undefined) apiField.min = field.config.min;
-        if (field.config.max !== undefined) apiField.max = field.config.max;
-        if (field.config.step !== undefined) apiField.step = field.config.step;
+    // Copy number field constraints
+    if (field.type === 'number' && field.config) {
+        if ('min' in field.config) apiField.min = field.config.min;
+        if ('max' in field.config) apiField.max = field.config.max;
+        if ('step' in field.config) apiField.step = field.config.step;
     }
 
-    if (field.type === 'slider' && field.config) {
-        if (field.config.min !== undefined) apiField.min = field.config.min;
-        if (field.config.max !== undefined) apiField.max = field.config.max;
-        if (field.config.step !== undefined) apiField.step = field.config.step;
-    }
-
-    // Handle capture-flow specific config
-    if (field.type === 'capture-flow' && field.config) {
-        apiField.description = field.config.photoInstructions || field.description;
+    // Add capture-flow config
+    if (field.type === 'capture-flow') {
+        apiField.config = {
+            requireBarcode: true,
+            requirePhoto: true,
+            photoInstructions: 'Take a clear photo of the equipment'
+        };
     }
 
     console.log('Transformed to API field:', apiField);
@@ -154,12 +154,6 @@ const transformApiType = (apiType: ApiEquipmentType): EquipmentTypeConfig => {
         inspectionConfig: apiType.inspectionConfig
     };
 
-    // Validate the transformed type
-    const errors = validateEquipmentType(transformed);
-    if (errors.length > 0) {
-        console.warn('Equipment type validation errors:', errors);
-    }
-
     console.log('Transformed to:', transformed);
     return transformed;
 };
@@ -176,10 +170,10 @@ const transformToApiType = (type: EquipmentTypeConfig): ApiEquipmentType => {
 
     const transformed = {
         name: type.label || type.value,
-        fields: type.fields.map(transformToApiField),
+        fields: Array.isArray(type.fields) ? type.fields.map(transformToApiField) : [],
         barcodeRequired: type.barcodeRequired,
         photoRequired: type.photoRequired,
-        inspectionConfig: type.inspectionConfig
+        inspectionConfig: type.inspectionConfig || { sections: [] }
     };
 
     console.log('Transformed to API type:', transformed);
@@ -224,6 +218,7 @@ export const useUpdateEquipmentTypes = () => {
     const queryClient = useQueryClient();
 
     return useMutation<EquipmentTypeConfig, Error, EquipmentTypeConfig>({
+
         mutationFn: async (type) => {
             console.log('Updating equipment type with:', type);
             try {

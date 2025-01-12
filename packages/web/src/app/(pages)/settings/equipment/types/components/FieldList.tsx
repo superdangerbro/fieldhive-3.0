@@ -63,6 +63,10 @@ export function FieldList({
                 return 'Checkbox';
             case 'textarea':
                 return 'Text Area';
+            case 'capture-flow':
+                return 'Equipment Capture';
+            case 'boolean':
+                return 'Yes/No';
             default:
                 return field.type;
         }
@@ -184,8 +188,10 @@ export function FieldList({
                                 </Typography>
                             )}
                             
+
                             {renderFieldConfig(field)}
                             
+
                             {field.conditions && field.conditions.length > 0 && (
                                 <Box sx={{ mt: 2 }}>
                                     <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -206,8 +212,11 @@ export function FieldList({
                                         >
                                             <Typography variant="body2">
                                                 When field{' '}
+
                                                 <strong>{condition.field}</strong>{' '}
+
                                                 {condition.operator}{' '}
+
                                                 <strong>{condition.value}</strong>
                                                 {condition.makeRequired && (
                                                     <Typography 

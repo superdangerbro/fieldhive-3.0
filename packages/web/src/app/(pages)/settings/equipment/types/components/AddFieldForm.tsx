@@ -7,6 +7,8 @@ import {
     MenuItem,
     FormControl,
     InputLabel,
+    FormControlLabel,
+    Switch
 } from '@mui/material';
 import type { FormField } from './types';
 
@@ -15,7 +17,7 @@ const FIELD_TYPES = [
     { value: 'number', label: 'Number' },
     { value: 'boolean', label: 'Yes/No' },
     { value: 'select', label: 'Select' },
-    { value: 'capture-flow', label: 'Capture Flow' },
+    { value: 'capture-flow', label: 'Equipment Capture' },
 ] as const;
 
 interface AddFieldFormProps {
@@ -28,7 +30,7 @@ interface AddFieldFormProps {
 export function AddFieldForm({ onAdd, onCancel, existingFields, initialValues }: AddFieldFormProps) {
     const [field, setField] = React.useState<FormField>(() => {
         if (initialValues) {
-            console.log('Initializing with values:', initialValues); // Debug log
+            console.log('Initializing with values:', initialValues);
             return { ...initialValues };
         }
         return {
@@ -36,6 +38,7 @@ export function AddFieldForm({ onAdd, onCancel, existingFields, initialValues }:
             label: '',
             type: 'text',
             description: '',
+            required: false,
             showWhen: [],
             config: {}
         };
@@ -46,28 +49,40 @@ export function AddFieldForm({ onAdd, onCancel, existingFields, initialValues }:
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         
-        // Validate name
-        const normalizedName = field.name.toLowerCase().replace(/\s+/g, '_');
-        if (!normalizedName) {
-            setError('Name is required');
-            return;
-        }
-        
-        // Check for duplicates only if this is a new field or the name has changed
-        if (!initialValues || initialValues.name !== normalizedName) {
-            if (existingFields.includes(normalizedName)) {
-                setError('A field with this name already exists');
+        // Ensure capture-flow field has proper config
+        if (field.type === 'capture-flow') {
+            field.name = 'equipment_capture';
+            field.label = 'Equipment Capture';
+            field.description = 'Capture equipment barcode and photo';
+            field.required = true;
+            field.config = {
+                requireBarcode: true,
+                requirePhoto: true,
+                photoInstructions: 'Take a clear photo of the equipment'
+            };
+        } else {
+            // Only validate name for non-capture-flow fields
+            const normalizedName = field.name.toLowerCase().replace(/\s+/g, '_');
+            if (!normalizedName) {
+                setError('Name is required');
                 return;
             }
+            
+            // Check for duplicates only if this is a new field or the name has changed
+            if (!initialValues || initialValues.name !== normalizedName) {
+                if (existingFields.includes(normalizedName)) {
+                    setError('A field with this name already exists');
+                    return;
+                }
+            }
+            
+            field.name = normalizedName;
         }
 
-        console.log('Submitting field:', { ...field, name: normalizedName }); // Debug log
+        console.log('Submitting field:', field); // Debug log
         
         // Add field
-        onAdd({
-            ...field,
-            name: normalizedName
-        });
+        onAdd(field);
     };
 
     const handleTypeChange = (type: string) => {
@@ -76,10 +91,14 @@ export function AddFieldForm({ onAdd, onCancel, existingFields, initialValues }:
             
             // Add default config for specific types
             if (type === 'capture-flow') {
+                newField.name = 'equipment_capture';
+                newField.label = 'Equipment Capture';
+                newField.description = 'Capture equipment barcode and photo';
+                newField.required = true;
                 newField.config = {
                     requireBarcode: true,
                     requirePhoto: true,
-                    photoInstructions: ''
+                    photoInstructions: 'Take a clear photo of the equipment'
                 };
             } else if (type === 'select') {
                 newField.config = {
@@ -91,6 +110,7 @@ export function AddFieldForm({ onAdd, onCancel, existingFields, initialValues }:
             
             return newField;
         });
+        setError('');
     };
 
     return (
@@ -132,6 +152,17 @@ export function AddFieldForm({ onAdd, onCancel, existingFields, initialValues }:
                 </Select>
             </FormControl>
 
+            <FormControlLabel
+                control={
+                    <Switch
+                        checked={field.required || false}
+                        onChange={(e) => setField(prev => ({ ...prev, required: e.target.checked }))}
+                        disabled={field.type === 'capture-flow'} // Required is always true for capture-flow
+                    />
+                }
+                label="Required Field"
+            />
+
             <TextField
                 label="Description"
                 value={field.description || ''}
@@ -157,7 +188,7 @@ export function AddFieldForm({ onAdd, onCancel, existingFields, initialValues }:
                 />
             )}
 
-            {field.type === 'capture-flow' && (
+            {(field.type === 'capture-flow') && (
                 <>
                     <TextField
                         label="Photo Instructions"
