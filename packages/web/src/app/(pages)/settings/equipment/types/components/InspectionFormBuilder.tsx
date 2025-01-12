@@ -17,6 +17,7 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import type { InspectionSection, FormField, EquipmentTypeConfig, Condition } from './types';
 import { SelectFieldDialog } from '@/app/components/fields/SelectFieldDialog';
 import { FieldList } from './FieldList';
+import { crypto } from 'crypto';
 
 interface InspectionFormBuilderProps {
     equipmentType: EquipmentTypeConfig;
@@ -48,17 +49,29 @@ export function InspectionFormBuilder({ equipmentType, onSave }: InspectionFormB
     }, [equipmentType]);
 
     const handleAddSection = () => {
+        const newSection = {
+            id: crypto.randomUUID(),
+            title: `Section ${inspectionConfig.sections.length + 1}`,
+            order: inspectionConfig.sections.length,
+            fields: []
+        };
+
         setInspectionConfig(prev => ({
             ...prev,
-            sections: [
-                ...prev.sections,
-                {
-                    title: `Section ${prev.sections.length + 1}`,
-                    fields: []
-                }
-            ]
+            sections: [...prev.sections, newSection]
         }));
-        handleSave();
+        
+        const updatedType = {
+            ...equipmentType,
+            inspectionConfig: {
+                ...equipmentType.inspectionConfig,
+                sections: [
+                    ...(equipmentType.inspectionConfig?.sections || []),
+                    newSection
+                ]
+            }
+        };
+        onSave(updatedType);
     };
 
     const handleDeleteSection = (index: number) => {
